@@ -18,23 +18,25 @@ root.frame = Frame(root, height=50, bg="lightgrey")
 root.frame.pack(fill=X)
 
 # hamburger menu button
-hamburgerImage = Image.open(getAbsolutePath("media\\HamburgerIcon.png")
-                            )  # Replace with your image file path
+hamburgerImage = Image.open(getAbsolutePath("media\\HamburgerIcon.png"))  # Replace with your image file path
 resizedHamburgerImage = hamburgerImage.resize((45, 45))
 imgHamburger = ImageTk.PhotoImage(resizedHamburgerImage)
 Hamburger = tk.Button(root, border=0, width=50, height=48,
                       background="lightgrey", image=imgHamburger)
-Hamburger.place(x=0, y=0)
+Hamburger.place(relx=0.0, rely=0.0)
 
 
 # connection button
-connectionImage = Image.open(getAbsolutePath("media\\connect.png")
-                             )  # Replace with your image file path
+connectionImage = Image.open(getAbsolutePath("media\\connect.png"))  # Replace with your image file path
 resizedConnectionImage = connectionImage.resize((35, 20))
 imgConection = ImageTk.PhotoImage(resizedConnectionImage)
 Connect = tk.Button(root, image=imgConection, command=root.destroy)
-Connect.place(x=1400, y=15)
-
+Connect.place(relx=0.82, rely=0.02)
+# IP address Input
+ip_address_label = tk.Label(root, text="IP Address:")
+ip_address_label.place(relx=0.86, rely=0.02)
+ip_address_entry = tk.Entry(root)
+ip_address_entry.place(relx=0.91, rely=0.02)
 is_maximized = True
 # 'zoomed' werkt op Windows om het venster te maximaliseren
 root.state('zoomed')
