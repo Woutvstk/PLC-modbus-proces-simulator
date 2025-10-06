@@ -13,15 +13,27 @@ def getAbsolutePath(relativePath: str) -> str:
 # Maak een nieuw venster
 root = tk.Tk()
 root.title("PID Regelaar Tank")
+# toolbar
+root.frame = Frame(root, height=50, bg="lightgrey")
+root.frame.pack(fill=X)
+
+# hamburger menu button
+hamburgerImage = Image.open(getAbsolutePath("media\\HamburgerIcon.png")
+                            )  # Replace with your image file path
+resizedHamburgerImage = hamburgerImage.resize((45, 45))
+imgHamburger = ImageTk.PhotoImage(resizedHamburgerImage)
+Hamburger = tk.Button(root, border=0, width=50, height=48,
+                      background="lightgrey", image=imgHamburger)
+Hamburger.place(x=0, y=0)
 
 
-image = Image.open(getAbsolutePath("media\\connect.png")
-                   )  # Replace with your image file path
-resized_image = image.resize((35, 20))
-img = ImageTk.PhotoImage(resized_image)
-connectImage = tk.PhotoImage(file=getAbsolutePath("media\\connect.png"))
-Connect = tk.Button(root, image=img, command=root.destroy).pack()
-Connect.place(x=50, y=50)
+# connection button
+connectionImage = Image.open(getAbsolutePath("media\\connect.png")
+                             )  # Replace with your image file path
+resizedConnectionImage = connectionImage.resize((35, 20))
+imgConection = ImageTk.PhotoImage(resizedConnectionImage)
+Connect = tk.Button(root, image=imgConection, command=root.destroy)
+Connect.place(x=1400, y=15)
 
 is_maximized = True
 # 'zoomed' werkt op Windows om het venster te maximaliseren
