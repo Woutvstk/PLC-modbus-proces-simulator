@@ -1,18 +1,23 @@
 import tkinter as tk
+import pathlib, os
+
+def  getAbsolutePath (relativePath: str) -> str:
+    current_dir = pathlib.Path(__file__).parent.resolve()
+    return os.path.join(current_dir, relativePath)
+
+
+
 
 
 # Maak een nieuw venster
 root = tk.Tk()
 root.title("PID Regelaar Tank")
-connectImage = tk.PhotoImage(file="C:\connect.png")
+connectImage = tk.PhotoImage(file=getAbsolutePath("media\\connect.png"))
 Connect= tk.Button(root,image=connectImage, width=800,height= 500, command=root.destroy ).pack()
 
 
 
-# Gebruik windowed fullscreen (maximized) in plaats van echte fullscreen.
-# Dit houdt de titelbalk en taakbalk-gedrag meer zoals een normaal venster,
-# maar het venster vult wel het scherm (geschikt voor Windows).
-# F11 togglet gemaximaliseerd, Escape zet terug naar normaal.
+
 is_maximized = True
 root.state('zoomed')  # 'zoomed' werkt op Windows om het venster te maximaliseren
 
@@ -35,5 +40,6 @@ def exit_fullscreen(event=None):
 # Bind toetsen
 root.bind('<F11>', toggle_fullscreen)
 root.bind('<Escape>', exit_fullscreen)
+
 
 root.mainloop()
