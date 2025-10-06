@@ -10,23 +10,27 @@ root.title("PID Regelaar Tank")
 # maar het venster vult wel het scherm (geschikt voor Windows).
 # F11 togglet gemaximaliseerd, Escape zet terug naar normaal.
 is_maximized = True
-root.state('zoomed')  # 'zoomed' werkt op Windows om het venster te maximaliseren
+# 'zoomed' werkt op Windows om het venster te maximaliseren
+root.state('zoomed')
+
 
 def toggle_fullscreen(event=None):
-	"""Toggle windowed fullscreen / maximize (gebonden aan F11)."""
-	global is_maximized
-	if is_maximized:
-		root.state('normal')
-		is_maximized = False
-	else:
-		root.state('zoomed')
-		is_maximized = True
+    """Toggle windowed fullscreen / maximize (gebonden aan F11)."""
+    global is_maximized
+    if is_maximized:
+        root.state('normal')
+        is_maximized = False
+    else:
+        root.state('zoomed')
+        is_maximized = True
+
 
 def exit_fullscreen(event=None):
-	"""Zet het venster terug naar normaal (gebonden aan Escape)."""
-	global is_maximized
-	root.state('normal')
-	is_maximized = False
+    """Zet het venster terug naar normaal (gebonden aan Escape)."""
+    global is_maximized
+    root.state('normal')
+    is_maximized = False
+
 
 # Bind toetsen
 root.bind('<F11>', toggle_fullscreen)
