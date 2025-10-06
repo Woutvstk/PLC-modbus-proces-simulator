@@ -32,7 +32,8 @@ Hamburger.place(relx=0.0, rely=0.0)
 connectionImage = Image.open(getAbsolutePath("media\\connect.png"))
 resizedConnectionImage = connectionImage.resize((35, 20))
 imgConection = ImageTk.PhotoImage(resizedConnectionImage)
-Connect = tk.Button(root, image=imgConection, command=root.destroy)
+Connect = tk.Button(root, image=imgConection,
+                    background="lightgrey", command=root.destroy, border=0)
 Connect.place(relx=0.82, rely=0.02)
 # IP address Input
 ip_address_label = tk.Label(root, text="IP Address:", background="lightgrey")
