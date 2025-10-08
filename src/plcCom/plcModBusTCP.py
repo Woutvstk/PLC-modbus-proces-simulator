@@ -1,18 +1,19 @@
 from pymodbus.client import ModbusTcpClient
-
+import time
 
 class plcModBusTCP:
     """
-    Klasse voor Modbus TCP communicatie met een PLC.
+    Class for Modbus TCP communication with a PLC.
     """
 
     def __init__(self, ip: str, port: int = 502):
+        """Initialize the Modbus client with IP and port"""
         self.ip = ip
         self.port = port
         self.client = None
 
     def connect(self):
-        """Verbind met de Modbus server"""
+        """Connect to the Modbus server and reset registers if successful"""
         self.client = ModbusTcpClient(self.ip, port=self.port)
         if self.client.connect():
             print(f"Connected to Modbus server {self.ip}:{self.port}")
@@ -23,45 +24,62 @@ class plcModBusTCP:
             return False
 
     def disconnect(self):
-        """Verbinding afsluiten"""
+        """Close the connection to the Modbus server"""
         if self.client:
             self.client.close()
 
     def check(self):
-        """Herstel connectie indien verbroken"""
+        """Check connection and attempt to reconnect if broken"""
         if self.client is None or not self.client.is_socket_open():
-            try:
-                self.client.connect()
-            except Exception as e:
-                print("Can't reconnect to PLC:", e)
+            print("Connection lost to the PLC!")
+            for i in range(3):  # try reconnecting up to 3 times
+                try:
+                    self.client.connect()
+                except Exception as e:
+                    print("Reconnecting..." + str(i+1) + "/3")
+                time.sleep(2)
 
     def SetDI(self, index, value):
-        """Schrijf een digitale input (0/1) in de databank"""
+        """
+        Write a digital input (0/1) to the Modbus registers.
+        index: register index (0-15)
+        value: 0 or 1 (or True/False)
+        """
         self.check()
         if 0 <= index < 16:
             self.client.write_register(index, int(bool(value)))
-            return int(bool(value))   # geef int terug
+            return int(bool(value))  # return as int
         return 0
 
     def SetAI(self, index, value):
-        """Schrijf een analoge input (0-65535) in de databank"""
+        """
+        Write an analog input (0-65535) to the Modbus registers.
+        index: register index (16-31)
+        value: integer value
+        """
         self.check()
         if 16 <= index < 32:
-            val = int(value) & 0xFFFF
+            val = int(value) & 0xFFFF  # ensure 16-bit
             self.client.write_register(index, val)
             return val
         return 0
 
     def GetDO(self, index):
-        """Lees een digitale output (coil)"""
+        """
+        Read a digital output (coil) from the Modbus server.
+        index: coil index
+        """
         self.check()
         rr = self.client.read_coils(index, count=1)
         if rr.isError():
             return 0
-        return int(rr.bits[0])   # 0 of 1
+        return int(rr.bits[0])  # return 0 or 1
 
     def GetAO(self, index):
-        """Lees een analoge output (holding register)"""
+        """
+        Read an analog output (holding register) from the Modbus server.
+        index: register index
+        """
         self.check()
         rr = self.client.read_holding_registers(index + 32, count=1)
         if rr.isError():
@@ -69,7 +87,7 @@ class plcModBusTCP:
         return rr.registers[0]
 
     def reset_registers(self):
-        """Reset alle DI en AI registers naar 0"""
+        """Reset all DI and AI registers to 0"""
         for i in range(16):
-            self.client.write_register(i, 0)       # DI
-            self.client.write_register(i + 16, 0)  # AI
+            self.client.write_register(i, 0)       # reset DI registers
+            self.client.write_register(i + 16, 0)  # reset AI registers

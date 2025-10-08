@@ -1,18 +1,13 @@
 import snap7
 import snap7.util as s7util
+import time
 
 
 class plcS7:
-    """
-    Klasse voor communicatie met een Siemens S7 PLC via Snap7.
-    DB10 structuur:
-      - 0–15   : Digitale Inputs (DI)
-      - 16–31  : Digitale Outputs (DO)
-      - 0–15   : Analoge Inputs (AI)
-      - 0–15   : Analoge Outputs (AO)
-    """
+    """Class for communication with a Siemens S7 PLC using Snap7"""
 
-    def __init__(self, ip: str, rack: int = 0, slot: int = 1, tcpport: int = 102):
+    def __init__(self, ip: str, rack: int, slot: int, tcpport: int = 102):
+        """Initialize the PLC client with IP, rack, slot, and TCP port"""
         self.ip = ip
         self.rack = rack
         self.slot = slot
@@ -20,7 +15,7 @@ class plcS7:
         self.client = snap7.client.Client()
 
     def connect(self):
-        """Verbind met de PLC"""
+        """Connect to the PLC and reset registers if successful"""
         try:
             self.client.connect(self.ip, self.rack, self.slot, self.tcpport)
             if self.client.get_connected():
@@ -36,37 +31,33 @@ class plcS7:
             return False
 
     def disconnect(self):
+        """Disconnect from the PLC if the connection is active"""
         if self.client.get_connected():
             self.client.disconnect()
 
     def check(self):
+        """Check if the connection is alive and attempt reconnection if not"""
         if not self.client.get_connected():
-            try:
-                self.client.connect(self.ip, self.rack,
-                                    self.slot, self.tcpport)
-            except Exception as e:
-                print("Can't reconnect to PLC:", e)
-
-    # =====================
-    # Schrijven
-    # =====================
+            print("Connection lost to the PLC!")
+            for i in range(3):  # try reconnecting up to 3 times
+                try:
+                    self.client.connect(self.ip, self.rack,
+                                        self.slot, self.tcpport)
+                except Exception as e:  # e = error object
+                    print("Reconnecting..." + str(i+1) + "/3")
+            time.sleep(2)
 
     def SetDI(self, index, value, db_number=10):
-        if 0 <= index < 16:
+        """
+        Set a digital input (DI) to 0 or 1.
+        index: bit index (0-16)
+        value: True/False or 1/0
+        db_number: PLC data block
+        """
+        if 0 <= index < 17:
             self.check()
-            byte_index = index // 8
-            bit_index = index % 8
-            data = self.client.db_read(db_number, byte_index, 1)
-            s7util.set_bool(data, 0, bit_index, bool(value))
-            self.client.db_write(db_number, byte_index, data)
-            return int(bool(value))
-        return 0
-
-    def SetDO(self, index, value, db_number=10):
-        if 0 <= index < 16:
-            self.check()
-            byte_index = 2 + index // 8
-            bit_index = index % 8
+            byte_index = index // 8  # determine which byte contains the bit
+            bit_index = index % 8    # determine the bit position within the byte
             data = self.client.db_read(db_number, byte_index, 1)
             s7util.set_bool(data, 0, bit_index, bool(value))
             self.client.db_write(db_number, byte_index, data)
@@ -74,70 +65,53 @@ class plcS7:
         return 0
 
     def SetAI(self, index, value, db_number=10):
+        """
+        Set an analog input (AI) as a 16-bit integer.
+        index: input index (0-15)
+        value: value (0-65535)
+        db_number: PLC data block
+        """
         if 0 <= index < 16:
             self.check()
-            val = int(value) & 0xFFFF
-            byte_index = 4 + index * 2
+            val = int(value) & 0xFFFF  # ensure 16-bit
+            byte_index = 4 + index * 2  # each AI occupies 2 bytes
             data = bytearray(2)
             s7util.set_int(data, 0, val)
             self.client.db_write(db_number, byte_index, data)
             return val
-        return 0
-
-    def SetAO(self, index, value, db_number=10):
-        if 0 <= index < 16:
-            self.check()
-            val = int(value) & 0xFFFF
-            byte_index = 36 + index * 2
-            data = bytearray(2)
-            s7util.set_int(data, 0, val)
-            self.client.db_write(db_number, byte_index, data)
-            return val
-        return 0
-
-    # =====================
-    # Lezen
-    # =====================
-
-    def GetDI(self, index, db_number=10):
-        if 0 <= index < 16:
-            self.check()
-            byte_index = index // 8
-            bit_index = index % 8
-            data = self.client.db_read(db_number, byte_index, 1)
-            return int(s7util.get_bool(data, 0, bit_index))
         return 0
 
     def GetDO(self, index, db_number=10):
+        """
+        Read a digital output (DO).
+        index: output index (0-15)
+        db_number: PLC data block
+        """
         if 0 <= index < 16:
             self.check()
-            byte_index = 2 + index // 8
-            bit_index = index % 8
+            byte_index = 2 + index // 8  # determine which byte contains the bit
+            bit_index = index % 8         # determine the bit position within the byte
             data = self.client.db_read(db_number, byte_index, 1)
             return int(s7util.get_bool(data, 0, bit_index))
         return 0
 
-    def GetAI(self, index, db_number=10):
-        if 0 <= index < 16:
-            self.check()
-            byte_index = 4 + index * 2
-            data = self.client.db_read(db_number, byte_index, 2)
-            return s7util.get_int(data, 0)
-        return 0
-
     def GetAO(self, index, db_number=10):
+        """
+        Read an analog output (AO) as a 16-bit integer.
+        index: output index (0-15)
+        db_number: PLC data block
+        """
         if 0 <= index < 16:
             self.check()
-            byte_index = 36 + index * 2
+            byte_index = 36 + index * 2  # each AO occupies 2 bytes
             data = self.client.db_read(db_number, byte_index, 2)
             return s7util.get_int(data, 0)
         return 0
-
-    # =====================
-    # Reset
-    # =====================
 
     def reset_registers(self, db_number=10):
-        """Reset alle DI/DO/AI/AO naar 0"""
-        data = bytearray(68)  # DB10 is 68 bytes groot
+        """
+        Reset all registers in the data block to 0.
+        db_number: PLC data block
+        """
+        data = bytearray(68)  # create zeroed byte array for reset
         self.client.db_write(db_number, 0, data)

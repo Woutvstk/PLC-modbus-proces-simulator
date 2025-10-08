@@ -6,24 +6,15 @@ import time
 """Initialize process0 object"""
 
 process0 = tankSim("process0", 2000, 250, 135)
-process0.simStart()
 
-""""Initialize plc communication object"""
+Protocol = "S7"   # of "ModBusTCP"
 
-if "Protocol" == "ModBusTCP":
+if Protocol == "ModBusTCP":
     PlcCom = plcModBusTCP("192.168.111.80", 502)
-elif "Protocol" == "S7" or True == True:
-    # IP address, rack, slot (from HW settings)
+elif Protocol == "S7":
     PlcCom = plcS7("192.168.111.80", 0, 1)
 
 PlcCom.connect()
-PlcCom.reset_registers()
-
-DI = [0]*16
-DO = [0]*16
-AI = [0]*16
-AO = [0]*16
-
 
 # remember at what time we started
 startTime = time.time()
@@ -33,13 +24,8 @@ while True:
 
     # print out the current time since start and the current liquid level
     print(
-        f"At time: {int(time.time() - startTime)}, Current liquid level: {int(process0.liquidVolume)}")
+    '''Examples of using the plcCom class'''
 
-    # only print out status every second
-    time.sleep(1)
-
-    # during the first 10 seconds: let liquid flow in the tank
-    if ((time.time() - startTime) < 10):
         process0.valveInOpen = True
         process0.valveOutOpen = False
 
@@ -47,21 +33,18 @@ while True:
     elif (10 < (time.time() - startTime) < 20):
         process0.valveInOpen = False
         process0.valveOutOpen = True
+    print("Setting analog inputs...")
+    PlcCom.SetAI(0, 12345)  # Set AI0 (register 16) to 12345
+    PlcCom.SetAI(15, 30000)  # Set AI15 (register 17) to 30000
 
-    # after 20 close both valves
-    else:
-        process0.valveInOpen = False
-        process0.valveOutOpen = False
+    #  Read digital outputs (DO)
+    print("Reading digital outputs...")
+    do0 = PlcCom.GetDO(0)
+    do1 = PlcCom.GetDO(1)
 
-    for i in range(16):
-        DI[i] = PlcCom.SetDI(i, 1)
-        AI[i] = PlcCom.SetAI(i, 1)
-        DO[i] = PlcCom.GetDO(i)
-        AO[i] = PlcCom.GetAO(i)
+    #  Read analog outputs (AO)
+    print("Reading analog outputs...")
+    ao0 = PlcCom.GetAO(0)
+    ao1 = PlcCom.GetAO(1)
 
-    # Debug
-    print(f"DI={list(DI)}")
-    print(f"DO={list(DO)}")
-    print(f"AI={list(AI)}")
-    print(f"AO={list(AO)}")
-    print("-"*50)
+    time.sleep(1.5)
