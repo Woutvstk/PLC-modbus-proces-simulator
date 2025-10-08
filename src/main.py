@@ -5,7 +5,6 @@ import time
 
 """Initialize process0 object"""
 
-process0 = tankSim("process0", 2000, 250, 135)
 
 Protocol = "S7"   # of "ModBusTCP"
 
@@ -16,23 +15,17 @@ elif Protocol == "S7":
 
 PlcCom.connect()
 
-# remember at what time we started
-startTime = time.time()
-
 
 while True:
 
-    # print out the current time since start and the current liquid level
-    print(
     '''Examples of using the plcCom class'''
 
-        process0.valveInOpen = True
-        process0.valveOutOpen = False
+    # 3️Set some digital inputs
+    print("Setting digital inputs...")
+    PlcCom.SetDI(0, 1)  # Set DI0 to 1 (ON)
+    PlcCom.SetDI(1, 0)  # Set DI1 to 0 (OFF)
 
-    # during 10 to 20 seconds: let liquid flow out of the tank
-    elif (10 < (time.time() - startTime) < 20):
-        process0.valveInOpen = False
-        process0.valveOutOpen = True
+    # Set some analog inputs
     print("Setting analog inputs...")
     PlcCom.SetAI(0, 12345)  # Set AI0 (register 16) to 12345
     PlcCom.SetAI(15, 30000)  # Set AI15 (register 17) to 30000
