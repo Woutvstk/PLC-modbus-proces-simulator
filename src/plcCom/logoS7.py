@@ -4,11 +4,11 @@ import snap7
 class logoS7:
     """Class for communication with a Siemens S7 PLC using Snap7"""
 
-    def __init__(self, ip: str, tasplogo: int, tsapServer: int, tcpport: int = 102):
+    def __init__(self, ip: str, tsapLogo: int, tsapServer: int, tcpport: int = 102):
         """Initialize the PLC logo with IP, rack, slot, and TCP port"""
         self.ip = ip
-        self.tasplogo = tasplogo
-        self.taspServer = tsapServer
+        self.tsaplogo = tsapLogo
+        self.tsapServer = tsapServer
         self.tcpport = tcpport
         self.logo = snap7.logo.Logo()
 
@@ -17,10 +17,10 @@ class logoS7:
         ### <ip_address, tsap_snap7 (logo) 03.00 = 0x0300, tsap_logo (server) 20.00 = 0x2000>
         try:
             self.logo.create()
-            self.logo.connect(self.ip, self.tasplogo, self.taspServer)
+            self.logo.connect(self.ip, self.tsapLogo, self.tsapServer)
             if self.logo.get_connected():
                 print(
-                    f"Connected to S7 LOGO at {self.ip}:{self.tcpport} (tsaplogo {self.tasplogo}, tsapServer {self.taspServer})")
+                    f"Connected to S7 LOGO at {self.ip}:{self.tcpport} (tsaplogo {self.taspLogo}, tsapServer {self.taspServer})")
                 return True
             else:
                 print(f"Cannot connect to S7 LOGO! at {self.ip}")

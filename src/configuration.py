@@ -10,12 +10,12 @@ class configuration:
         Plc connection settings
         """
         self.plcProtocol: str = "logoS7"
-        self.plcIpAdress: str = "192.168.111.01"
+        self.plcIpAdress: str = "192.168.111.1"
         self.plcPort: int = 502
         self.plcRack: int = 0
         self.plcSlot: int = 1
-        self.taspLogo: int = 0x0300
-        self.taspServer: int = 0x2000
+        self.tsapLogo: int = 0x0300
+        self.tsapServer: int = 0x2000
         """
         IO settings
         """
