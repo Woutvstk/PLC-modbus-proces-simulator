@@ -76,7 +76,8 @@ while True:
             # IP address, rack, slot (from HW settings)
             PlcCom = plcS7(config.plcIpAdress, config.plcRack, config.plcSlot)
         elif config.plcProtocol == "logoS7":
-            PlcCom = logoS7(config.plcIpAdress, config.taspLogo, config.taspServer)
+            PlcCom = logoS7(config.plcIpAdress,
+                            config.tsapLogo, config.tsapServer)
         else:
             print("Error: no valid plcProtocol")
 

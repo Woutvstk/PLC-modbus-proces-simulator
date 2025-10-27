@@ -1,5 +1,6 @@
 import snap7
-#https://python-snap7.readthedocs.io/en/1.0/logo.html
+# https://python-snap7.readthedocs.io/en/1.0/logo.html
+
 
 class logoS7:
     """Class for communication with a Siemens S7 PLC using Snap7"""
@@ -7,20 +8,20 @@ class logoS7:
     def __init__(self, ip: str, tsapLogo: int, tsapServer: int, tcpport: int = 102):
         """Initialize the PLC logo with IP, rack, slot, and TCP port"""
         self.ip = ip
-        self.tsaplogo = tsapLogo
+        self.tsapLogo = tsapLogo
         self.tsapServer = tsapServer
         self.tcpport = tcpport
         self.logo = snap7.logo.Logo()
 
     def connect(self):
         """Connect to the LOGO"""
-        ### <ip_address, tsap_snap7 (logo) 03.00 = 0x0300, tsap_logo (server) 20.00 = 0x2000>
+        # <ip_address, tsap_snap7 (logo) 03.00 = 0x0300, tsap_logo (server) 20.00 = 0x2000>
         try:
             self.logo.create()
             self.logo.connect(self.ip, self.tsapLogo, self.tsapServer)
             if self.logo.get_connected():
                 print(
-                    f"Connected to S7 LOGO at {self.ip}:{self.tcpport} (tsaplogo {self.taspLogo}, tsapServer {self.taspServer})")
+                    f"Connected to S7 LOGO at {self.ip}:{self.tcpport} (tsaplogo {self.tsapLogo}, tsapServer {self.tsapServer})")
                 return True
             else:
                 print(f"Cannot connect to S7 LOGO! at {self.ip}")
@@ -53,7 +54,7 @@ class logoS7:
             byte_index = index // 8  # determine which byte contains the bit
             bit_index = index % 8    # determine the bit position within the byte
             address = "V" + str(byte_index) + "." + str(bit_index)
-            self.logo.write(address,value)
+            self.logo.write(address, value)
             return int(bool(value))
         return 0
 
@@ -65,7 +66,7 @@ class logoS7:
         """
         if 0 <= index < 16:
             val = int(value) & 0xFFFF  # ensure 16-bit
-            byte_index = 4 + index *2  # each AI occupies 2 bytes 
+            byte_index = 4 + index * 2  # each AI occupies 2 bytes
             address = "VW" + str(byte_index)
             self.logo.write(address, val)
             return val
@@ -81,7 +82,7 @@ class logoS7:
             bit_index = index % 8  # determine the bit position within the byte
             address = "V" + str(byte_index) + "." + str(bit_index)
             data = self.logo.read(address)
-            return int(bool(data)) 
+            return int(bool(data))
         return 0
 
     def GetAO(self, index):
@@ -100,12 +101,11 @@ class logoS7:
         """
         Reset all registers in the data block to 0.
         """
-        for i in range(0,3):
-            for j in range(0,7):
+        for i in range(0, 3):
+            for j in range(0, 7):
                 address = "V" + str(j) + "." + str(i)
                 self.logo.write(address, 0)
 
-        for i in range(4,68):
+        for i in range(4, 68):
             address = "VW" + str(i)
             self.logo.write(address, 0)
-
