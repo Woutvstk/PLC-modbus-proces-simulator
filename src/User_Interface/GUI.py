@@ -3,25 +3,36 @@ import pathlib
 import os
 from PIL import Image, ImageTk
 import math
+from configuration import configurationClass
+from status import statusClass
 
 navColor = '#383838'
 
+defaultStatus = statusClass()
+defaultConfig = configurationClass()
+
+# flag to notify the rest of the program that the gui has been closed
+exitProgram = False
+
 # Global state variables
-inlet_valve = 0  # 0-100%
-outlet_valve = 0  # 0-100%
-heating_power = 0  # 0-100%
-water_level = 1500  # mm (0-2000)
-target_level = 1000  # mm - gewenste waterniveau
-temperature = 20.0  # °C - water temperature
-tank_volume = 2000  # mm max height
-flow_rate = 100  # l/min
+inlet_valve = defaultStatus.valveInOpenFraction*100  # 0-100%
+outlet_valve = defaultStatus.valveOutOpenFraction*100  # 0-100%
+heating_power = defaultStatus.heaterPowerFraction*100  # 0-100%
+water_level = defaultStatus.liquidVolume  # liters
+target_level = 1000  # liters - gewenste waterniveau
+temperature = defaultStatus.liquidTemperature  # °C - water temperature
+tank_volume = defaultConfig.tankVolume  # liters
+flow_rate_in = defaultStatus.flowRateIn
+TryConnectPending = False
+ip_adress = defaultConfig.plcIpAdress
+
 
 SaveKleur = "blue"
 SaveBreedte = 1000
 SaveHoogte = 2000
 SaveDebiet = 100
 SaveDichtheid = 997
-SaveControler = "Logo"
+SaveControler = "ModBusTCP"
 SaveKlepen = 1
 SaveWeerstand = 1
 SaveHoogtemeting = 1
@@ -56,18 +67,24 @@ class MainScherm:
         main.conFrame.place(relwidth=1.0, x=50, y=4)
 
         connectButton = tk.Button(main.conFrame, text="Connect",
-                                  bg=conColor, activebackground=conColor, fg="white")
+                                  bg=conColor, activebackground=conColor, fg="white", command=main.setTryConnect)
         connectButton.place(x=830, y=10)
-        AdresLabel = tk.Label(main.conFrame, text="IP Adress:",
-                              bg=conColor, fg="White", font=("Arial", 10))
-        AdresLabel.place(x=900, y=10)
-        Adres = tk.Entry(main.conFrame, bg=conColor,
-                         fg="White", font=("Arial", 10))
-        Adres.place(x=970, y=12.5)
-        Adres.insert(0, "192.168.111.10")
+
+        main.AdresLabel = tk.Label(main.conFrame, text="IP Adress:",
+                                   bg=conColor, fg="White", font=("Arial", 10))
+        main.AdresLabel.place(x=900, y=10)
+        main.Adres = tk.Entry(main.conFrame, bg=conColor,
+                              fg="White", font=("Arial", 10))
+        main.Adres.place(x=970, y=12.5)
+        main.Adres.insert(0, "192.168.111.10")
 
         main.MainFrame = tk.Frame(main.root, bg="white")
         main.MainFrame.place(relwidth=1.0, relheight=1.0, x=50, y=50)
+
+    def setTryConnect(self):
+        global TryConnectPending, ip_adress
+        ip_adress = self.Adres.get()
+        TryConnectPending = True
 
 
 class TankScherm:
@@ -125,7 +142,7 @@ class TankScherm:
             # Flow arrow
             main.canvas.create_line(150, pipe_y_top + 10, 200, pipe_y_top + 10,
                                     arrow=tk.LAST, fill="black", width=3)
-            main.canvas.create_text(120, pipe_y_top - 10, text=f"{flow_rate} L/min",
+            main.canvas.create_text(120, pipe_y_top - 10, text=f"{flow_rate_in} L/min",
                                     font=("Arial", 9, "bold"))
 
         # Inlet valve (triangles pointing at each other)
@@ -385,17 +402,26 @@ class TankScherm:
         global inlet_valve, outlet_valve, heating_power, target_level
 
         try:
-            inlet_valve = max(0, min(100, int(main.inlet_entry.get())))
-            outlet_valve = max(0, min(100, int(main.outlet_entry.get())))
-            heating_power = max(0, min(100, int(main.heating_entry.get())))
+            inlet_valve = max(0, min(100, float(main.inlet_entry.get())))
+            outlet_valve = max(0, min(100, float(main.outlet_entry.get())))
+            heating_power = max(0, min(100, float(main.heating_entry.get())))
             target_level = max(
-                0, min(tank_volume, int(main.target_entry.get())))
+                0, min(tank_volume, float(main.target_entry.get())))
 
             # Redraw the system
             main.draw_system()
 
         except ValueError:
             print("Invalid input - please enter valid numbers")
+
+    def redrawTank(self):
+        # Redraw and update displays
+        self.draw_system()
+        self.canvas.itemconfig(self.level_label, text=f"{int(water_level)} mm")
+        self.canvas.itemconfig(self.temp_label, text=f"{int(temperature)}°C")
+
+        # Schedule next update
+        self.update_id = self.canvas.after(100, self.redrawTank)
 
     def toggle_simulation(main):
         """Start or stop the simulation"""
@@ -407,50 +433,7 @@ class TankScherm:
         else:
             main.is_running = True
             main.start_stop_btn.config(text="Stop Simulation", bg="#F44336")
-            main.update_water_level()
-
-    def update_water_level(main):
-        """Update water level and temperature based on valve positions and heating"""
-        global water_level, temperature
-
-        if not main.is_running:
-            return
-
-        # Calculate flow rates (10x faster than before)
-        # Inlet adds water, outlet removes water
-        inlet_flow = (inlet_valve / 100) * flow_rate * 10  # L/min * 10
-        outlet_flow = (outlet_valve / 100) * flow_rate * 0.8 * 10  # L/min * 10
-
-        # Convert L/min to mm change
-        tank_area_m2 = (SaveBreedte / 1000) ** 2  # m²
-
-        # Net flow in L/min
-        net_flow = inlet_flow - outlet_flow
-
-        # Convert to mm change per update (every 100ms = 0.1s)
-        volume_change = net_flow * 0.001 / 60 * 0.1  # m³
-        height_change = (volume_change / tank_area_m2) * 1000  # mm
-
-        # Update water level
-        water_level = max(0, min(tank_volume, water_level + height_change))
-
-        # Update temperature based on heating power
-        ambient_temp = 20  # °C
-        # °C per update (max 0.5°C per 100ms)
-        heating_rate = (heating_power / 100) * 0.5
-        cooling_rate = (temperature - ambient_temp) * 0.01  # Natural cooling
-
-        temperature += heating_rate - cooling_rate
-        temperature = max(ambient_temp, min(100, temperature)
-                          )  # Between 20°C and 100°C
-
-        # Redraw and update displays
-        main.draw_system()
-        main.canvas.itemconfig(main.level_label, text=f"{int(water_level)} mm")
-        main.canvas.itemconfig(main.temp_label, text=f"{int(temperature)}°C")
-
-        # Schedule next update
-        main.update_id = main.canvas.after(100, main.update_water_level)
+            main.redrawTank()
 
 
 class SettingsScherm:
@@ -479,7 +462,7 @@ class SettingsScherm:
         SoortControlerlabel.grid(row=0, column=0, sticky="e")
         SoortControler = tk.StringVar()
         soortControlerMenu = tk.OptionMenu(
-            SettingsFrame, SoortControler, "Logo", "S7 - 1200 PLC", "PLC Simulator")
+            SettingsFrame, SoortControler, "ModBusTCP", "plcS7", "logoS7")
         soortControlerMenu.grid(row=0, column=1, sticky="ew")
         SoortControler.set(SaveControler)
 
@@ -643,8 +626,48 @@ kleuren = [
 ]
 
 
-root = tk.Tk()
-Main = MainScherm(root)
-nav = NavigationFrame(root, Main.MainFrame)
-Tank = TankScherm(Main.MainFrame)
-root.mainloop()
+class GuiClass:
+
+    def __init__(self) -> None:
+
+        self.root = tk.Tk()
+        # when window is closed, stop the rest of the program
+        self.root.protocol("WM_DELETE_WINDOW", self.onExit)
+        self.Main = MainScherm(self.root)
+        self.nav = NavigationFrame(self.root, self.Main.MainFrame)
+        self.Tank = TankScherm(self.Main.MainFrame)
+
+    def updateGui(self) -> None:
+        self.root.update_idletasks()
+        self.root.update()
+
+    def updateData(self, config: configurationClass, status: statusClass) -> None:
+        global heating_power, inlet_valve, outlet_valve, water_level, tank_volume, temperature
+        global exitProgram, TryConnectPending, ip_adress, SaveControler
+
+        # write data to status and config
+        config.plcProtocol = SaveControler
+        config.doExit = exitProgram
+        status.simRunning = self.Tank.is_running
+        config.tankVolume = tank_volume
+        if (TryConnectPending):
+            config.plcIpAdress = ip_adress
+            config.tryConnect = True  # set flag
+            TryConnectPending = False  # clear flag
+
+        # only write if guiControl
+        if (config.plcGuiControl == "gui"):
+            status.valveInOpenFraction = inlet_valve/100
+            status.valveOutOpenFraction = outlet_valve/100
+            status.heaterPowerFraction = heating_power/100
+
+        # read data from status and config
+        water_level = status.liquidVolume
+        temperature = status.liquidTemperature
+        inlet_valve = status.valveInOpenFraction*100
+        outlet_valve = status.valveOutOpenFraction*100
+        heating_power = status.heaterPowerFraction*100
+
+    def onExit(self) -> None:
+        global exitProgram
+        exitProgram = True

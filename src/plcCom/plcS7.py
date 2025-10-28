@@ -1,5 +1,14 @@
 import snap7
 import snap7.util as s7util
+from configuration import configurationClass
+from status import statusClass
+
+plcAnalogMax = 32767
+
+
+def mapValue(oldMin: int, oldMax: int, newMin: int, newMax: int, old: float) -> float:
+    return (old-oldMin)*(newMax-newMin)/(oldMax-oldMin)+newMin
+
 
 class plcS7:
     """Class for communication with a Siemens S7 PLC using Snap7"""
@@ -100,6 +109,37 @@ class plcS7:
             data = self.client.db_read(db_number, byte_index, 2)
             return s7util.get_int(data, 0)
         return 0
+
+    def updateData(self, config: configurationClass, status: statusClass):
+        # only update status if controller by plc
+        if (config.plcGuiControl == "plc"):
+            if (self.GetDO(config.DQValveIn)):  # if DQ valveIn = 1, ignore analog setpoint
+                status.valveInOpenFraction = 1
+            else:
+                status.valveInOpenFraction = mapValue(
+                    0, plcAnalogMax, 0, 1, self.GetAO(config.AQValveInFraction))
+
+            if (self.GetDO(config.DQValveOut)):  # if DQ valveOut = 1, ignore analog setpoint
+                status.valveOutOpenFraction = 1
+            else:
+                status.valveOutOpenFraction = mapValue(
+                    0, plcAnalogMax, 0, 1, self.GetAO(config.AQValveOutFraction))
+
+            if (self.GetDO(config.DQHeater)):  # if DQ heater = 1, ignore analog setpoint
+                status.heaterPowerFraction = 1
+            else:
+                status.heaterPowerFraction = self.GetAO(
+                    config.AQHeaterFraction)
+
+        # always set PLC inputs even if gui controls process
+        self.SetDI(config.DILevelSensorHigh,
+                   status.digitalLevelSensorHighTriggered)
+        self.SetDI(config.DILevelSensorLow,
+                   status.digitalLevelSensorLowTriggered)
+        self.SetAI(config.AILevelSensor, mapValue(
+            0, status.tankVolume, 0, plcAnalogMax, status.liquidVolume))
+        self.SetAI(config.AITemperatureSensor, mapValue(-50, 250,
+                   0, plcAnalogMax, status.liquidTemperature))
 
     def reset_registers(self, db_number=10):
         """

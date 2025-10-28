@@ -1,14 +1,21 @@
 
-class configuration:
+
+class configurationClass:
 
     """
     Contructor: create configuration object with default parameters
     """
 
     def __init__(self):
+
+        # control process trough gui or plc
+        # written by: gui
+        self.plcGuiControl = "gui"  # options: gui/plc
+        self.doExit = False
         """
         Plc connection settings
         """
+        # written by: gui
         self.plcProtocol: str = "logoS7"
         self.plcIpAdress: str = "192.168.111.1"
         self.plcPort: int = 502
@@ -16,6 +23,8 @@ class configuration:
         self.plcSlot: int = 1
         self.tsapLogo: int = 0x0300
         self.tsapServer: int = 0x2000
+        # set True by gui, set False by main
+        self.tryConnect: bool = False
         """
         IO settings
         """
@@ -41,7 +50,27 @@ class configuration:
         """
         Simulation settings
         """
-
+        self.simulationInterval = 0.2  # in seconds
         """
-        UI settings
+        process settings
         """
+        self.tankVolume = 200
+        self.valveInMaxFlow = 5
+        self.valveOutMaxFlow = 2
+        self.ambientTemp = 21
+        # default at 90%
+        self.digitalLevelSensorHighTriggerLevel = 0.9 * self.tankVolume
+        # default at 10%
+        self.digitalLevelSensorLowTriggerLevel = 0.1 * self.tankVolume
+        # heater power in watts
+        self.heaterMaxPower = 10000
+        # tank heat loss
+        self.tankHeatLoss = 150
+        # specific heat capacity in Joeles/Kg*°C (4186 for water)
+        self.liquidSpecificHeatCapacity: float = 4186
+        # specific weight in kg per liter (water: 1)
+        self.liquidSpecificWeight: float = 1
+        # initialize liquid temp at ambient
+        self.liquidTemperature = self.ambientTemp
+        # boiling temperature of liquid (water: 100)
+        self.liquidBoilingTemp = 100

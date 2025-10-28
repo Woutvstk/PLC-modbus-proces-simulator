@@ -1,4 +1,6 @@
 import snap7
+from configuration import configurationClass
+from status import statusClass
 # https://python-snap7.readthedocs.io/en/1.0/logo.html
 
 
@@ -39,7 +41,6 @@ class logoS7:
     def isConnected(self) -> bool:
         """check if the connection is alive and attempt reconnection if not"""
         if not self.logo.get_connected():
-            print("Connection lost to the LOGO!")
             return False
         else:
             return True
@@ -96,6 +97,37 @@ class logoS7:
             data = self.logo.read(address)
             return int(data)
         return 0
+
+    def updateData(self, config: configurationClass, status: statusClass):
+        # only update status if controller by plc
+        if (config.plcGuiControl == "plc"):
+            if (self.GetDO(config.DQValveIn)):  # if DQ valveIn = 1, ignore analog setpoint
+                status.valveInOpenFraction = 1
+            else:
+                status.valveInOpenFraction = mapValue(
+                    0, plcAnalogMax, 0, 1, self.GetAO(config.AQValveInFraction))
+
+            if (self.GetDO(config.DQValveOut)):  # if DQ valveOut = 1, ignore analog setpoint
+                status.valveOutOpenFraction = 1
+            else:
+                status.valveOutOpenFraction = mapValue(
+                    0, plcAnalogMax, 0, 1, self.GetAO(config.AQValveOutFraction))
+
+            if (self.GetDO(config.DQHeater)):  # if DQ heater = 1, ignore analog setpoint
+                status.heaterPowerFraction = 1
+            else:
+                status.heaterPowerFraction = self.GetAO(
+                    config.AQHeaterFraction)
+
+        # always set PLC inputs even if gui controls process
+        self.SetDI(config.DILevelSensorHigh,
+                   status.digitalLevelSensorHighTriggered)
+        self.SetDI(config.DILevelSensorLow,
+                   status.digitalLevelSensorLowTriggered)
+        self.SetAI(config.AILevelSensor, mapValue(
+            0, status.tankVolume, 0, plcAnalogMax, status.liquidVolume))
+        self.SetAI(config.AITemperatureSensor, mapValue(-50, 250,
+                   0, plcAnalogMax, status.liquidTemperature))
 
     def reset_registers(self, db_number=10):
         """
