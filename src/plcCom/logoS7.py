@@ -131,7 +131,7 @@ class logoS7:
         self.SetDI(config.DILevelSensorLow,
                    status.digitalLevelSensorLowTriggered)
         self.SetAI(config.AILevelSensor, mapValue(
-            0, status.tankVolume, 0, plcAnalogMax, status.liquidVolume))
+            0, config.tankVolume, 0, plcAnalogMax, status.liquidVolume))
         self.SetAI(config.AITemperatureSensor, mapValue(-50, 250,
                    0, plcAnalogMax, status.liquidTemperature))
 
