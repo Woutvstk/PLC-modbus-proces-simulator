@@ -4,15 +4,15 @@ import csv
 class statusClass:
     def __init__(self):
         # valve IN status
-        # written by: plc or gui
+        # written by: plc, gui or import
         self.valveInOpenFraction: float = 0
 
         # valve OUT status
-        # written by: plc or gui
+        # written by: plc, gui or import
         self.valveOutOpenFraction: float = 0
 
         # heating element status
-        # written by: plc or gui
+        # written by: plc, gui or import
         self.heaterPowerFraction: float = 0
 
         # digital level sensor status
@@ -21,10 +21,10 @@ class statusClass:
         self.digitalLevelSensorHighTriggered: bool = False
 
         # liquid parameters
-        # written by: procesSim
+        # written by: procesSim, import
         self.liquidVolume = 100
         # initialize liquid temp
-        # written by: procesSim
+        # written by: procesSim, import
         self.liquidTemperature = 0
 
         # simulation status
@@ -52,6 +52,7 @@ class statusClass:
                 writer.writerow(["variable", "value"])
             writer.writerow(["valveInOpenFraction", self.valveInOpenFraction])
             writer.writerow(["heaterPowerFraction", self.heaterPowerFraction])
+            writer.writerow(["liquidVolume", self.liquidVolume])
             file.close
 
     # Read status back from the CSV file
@@ -60,7 +61,9 @@ class statusClass:
             reader = csv.DictReader(file)
             for row in reader:
                 if row["variable"] == "valveInOpenFraction":
-                    self.valveInOpenFraction = int(row["value"])
+                    self.valveInOpenFraction = float(row["value"])
                 elif row["variable"] == "heaterPowerFraction":
-                    self.heaterPowerFraction = int(row["value"])
+                    self.heaterPowerFraction = float(row["value"])
+                elif row["variable"] == "liquidVolume":
+                    self.liquidVolume = float(row["value"])
         print(f"Status loaded from: {importFileName}")

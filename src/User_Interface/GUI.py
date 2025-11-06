@@ -695,30 +695,39 @@ class GuiClass:
             status.valveOutOpenFraction = outlet_valve/100
             status.heaterPowerFraction = heating_power/100
 
-        # read data from status and config
+        # define csv fileType for filedialog functions
+        csvFileType = [
+            ('Comma-separated values', '*.csv'), ('All Files', '*.*'),]
+
+        # overwrite config and status after other changes done by gui
+        if (importCommand):
+            file = filedialog.askopenfilename(
+                filetypes=csvFileType, defaultextension=csvFileType)
+            # only try to import when the was a file selected
+            if (file):
+                config.loadFromFile(file)
+                status.loadFromFile(file)
+            importCommand = False  # reset import command flag
+
+        # read data from status and config (can include our imported changes)
         water_level = status.liquidVolume
         temperature = status.liquidTemperature
         inlet_valve = status.valveInOpenFraction*100
         outlet_valve = status.valveOutOpenFraction*100
         heating_power = status.heaterPowerFraction*100
 
-        csvFileType = [
-            ('Comma-separated values', '*.csv'), ('All Files', '*.*'),]
-
+        # export status and config after all changes are done
         if (exportCommand):
             file = filedialog.asksaveasfilename(
                 filetypes=csvFileType, defaultextension=csvFileType)
-            # create file, add header, add config variables
-            config.saveToFile(file, True)
-            # add status variables to file
-            status.saveToFile(file)
-            # reset export command flag
+            # only try to export when the was a file selected
+            if (file):
+                # create file, add header, add config variables
+                config.saveToFile(file, True)
+                # add status variables to file
+                status.saveToFile(file)
+                # reset export command flag
             exportCommand = False
-        if (importCommand):
-            file = filedialog.askopenfilename(
-                filetypes=csvFileType, defaultextension=csvFileType)
-            config.loadFromFile(file)
-            importCommand = False  # reset import command flag
 
     def onExit(self) -> None:
         global exitProgram
