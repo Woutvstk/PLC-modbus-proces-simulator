@@ -31,21 +31,23 @@ class configurationClass:
 
         # PLC OUTPUTS
         # DIGITAL
-        self.DQValveIn: int = 0  # False = Closed
-        self.DQValveOut: int = 1  # False = Closed
-        self.DQHeater: int = 2  # False = Off
+        self.DQValveIn = {"byte": 0, "bit": 0}   # False = Closed
+        self.DQValveOut = {"byte": 0, "bit": 1}  # False = Closed
+        self.DQHeater = {"byte": 0, "bit": 2}    # False = Off
         # ANALOG
-        self.AQValveInFraction: int = 0  # 0 = Closed, MAX = full open
-        self.AQValveOutFraction: int = 1  # 0 = Closed, MAX = full open
-        self.AQHeaterFraction: int = 2  # 0 = Off, MAX = full power
+        self.AQValveInFraction = {"byte": 2}     # 0 = Closed, MAX = full open
+        self.AQValveOutFraction = {"byte": 4}    # 0 = Closed, MAX = full open
+        self.AQHeaterFraction = {"byte": 6}      # 0 = Off, MAX = full power
 
         # PLC INPUTS
         # DIGITAL
-        self.DILevelSensorHigh: int = 0  # False = liquid below sensor
-        self.DILevelSensorLow: int = 1  # False = liquid below sensor
+        self.DILevelSensorHigh = {"byte": 0, "bit": 0}  # False = liquid below sensor
+        self.DILevelSensorLow = {"byte": 0, "bit": 1}   # False = liquid below sensor
         # ANALOG
-        self.AILevelSensor: int = 0  # 0 = empty tank, MAX = full tank
-        self.AITemperatureSensor: int = 1  # 0 = -50°C, MAX = 250°C
+        self.AILevelSensor = {"byte": 2}                # 0 = empty tank, MAX = full tank
+        self.AITemperatureSensor = {"byte": 4}          # 0 = -50°C, MAX = 250°C
+
+        self.lowestByte, self.highestByte = self.get_byte_range()
 
         """
         Simulation settings
@@ -74,3 +76,33 @@ class configurationClass:
         self.liquidTemperature = self.ambientTemp
         # boiling temperature of liquid (water: 100)
         self.liquidBoilingTemp = 100
+
+
+    def get_byte_range(self):
+        """
+        Return the lowest and highest byte used in all IO definitions.
+        Scans all dicts in the current object that have a 'byte' key.
+        """
+        #function used for resetSendInputs in plcCom
+        bytes_used = []
+
+        for _, value in self.__dict__.items():
+            # Controleer of de waarde een dictionary is met een 'byte'-sleutel
+            if isinstance(value, dict) and "byte" in value:
+                # Voeg de byte-waarde toe aan de lijst met gebruikte bytes
+                bytes_used.append(value["byte"])
+
+        # Als er minstens één byte gevonden is → bepaal laagste en hoogste
+        if bytes_used:
+            lowest = min(bytes_used)
+            highest = max(bytes_used)
+            return lowest, highest
+        else:
+            return None, None
+
+    # ----------------------------------------------------------
+    def update_io_range(self):
+        """
+        Call this when IO data changes (e.g. GUI edits addresses).
+        """
+        self.lowestByte, self.highestByte = self.get_byte_range()
