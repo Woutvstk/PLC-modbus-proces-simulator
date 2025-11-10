@@ -1,6 +1,5 @@
 import csv
 
-
 class statusClass:
     def __init__(self):
         # valve IN status

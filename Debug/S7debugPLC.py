@@ -3,6 +3,7 @@ import snap7.util as s7util
 import time
 
 # ---------------debug prog voor werking S7--------------------
+#run deze code om de werking van de S7 communicatie te testen los van de rest van de simulator
 
 ip = "192.168.0.1"
 rack = 0
@@ -85,30 +86,36 @@ def GetAO(byte: int):
     return -1
 
 def print_status():
-    # Digitale ingangen (2 bytes)
-    di_str = ' '.join(f"{b}.{bit}:{(buffer_DI[b] >> bit) & 1}" 
-                      for b in range(len(buffer_DI)) for bit in range(8))
+    # Digitale ingangen
+    di_vals = []
+    for byte in range(len(buffer_DI)):
+        data = client.eb_read(start=byte, size=1)
+        for bit in range(8):
+            di_vals.append(f"{byte}.{bit}:{(data[0] >> bit) & 1}")
     
-    # Digitale uitgangen (2 bytes)
-    do_str = ' '.join(f"{b}.{bit}:{GetDO(b, bit)}" 
-                      for b in range(len(buffer_DI)) for bit in range(8))
+    # Digitale uitgangen
+    do_vals = []
+    for byte in range(len(buffer_DI)):
+        for bit in range(8):
+            do_vals.append(f"{byte}.{bit}:{GetDO(byte, bit)}")
     
-    # Analoge ingangen (16 waarden, 2 bytes elk)
-    ai_str = ' '.join(f"{i}:{(buffer_AI[i*2]<<8) | buffer_AI[i*2+1]}" 
-                      for i in range(16))
+    # Analoge ingangen (lees 2 bytes per AI)
+    ai_vals = []
+    for byte in range(2, len(buffer_AI)+2, 2):
+        data = client.eb_read(start=byte, size=2)
+        val = (data[0] << 8) | data[1]
+        ai_vals.append(f"{byte}:{val}")
     
-    # Analoge uitgangen (16 waarden, 2 bytes elk)
-    ao_str = ' '.join(f"{i}:{GetAO(i*2)}" 
-                      for i in range(16))
+    # Analoge uitgangen
+    ao_vals = []
+    for byte in range(2, 34, 2):
+        ao_vals.append(f"{byte}:{GetAO(byte)}")
     
-    print(f"DI: {di_str}")
-    print(f"DO: {do_str}")
-    print(f"AI: {ai_str}")
-    print(f"AO: {ao_str}")
+    print(f"DI: {' '.join(di_vals)}")
+    print(f"DO: {' '.join(do_vals)}")
+    print(f"AI: {' '.join(ai_vals)}")
+    print(f"AO: {' '.join(ao_vals)}")
     print('-'*80)
-
-
-
 
 while True:
     SetDI(0,0,1)
@@ -116,20 +123,11 @@ while True:
     SetDI(0,5,1) 
     SetDI(1,5,1)
 
-    GetDO(0,1)
-    GetDO(0,5)
-    GetDO(1,7)  
-
-    SetAI(2,255)
+    SetAI(2,0)
     SetAI(4,255)
     SetAI(6,-25000)
     SetAI(20,69)
     SetAI(32,69)
-
-    print(GetAO(2))
-    GetAO(4)
-    GetAO(6)
-    GetAO(8)
-    print(GetAO(32))
     print_status()
+
     time.sleep(1)
