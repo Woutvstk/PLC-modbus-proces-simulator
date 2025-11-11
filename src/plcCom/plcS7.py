@@ -117,13 +117,12 @@ class plcS7:
 
     def resetSendInputs(self, startByte: int, endByte: int):
         """
-        Resets all send input data to the PLC (DI, AI)
+        Resets all send input data and to the PLC (DI, AI)
         """
         if self.isConnected():
-            if startByte <= 0 and endByte > 0:
+            if startByte >= 0 and endByte > startByte:
                 bufferEmpty = bytearray(2)
-                self.client.eb_write(start=startByte, size=(endByte - startByte), data=bufferEmpty)
-                self.client.ab_write(start=startByte, size=(endByte - startByte), data=bufferEmpty)
+                self.client.eb_write(start=startByte, size=(endByte - startByte +1), data=bufferEmpty)
                 return True
             else:
                 return False

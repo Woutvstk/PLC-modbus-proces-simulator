@@ -4,12 +4,19 @@ import time
 
 #connects to to the softbus of a Siemens PLC simulator via an API DLL
 
-# --- PAD NAAR DLL ---
-dll_path = r"D:\Eigen projecten\visual studio\DEV\PLC-modbus-proces-simulator\src\plcCom\Siemens.Simatic.Simulation.Runtime.Api.x64.dll"
+# map van dit script
+script_dir = os.path.dirname(os.path.abspath(__file__))
+
+# pad naar DLL vanaf script_dir
+dll_path = os.path.join(script_dir,"..","src", "plcCom", "Siemens.Simatic.Simulation.Runtime.Api.x64.dll")
+
+print(f"Trying to load DLL from: {dll_path}")
 if not os.path.exists(dll_path):
     raise FileNotFoundError(f"DLL niet gevonden: {dll_path}")
 
+# DLL importeren
 clr.AddReference(dll_path)
+
 from Siemens.Simatic.Simulation.Runtime import SimulationRuntimeManager #type: ignore
 
 instance_name = "PLC1"
@@ -19,23 +26,47 @@ class plcSimAPI:
     """Class for communication with a Siemens S7 PLC simulator via Simatic.Simulation.Runtime API"""
 
     def __init__(self):
-        """Initialize the PLC simulator interface with the given instance name"""
-        global manager , instance 
-        manager = SimulationRuntimeManager() 
-        instance = manager.RegisteredInstanceInfo 
-    
-    def connect(self, instance_name: str): 
-        """Create an interface to the specified PLC simulation instance Return true = connected, false = not connected""" 
-        for inst in instance: 
-            if inst.Name == instance_name: 
-                try: 
-                    self.simulation_instance = manager.CreateInterface(inst.ID) 
-                    print(f"Interface created for instance: {instance_name}") 
-                    return True 
+        """Initialize the PLC simulator manager"""
+        self.manager = SimulationRuntimeManager()
+        self.simulation_instance = None
+
+    def connect(self, instance_name: str | None = None) -> bool:
+        """Connect to the specified PLC simulation instance.
+           Returns True if connected, False otherwise.
+        """
+        instances = self.manager.RegisteredInstanceInfo  # altijd up-to-date lijst
+
+        if instance_name is not None:
+            # Zoek specifieke instantie
+            for inst in instances:
+                if inst.Name == instance_name:
+                    try:
+                        self.simulation_instance = self.manager.CreateInterface(inst.Name)
+                        print(f"Interface created for instance: {inst.Name}")
+                        print(f"OperatingState: {self.simulation_instance.OperatingState}")
+                        return True
+                    except Exception as e:
+                        print(f"Fout bij het maken van de interface voor {instance_name}: {e}")
+                        return False
+            print(f"Instantie '{instance_name}' niet gevonden.")
+            return False
+
+        else:
+            # Geen naam opgegeven: probeer eerste beschikbare instantie
+            print(f"{'-'*10} No instance defined, trying first available instance  {'-'*10}")
+            for inst in instances:
+                try:
+                    self.simulation_instance = self.manager.CreateInterface(inst.Name)
+                    if str(self.simulation_instance.OperatingState) == "Run":
+                        print(f"{inst.Name} OperatingState = {self.simulation_instance.OperatingState}, connected successfully.")
+                        return True
+                    else:
+                        print(f"{inst.Name} OperatingState = {self.simulation_instance.OperatingState}... trying next instance.") 
                 except Exception:
-                    print(f"Fout bij het maken van de interface voor instantie:", instance_name)
-                    return False 
-                    print(f"Instance '{instance_name}' not found.")
+                    continue
+            print("No running instances found. Please check if a PLC simulator is running.")
+            return False
+
 
     def isConnected(self) -> bool:
         """Check if the connection to the PLC simulator is alive"""
@@ -55,7 +86,7 @@ class plcSimAPI:
             if self.simulation_instance is not None:
                 self.simulation_instance = None
                 for inst in instance:
-                    self.simulation_instance = manager.DestroyInterface(inst.ID)
+                    self.simulation_instance = self.manager.DestroyInterface(inst.ID)
                 print("Disconnected from PLC simulator instance.")
         except Exception as e:
             print("Disconnection error:", e)
@@ -121,6 +152,16 @@ class plcSimAPI:
                 data = self.simulation_instance.OutputArea.ReadBytes(startByte,2)
                 value = int.from_bytes(data, byteorder='big', signed = True)
                 return int(value)
+            
+    def resetSendInputs(self, startByte: int, endByte: int):
+        """
+        Resets all send input data to the PLC (DI, AI)
+        """
+        if self.isConnected():
+            if startByte >= 0 and endByte > startByte:
+                size = endByte - startByte + 1
+                Empty_buffer = bytearray(size)
+                self.simulation_instance.InputArea.WriteBytes(startByte, size, Empty_buffer)
 
     def print_status(self):
         if not self.isConnected():
@@ -157,7 +198,14 @@ simulator = plcSimAPI()
 while True:  
     if simulator.isConnected() == False:
         
-        simulator.connect("PLC1")
+        simulator.connect()
     simulator.print_status()
+    simulator.SetDI(0,0,1)
+    simulator.SetDI(0,1,1)
+    simulator.SetDI(1,0,1)
+    simulator.SetDI(1,0,1)
+
+    time.sleep(1)
+    simulator.resetSendInputs(0,33)
 
     time.sleep(1)    
