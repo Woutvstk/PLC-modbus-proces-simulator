@@ -89,7 +89,8 @@ class plcS7:
                         buffer_DI[0] &= ~(1 << bit)
                     self.client.eb_write(start=byte, size=1, data=buffer_DI)
                     return int(bool(value))
-                except Exception:
+                except Exception as e:
+                    print("Error:", e)
                     return -1
             return -1
         return -1
@@ -110,7 +111,8 @@ class plcS7:
                 try:
                     data = self.client.ab_read(byte, 1)
                     return int(s7util.get_bool(data, 0, bit))
-                except Exception:
+                except Exception as e:
+                    print("Error:", e)
                     return -1
             return -1
         return -1
@@ -137,7 +139,8 @@ class plcS7:
                     buffer_AI[1] = lowByte
                     self.client.eb_write(start=startByte, size=2, data=buffer_AI)
                     return val_int
-                except Exception:
+                except Exception as e:
+                    print("Error:", e)
                     return -1
             return -1
         return -1
@@ -157,7 +160,8 @@ class plcS7:
                 try:
                     data = self.client.ab_read(start=startByte, size=2)
                     return s7util.get_int(data, 0)
-                except Exception:
+                except Exception as e:
+                    print("Error:", e)
                     return -1
             return -1
         return -1
@@ -175,8 +179,12 @@ class plcS7:
         """
         if self.isConnected():
             if startByte >= 0 and endByte > startByte:
-                bufferEmpty = bytearray(endByte - startByte + 1)
-                self.client.eb_write(start=startByte, size=(endByte - startByte + 1), data=bufferEmpty)
-                return True
+                try:
+                    bufferEmpty = bytearray(endByte - startByte + 1)
+                    self.client.eb_write(start=startByte, size=(endByte - startByte + 1), data=bufferEmpty)
+                    return True
+                except Exception as e:
+                    print("Error:", e)
+                    return False
             return False
         return False
