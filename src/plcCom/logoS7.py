@@ -51,84 +51,48 @@ class logoS7:
         """Check if the connection to the LOGO PLC is alive."""
         return self.logo.get_connected()
 
-    def SetDI(self, byte: int, bit: int, value: bool) -> int:
-        """
-        Set a digital input (DI) via byte and bit.
-
-        Parameters:
-        byte (int): Byte index (0..n)
-        bit (int): Bit position within the byte (0..7)
-        value (bool): True/False to set or clear the bit
-
-        Returns:
-        int: Value set (1/0), -1 on error
-
-        Example:
-        i1 = byte:0 bit:0 // i10 = byte:1 bit:1, ...
+    def SetDI(self,byte: int, bit: int, value: bool):
+        """Zet een digitale input (DI) via byte/bit
+        byte: 0..n  | bit: 0..7
+        example:
+        <I1 = byte:0 bit :0 // I10 = byte:1 bit :1,...
         """
         if 0 <= bit < 8:
-            address = f"V{byte+1024}.{bit}"
-            self.logo.write(address, int(bool(value)))
+            address = f"V{byte}.{bit}"
+            self.logo.write(address,int(bool(value)))
             return int(bool(value))
-        return -1
+        return 0
 
-    def GetDO(self, byte: int, bit: int) -> int:
-        """
-        Read a digital output (DO) via byte and bit.
 
-        Parameters:
-        byte (int): Byte index (0..n)
-        bit (int): Bit position within the byte (0..7)
-
-        Returns:
-        int: 0 or 1 if successful, -1 on error
-
-        Example:
-        q1 = byte:0 bit:0 // q10 = byte:1 bit:1, ...
-        """
+    def GetDO(self,byte: int, bit: int):
+        """Lees digitale output (DO) via byte/bit"""
         if 0 <= bit < 8:
-            address = f"V{byte+1064}.{bit}"
+            address = f"V{byte + 1064}.{bit}"
             data = self.logo.read(address)
             return int(bool(data))
-        return -1
+        return 0
 
-    def SetAI(self, byte: int, value: int) -> int:
-        """
-        Set an analog input (AI) value via byte.
 
-        Parameters:
-        byte (int): Byte index
-        value (int): Analog value (0–65535)
-
-        Returns:
-        int: Value set, -1 on error
-        """
+    def SetAI(self,byte: int, value: int):
+        """Zet analoge input (AI) via byte"""
         if byte >= 0:
             val = int(value) & 0xFFFF
-            address = f"VW{byte+1032}"
+            address = f"VW{byte}"
             self.logo.write(address, val)
             return val
-        return -1
+        return 0
 
-    def GetAO(self, byte: int) -> int:
-        """
-        Read an analog output (AO) value via byte.
-
-        Parameters:
-        byte (int): Byte index (must be even, 2 bytes per AO)
-
-        Returns:
-        int: Analog output value, -1 on error
-        """
+    def GetAO(self,byte: int):
+        """Lees analoge output (AO) via byte"""
         if byte % 2 == 0:
             address = f"VW{byte+1072}"
             data = self.logo.read(address)
             return int(data)
-        return -1
+        return 0
 
-    def resetSendInputs(self):
+    def resetSendInputs(self, startByte: int, endByte: int):
         """
         Reset all V memory (inputs) to 0.
         """
-        for byte in range(1024, 1468):
-            self.logo.write(f"VW{byte}", 0)
+        #for byte in range(1024, 1468):
+            #self.logo.write(f"VW{byte}", 0)

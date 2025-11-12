@@ -22,7 +22,7 @@ class configurationClass:
         self.plcRack: int = 0
         self.plcSlot: int = 1
         self.tsapLogo: int = 0x0300
-        self.tsapServer: int = 0x2000
+        self.tsapServer: int = 0x0200
         # set True by gui, set False by main
         self.tryConnect: bool = False
         """
