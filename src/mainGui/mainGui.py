@@ -4,14 +4,17 @@ import pathlib
 import os
 from PIL import Image, ImageTk
 import math
-from processSim.configuration import configurationClass
-from processSim.status import statusClass
+
+
+# tankSim specific imports, todo, move to tankSimGui?
+from tankSim.configuration import configurationClass as tankSimConfigurationClass
+from tankSim.status import statusClass as tankSimStatusClass
 
 
 navColor = '#383838'
 
-defaultStatus = statusClass()
-defaultConfig = configurationClass()
+defaultStatus = tankSimStatusClass()
+defaultConfig = tankSimConfigurationClass()
 
 # flag to notify the rest of the program that the gui has been closed
 exitProgram = False
@@ -653,7 +656,7 @@ kleuren = [
 refTank: TankScherm
 
 
-class GuiClass:
+class mainGuiClass:
 
     def __init__(self) -> None:
         global refTank
@@ -670,7 +673,7 @@ class GuiClass:
         self.root.update_idletasks()
         self.root.update()
 
-    def updateData(self, config: configurationClass, status: statusClass) -> None:
+    def updateData(self, config: tankSimConfigurationClass, status: tankSimStatusClass) -> None:
         global heating_power, inlet_valve, outlet_valve, water_level, tank_volume, temperature, SaveDebietMaxIn, SaveDichtheid
         global exitProgram, TryConnectPending, ip_adress, SaveControler, refTank
         global exportCommand, importCommand

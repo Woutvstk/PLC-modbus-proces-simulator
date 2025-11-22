@@ -1,22 +1,29 @@
-from processSim.tankSim import tankSim
+
+# general imports
+import time
 from plcCom.plcModBusTCP import plcModBusTCP
 from plcCom.plcS7 import plcS7
 from plcCom.logoS7 import logoS7
 from plcCom.PLCSimAPI import plcSimAPI
-from processSim.configuration import configurationClass
-from processSim.status import statusClass
-from User_Interface.GUI import GuiClass
-from processSim.UpdatePLCData import updateDataClass
-import time
+from mainGui.mainGui import mainGuiClass
+
+
+# tankSim specific imports
+from tankSim.tankSim import tankSim
+# from tankSim.tankSimGui import tankSimGui TODO move tanksimGui here
+from tankSim.status import statusClass as tankSimStatusClass
+from tankSim.configuration import configurationClass as tankSimConfigurationClass
+from tankSim.UpdatePLCData import updateDataClass as tankSimupdateDataClass
+
 
 """Initialize configuration instance with default parameters"""
-config = configurationClass()
+config = tankSimConfigurationClass()
 
 """Initialize configuration instance with default parameters"""
-status = statusClass()
+status = tankSimStatusClass()
 
 """Initialize updateData instance"""
-PLCdata = updateDataClass() 
+PLCdata = tankSimupdateDataClass()
 
 """Initialize process0 object"""
 process0 = tankSim("process0")
@@ -25,13 +32,15 @@ process0 = tankSim("process0")
 Gui0 = None
 validPlcConnection: bool = False
 print("creating gui class...")
-Gui0 = GuiClass()
+Gui0 = mainGuiClass()
 
 # remember at what time we started
 startTime = time.time()
 
+
 def tryConnectToPlc():
-    global config, validPlcConnection, PlcCom  # creates a global var inside a function (normally local)
+    # creates a global var inside a function (normally local)
+    global config, validPlcConnection, PlcCom
     """"Initialize plc communication object"""
     if config.plcProtocol == "ModBusTCP":
         PlcCom = plcModBusTCP(config.plcIpAdress, config.plcPort)
@@ -52,7 +61,7 @@ def tryConnectToPlc():
     else:
         if PlcCom.connect():  # run connect, returns True/False
             validPlcConnection = True
-            PlcCom.resetSendInputs(config.lowestByte, config.highestByte) 
+            PlcCom.resetSendInputs(config.lowestByte, config.highestByte)
         else:
             validPlcConnection = False
 
@@ -86,7 +95,7 @@ if __name__ == "__main__":
             """
             # only try to contact plc if there is a connection
             if (validPlcConnection):
-                PLCdata.updateData(PlcCom,config, status)
+                PLCdata.updateData(PlcCom, config, status)
             else:
                 # if control is plc but no plc connection, pretend plc outputs are all 0
                 PLCdata.resetOutputs(config, status)
