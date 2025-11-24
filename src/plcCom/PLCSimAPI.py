@@ -3,6 +3,7 @@ import os
 
 # Connects to the softbus of a Siemens PLC simulator via an API DLL
 
+
 class plcSimAPI:
 
     """Class for communication with a Siemens S7 PLC simulator via Simatic.Simulation.Runtime API"""
@@ -14,7 +15,8 @@ class plcSimAPI:
             script_dir = os.path.dirname(os.path.abspath(__file__))
 
             # Path to the DLL from script_dir
-            dll_path = os.path.join(script_dir, "Siemens.Simatic.Simulation.Runtime.Api.x64.dll")
+            dll_path = os.path.join(
+                script_dir, "Siemens.Simatic.Simulation.Runtime.Api.x64.dll")
 
             print(f"Trying to load DLL from: {dll_path}")
             if not os.path.exists(dll_path):
@@ -23,12 +25,14 @@ class plcSimAPI:
             # Import DLL
             clr.AddReference(dll_path)
 
-            from Siemens.Simatic.Simulation.Runtime import SimulationRuntimeManager #type: ignore
+            from Siemens.Simatic.Simulation.Runtime import SimulationRuntimeManager  # type: ignore
 
             self.manager = SimulationRuntimeManager()
             self.simulation_instance = None
         except Exception as e:
             print("Error in __init__:", e)
+
+        self.analogMax = 32767  # TODO correct to 27xxx
 
     def connect(self, instance_name: str | None = None) -> bool:
         try:
@@ -38,29 +42,38 @@ class plcSimAPI:
                 for inst in instances:
                     if inst.Name == instance_name:
                         try:
-                            self.simulation_instance = self.manager.CreateInterface(inst.Name)
-                            print(f"Interface created for instance: {inst.Name}")
-                            print(f"OperatingState: {self.simulation_instance.OperatingState}")
+                            self.simulation_instance = self.manager.CreateInterface(
+                                inst.Name)
+                            print(
+                                f"Interface created for instance: {inst.Name}")
+                            print(
+                                f"OperatingState: {self.simulation_instance.OperatingState}")
                             return True
                         except Exception as e:
-                            print(f"Error creating interface for {instance_name}: {e}")
+                            print(
+                                f"Error creating interface for {instance_name}: {e}")
                             return False
                 print(f"Instance '{instance_name}' not found.")
                 return False
             else:
-                print(f"{'-'*10} No instance_name defined, trying first available instance {'-'*10}")
+                print(
+                    f"{'-'*10} No instance_name defined, trying first available instance {'-'*10}")
                 for inst in instances:
                     try:
-                        self.simulation_instance = self.manager.CreateInterface(inst.Name)
+                        self.simulation_instance = self.manager.CreateInterface(
+                            inst.Name)
                         if str(self.simulation_instance.OperatingState) == "Run":
-                            print(f"{inst.Name} OperatingState = {self.simulation_instance.OperatingState}, connected successfully.")
+                            print(
+                                f"{inst.Name} OperatingState = {self.simulation_instance.OperatingState}, connected successfully.")
                             return True
                         else:
-                            print(f"{inst.Name} OperatingState = {self.simulation_instance.OperatingState}... trying next instance.") 
+                            print(
+                                f"{inst.Name} OperatingState = {self.simulation_instance.OperatingState}... trying next instance.")
                     except Exception as e:
                         print("Error in connect loop:", e)
                         continue
-                print("No running instances found. Please check if a PLC simulator is running.")
+                print(
+                    "No running instances found. Please check if a PLC simulator is running.")
                 return False
         except Exception as e:
             print("Error in connect:", e)
@@ -76,7 +89,7 @@ class plcSimAPI:
         except Exception as e:
             print("Error in isConnected:", e)
             return False
-        
+
     def Disconnect(self, instance_name: str | None = None) -> bool:
         try:
             instances = self.manager.RegisteredInstanceInfo
@@ -88,15 +101,18 @@ class plcSimAPI:
                             if hasattr(self, "simulation_instance") and self.simulation_instance is not None:
                                 self.simulation_instance.Dispose()
                                 self.simulation_instance = None
-                            print(f"Interface disconnected for instance: {inst.Name}")
+                            print(
+                                f"Interface disconnected for instance: {inst.Name}")
                             return True
                         except Exception as e:
-                            print(f"Error disconnecting the interface for {instance_name}: {e}")
+                            print(
+                                f"Error disconnecting the interface for {instance_name}: {e}")
                             return False
                 print(f"Instance '{instance_name}' not found.")
                 return False
             else:
-                print(f"{'-'*10} No instance defined, disconnecting all interfaces {'-'*10}")
+                print(
+                    f"{'-'*10} No instance defined, disconnecting all interfaces {'-'*10}")
                 success = False
                 for inst in instances:
                     try:
@@ -109,8 +125,9 @@ class plcSimAPI:
                         print(f"Could not disconnect {inst.Name}: {e}")
                         continue
                 if not success:
-                    print("No running instances found. Please check if a PLC simulator is running.")
-                return success     
+                    print(
+                        "No running instances found. Please check if a PLC simulator is running.")
+                return success
         except Exception as e:
             print("Error in Disconnect:", e)
             return False
@@ -119,19 +136,21 @@ class plcSimAPI:
         try:
             if self.isConnected():
                 if startByte >= 0 and 0 <= bit < 8:
-                    self.simulation_instance.InputArea.WriteBit(startByte, bit, bool(value))
+                    self.simulation_instance.InputArea.WriteBit(
+                        startByte, bit, bool(value))
                     return int(bool(value))
                 return -1
             return -1
         except Exception as e:
             print("Error in SetDI:", e)
             return -1
-    
+
     def GetDO(self, startByte: int, bit: int) -> int:
         try:
             if self.isConnected():
                 if startByte >= 0 and 0 <= bit <= 7:
-                    data = self.simulation_instance.OutputArea.ReadBit(startByte, bit)
+                    data = self.simulation_instance.OutputArea.ReadBit(
+                        startByte, bit)
                     return int(data)
                 return -1
             return -1
@@ -152,7 +171,8 @@ class plcSimAPI:
                     highByte = (val_int >> 8) & 0xFF
                     buffer_AI[0] = highByte
                     buffer_AI[1] = lowByte
-                    self.simulation_instance.InputArea.WriteBytes(byte, 2, buffer_AI)
+                    self.simulation_instance.InputArea.WriteBytes(
+                        byte, 2, buffer_AI)
                     return val_int
                 return -1
             return -1
@@ -164,7 +184,8 @@ class plcSimAPI:
         try:
             if self.isConnected():
                 if startByte >= 0:
-                    data = self.simulation_instance.OutputArea.ReadBytes(startByte, 2)
+                    data = self.simulation_instance.OutputArea.ReadBytes(
+                        startByte, 2)
                     value = int.from_bytes(data, byteorder='big', signed=True)
                     return value
             return -1
@@ -178,6 +199,7 @@ class plcSimAPI:
                 if startByte >= 0 and endByte > startByte:
                     size = endByte - startByte + 1
                     empty_buffer = bytearray(size)
-                    self.simulation_instance.InputArea.WriteBytes(startByte, size, empty_buffer)
+                    self.simulation_instance.InputArea.WriteBytes(
+                        startByte, size, empty_buffer)
         except Exception as e:
             print("Error in resetSendInputs:", e)

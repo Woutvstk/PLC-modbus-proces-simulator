@@ -1,6 +1,7 @@
 import csv
 
-class statusClass:
+
+class status:
     def __init__(self):
         # valve IN status
         # written by: plc, gui or import

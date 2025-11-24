@@ -1,5 +1,6 @@
 from pymodbus.client import ModbusTcpClient
 
+
 class plcModBusTCP:
     """
     Class for Modbus TCP communication with a PLC.
@@ -13,6 +14,8 @@ class plcModBusTCP:
             self.client = None
         except Exception as e:
             print("Error in __init__:", e)
+
+        self.analogMax = 32767  # TODO correct to 27xxx
 
     def connect(self) -> bool:
         try:
