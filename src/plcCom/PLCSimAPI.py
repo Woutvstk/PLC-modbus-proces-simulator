@@ -4,7 +4,6 @@ import os
 # Connects to the softbus of a Siemens PLC simulator via an API DLL
 #Only for 1500 simulated PLC's with an advanced license!
 
-
 class plcSimAPI:
 
     """
@@ -23,14 +22,8 @@ class plcSimAPI:
             # Determine the directory of the current script
             script_dir = os.path.dirname(os.path.abspath(__file__))
 
-<<<<<<< Updated upstream
-            # Path to the DLL from script_dir
-            dll_path = os.path.join(
-                script_dir, "Siemens.Simatic.Simulation.Runtime.Api.x64.dll")
-=======
             # Construct the absolute path to the API DLL
             dll_path = os.path.join(script_dir, "Siemens.Simatic.Simulation.Runtime.Api.x64.dll")
->>>>>>> Stashed changes
 
             print(f"Attempting to load DLL from: {dll_path}")
             if not os.path.exists(dll_path):
@@ -39,12 +32,8 @@ class plcSimAPI:
             # Import the DLL using the Common Language Runtime (CLR) bridge
             clr.AddReference(dll_path)
 
-<<<<<<< Updated upstream
-            from Siemens.Simatic.Simulation.Runtime import SimulationRuntimeManager  # type: ignore
-=======
             # Import the necessary class after the assembly is loaded
             from Siemens.Simatic.Simulation.Runtime import SimulationRuntimeManager #type: ignore
->>>>>>> Stashed changes
 
             self.manager = SimulationRuntimeManager()
             
@@ -56,8 +45,6 @@ class plcSimAPI:
             print(f"Error during initialization or DLL loading: {e}")
 
     # --- Connection Management ---
-
-        self.analogMax = 32767  # TODO correct to 27xxx
 
     def connect(self, instance_name: str | None = None) -> bool:
         """
@@ -82,41 +69,16 @@ class plcSimAPI:
                 for inst in instances:
                     if inst.Name == instance_name:
                         try:
-<<<<<<< Updated upstream
-                            self.simulation_instance = self.manager.CreateInterface(
-                                inst.Name)
-                            print(
-                                f"Interface created for instance: {inst.Name}")
-                            print(
-                                f"OperatingState: {self.simulation_instance.OperatingState}")
-=======
                             self.simulation_instance = self.manager.CreateInterface(inst.Name)
                             print(f"Interface created for instance: {inst.Name}")
                             print(f"Operating State: {self.simulation_instance.OperatingState}")
->>>>>>> Stashed changes
                             return True
                         except Exception as e:
-                            print(
-                                f"Error creating interface for {instance_name}: {e}")
+                            print(f"Error creating interface for {instance_name}: {e}")
                             return False
                 print(f"Instance '{instance_name}' not found.")
                 return False
             else:
-<<<<<<< Updated upstream
-                print(
-                    f"{'-'*10} No instance_name defined, trying first available instance {'-'*10}")
-                for inst in instances:
-                    try:
-                        self.simulation_instance = self.manager.CreateInterface(
-                            inst.Name)
-                        if str(self.simulation_instance.OperatingState) == "Run":
-                            print(
-                                f"{inst.Name} OperatingState = {self.simulation_instance.OperatingState}, connected successfully.")
-                            return True
-                        else:
-                            print(
-                                f"{inst.Name} OperatingState = {self.simulation_instance.OperatingState}... trying next instance.")
-=======
                 # Try connecting to the first available running instance
                 print("-" * 10 + " No instance_name provided, trying first available instance " + "-" * 10)
                 for inst in instances:
@@ -130,17 +92,11 @@ class plcSimAPI:
                         else:
                             print(f"{inst.Name} OperatingState = {self.simulation_instance.OperatingState}... skipping and trying next instance.") 
                             self.simulation_instance = None # Dispose of non-Run interface
->>>>>>> Stashed changes
                     except Exception as e:
                         print(f"Error in connection loop for instance {inst.Name}: {e}")
                         self.simulation_instance = None
                         continue
-<<<<<<< Updated upstream
-                print(
-                    "No running instances found. Please check if a PLC simulator is running.")
-=======
                 print("No running instances found. Please ensure a PLC simulator is active.")
->>>>>>> Stashed changes
                 return False
         except Exception as e:
             print(f"Error in connect procedure: {e}")
@@ -163,47 +119,6 @@ class plcSimAPI:
         except Exception as e:
             print(f"Error in isConnected check: {e}")
             return False
-<<<<<<< Updated upstream
-
-    def Disconnect(self, instance_name: str | None = None) -> bool:
-        try:
-            instances = self.manager.RegisteredInstanceInfo
-
-            if instance_name is not None:
-                for inst in instances:
-                    if inst.Name == instance_name:
-                        try:
-                            if hasattr(self, "simulation_instance") and self.simulation_instance is not None:
-                                self.simulation_instance.Dispose()
-                                self.simulation_instance = None
-                            print(
-                                f"Interface disconnected for instance: {inst.Name}")
-                            return True
-                        except Exception as e:
-                            print(
-                                f"Error disconnecting the interface for {instance_name}: {e}")
-                            return False
-                print(f"Instance '{instance_name}' not found.")
-                return False
-            else:
-                print(
-                    f"{'-'*10} No instance defined, disconnecting all interfaces {'-'*10}")
-                success = False
-                for inst in instances:
-                    try:
-                        if hasattr(self, "simulation_instance") and self.simulation_instance is not None:
-                            self.simulation_instance.Dispose()
-                            self.simulation_instance = None
-                        print(f"Disconnected instance: {inst.Name}")
-                        success = True
-                    except Exception as e:
-                        print(f"Could not disconnect {inst.Name}: {e}")
-                        continue
-                if not success:
-                    print(
-                        "No running instances found. Please check if a PLC simulator is running.")
-                return success
-=======
         
     def disconnect(self, instance_name: str | None = None) -> bool:
         """
@@ -225,7 +140,6 @@ class plcSimAPI:
             self.simulation_instance = None
             print("Successfully disconnected and disposed of the simulation interface.")
             return True
->>>>>>> Stashed changes
         except Exception as e:
             print(f"Error disconnecting the interface: {e}")
             return False
@@ -246,30 +160,15 @@ class plcSimAPI:
         """
         try:
             if self.isConnected():
-<<<<<<< Updated upstream
-                if startByte >= 0 and 0 <= bit < 8:
-                    self.simulation_instance.InputArea.WriteBit(
-                        startByte, bit, bool(value))
-=======
                 if byte >= 0 and 0 <= bit < 8:
                     # The API method takes a boolean
                     self.simulation_instance.InputArea.WriteBit(byte, bit, bool(value))
->>>>>>> Stashed changes
                     return int(bool(value))
                 return -1
             return -1
         except Exception as e:
             print(f"Error in SetDI: {e}")
             return -1
-<<<<<<< Updated upstream
-
-    def GetDO(self, startByte: int, bit: int) -> int:
-        try:
-            if self.isConnected():
-                if startByte >= 0 and 0 <= bit <= 7:
-                    data = self.simulation_instance.OutputArea.ReadBit(
-                        startByte, bit)
-=======
     
     def GetDO(self, byte: int, bit: int) -> int:
         """
@@ -287,7 +186,6 @@ class plcSimAPI:
                 if byte >= 0 and 0 <= bit <= 7:
                     # The API method returns a boolean
                     data = self.simulation_instance.OutputArea.ReadBit(byte, bit)
->>>>>>> Stashed changes
                     return int(data)
                 return -1
             return -1
@@ -320,14 +218,9 @@ class plcSimAPI:
                     highByte = (val_int >> 8) & 0xFF
                     buffer_AI[0] = highByte # S7 uses high byte first
                     buffer_AI[1] = lowByte
-<<<<<<< Updated upstream
-                    self.simulation_instance.InputArea.WriteBytes(
-                        byte, 2, buffer_AI)
-=======
                     
                     # The API takes a byte array
                     self.simulation_instance.InputArea.WriteBytes(byte, 2, buffer_AI)
->>>>>>> Stashed changes
                     return val_int
                 return -1
             return -1
@@ -348,11 +241,6 @@ class plcSimAPI:
         try:
             if self.isConnected():
                 if startByte >= 0:
-<<<<<<< Updated upstream
-                    data = self.simulation_instance.OutputArea.ReadBytes(
-                        startByte, 2)
-                    value = int.from_bytes(data, byteorder='big', signed=True)
-=======
                     # The API returns a CLR byte array (System.Array[System.Byte])
                     data = self.simulation_instance.OutputArea.ReadBytes(startByte, 2)
                     
@@ -360,7 +248,6 @@ class plcSimAPI:
                     # and then interpret it as a signed integer (Big Endian)
                     python_data = bytes(data) 
                     value = int.from_bytes(python_data, byteorder='big', signed=True)
->>>>>>> Stashed changes
                     return value
                 return -1
             return -1
@@ -384,15 +271,10 @@ class plcSimAPI:
                 if startByte >= 0 and endByte >= startByte:
                     size = endByte - startByte + 1
                     empty_buffer = bytearray(size)
-<<<<<<< Updated upstream
-                    self.simulation_instance.InputArea.WriteBytes(
-                        startByte, size, empty_buffer)
-=======
                     self.simulation_instance.InputArea.WriteBytes(startByte, size, empty_buffer)
                     return True
                 return False
             return False
->>>>>>> Stashed changes
         except Exception as e:
             print(f"Error in resetSendInputs: {e}")
             return False

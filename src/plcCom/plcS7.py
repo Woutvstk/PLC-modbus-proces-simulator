@@ -1,7 +1,6 @@
 import snap7
 import snap7.util as s7util
 
-
 class plcS7:
 
     """Class for communication with a Siemens S7 PLC using Snap7."""
@@ -21,7 +20,6 @@ class plcS7:
         self.slot = slot
         self.tcpport = tcpport
         self.client = snap7.client.Client()
-        self.analogMax = 32767  # TODO correct to 27xxx
 
     def connect(self,instance_name: str | None = None) -> bool:
         """
@@ -33,8 +31,7 @@ class plcS7:
         try:
             self.client.connect(self.ip, self.rack, self.slot, self.tcpport)
             if self.client.get_connected():
-                print(
-                    f"Connected to S7 PLC at {self.ip}:{self.tcpport} (rack {self.rack}, slot {self.slot})")
+                print(f"Connected to S7 PLC at {self.ip}:{self.tcpport} (rack {self.rack}, slot {self.slot})")
                 return True
             else:
                 print(f"Cannot connect to S7 PLC at {self.ip}")
@@ -44,8 +41,7 @@ class plcS7:
             for i in range(0, 2):
                 try:
                     self.client.connect(self.ip, self.rack, i, self.tcpport)
-                    print(
-                        f"Connected to S7 PLC at {self.ip}:{self.tcpport} (rack {self.rack}, slot {i})")
+                    print(f"Connected to S7 PLC at {self.ip}:{self.tcpport} (rack {self.rack}, slot {i})")
                     return True
                 except Exception:
                     continue
@@ -141,14 +137,12 @@ class plcS7:
             if startByte >= 0 and 0 <= value <= 65535:
                 try:
                     buffer_AI = bytearray(2)
-                    val_int = int(round(value)) if isinstance(
-                        value, float) else int(value)
+                    val_int = int(round(value)) if isinstance(value, float) else int(value)
                     lowByte = val_int & 0xFF
                     highByte = (val_int >> 8) & 0xFF
                     buffer_AI[0] = highByte
                     buffer_AI[1] = lowByte
-                    self.client.eb_write(
-                        start=startByte, size=2, data=buffer_AI)
+                    self.client.eb_write(start=startByte, size=2, data=buffer_AI)
                     return val_int
                 except Exception as e:
                     print("Error:", e)
@@ -192,8 +186,7 @@ class plcS7:
             if startByte >= 0 and endByte > startByte:
                 try:
                     bufferEmpty = bytearray(endByte - startByte + 1)
-                    self.client.eb_write(start=startByte, size=(
-                        endByte - startByte + 1), data=bufferEmpty)
+                    self.client.eb_write(start=startByte, size=(endByte - startByte + 1), data=bufferEmpty)
                     return True
                 except Exception as e:
                     print("Error:", e)

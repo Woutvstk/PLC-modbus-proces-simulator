@@ -29,13 +29,7 @@ class logoS7:
         except Exception as e:
             print(f"__init__ error: {e}")
 
-<<<<<<< Updated upstream
-        self.analogMax = 32767  # TODO correct to 27xxx
-
-    def connect(self) -> bool:
-=======
     def connect(self,instance_name: str | None = None) -> bool:
->>>>>>> Stashed changes
         """
         Connect to the LOGO PLC.
 
