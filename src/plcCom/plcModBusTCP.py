@@ -1,5 +1,6 @@
 from pymodbus.client import ModbusTcpClient
 
+
 class plcModBusTCP:
     """
     Class for Modbus TCP communication with a PLC.

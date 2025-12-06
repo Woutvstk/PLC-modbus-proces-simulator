@@ -1,9 +1,9 @@
 import time
-from processSim.configuration import configurationClass
-from processSim.status import statusClass
+from tankSim.configuration import configuration as configurationClass
+from tankSim.status import status as statusClass
 
 
-class tankSim:
+class simulation:
 
     """
     Constructor
@@ -22,7 +22,7 @@ class tankSim:
     Update simulation values in function of current statues and config
     """
 
-    def updateData(self, config: configurationClass, status: statusClass) -> None:
+    def doSimulation(self, config: configurationClass, status: statusClass) -> None:
         """check if simRunning before changing any data"""
         if (status.simRunning == True):
             """If simulation (re)starts, set _lastRun to current time and skip update at time 0"""

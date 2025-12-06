@@ -1,6 +1,7 @@
 import csv
 
-class configurationClass:
+
+class configuration:
 
     """
     Contructor: create configuration object with default parameters

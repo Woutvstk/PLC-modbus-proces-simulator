@@ -4,17 +4,18 @@ import pathlib
 import os
 from PIL import Image, ImageTk
 import math
-from processSim.configuration import configurationClass
-from processSim.status import statusClass
+
+# import class definition of mainConfig
+from configuration import configuration as mainConfigClass
+
+# tankSim specific imports
+from tankSim.status import status as tankSimStatusClass
+from tankSim.configuration import configuration as tankSimConfigurationClass
 
 
-navColor = '#383838'
+defaultStatus = tankSimStatusClass()
+defaultConfig = tankSimConfigurationClass()
 
-defaultStatus = statusClass()
-defaultConfig = configurationClass()
-
-# flag to notify the rest of the program that the gui has been closed
-exitProgram = False
 
 # Global state variables
 inlet_valve = defaultStatus.valveInOpenFraction*100  # 0-100%
@@ -25,11 +26,6 @@ target_level = 1000  # liters - gewenste waterniveau
 temperature = defaultStatus.liquidTemperature  # °C - water temperature
 tank_volume = defaultConfig.tankVolume  # liters
 flow_rate_in = defaultStatus.flowRateIn
-TryConnectPending = False
-ip_adress = defaultConfig.plcIpAdress
-# flag for updateData to also export config/status
-exportCommand: bool = False
-importCommand: bool = False
 
 
 SaveKleur = "blue"
@@ -38,15 +34,26 @@ SaveHoogte = 2000
 SaveDebietMaxIn = defaultConfig.valveInMaxFlow
 SaveDebietMaxOut = defaultConfig.valveOutMaxFlow
 SaveDichtheid = defaultConfig.liquidSpecificWeight*1000
-SaveControler = "PLC S7-1500/1200/400/300"
 SaveKlepen = 1
 SaveWeerstand = 1
 SaveHoogtemeting = 1
 
+# flag for updateData to also export config/status
+exportCommand: bool = False
+importCommand: bool = False
 
-def getAbsolutePath(relativePath: str) -> str:
-    current_dir = pathlib.Path(__file__).parent.resolve()
-    return os.path.join(current_dir, relativePath)
+
+kleuren = [
+    "Blue",
+    "Yellow",
+    "Gold",
+    "Green",
+    "Cyan",
+    "Orange",
+    "Red",
+    "Purple",
+    "Pink"
+]
 
 
 def get_heating_color(power):
@@ -61,42 +68,10 @@ def get_heating_color(power):
         return "#FF6B35"
 
 
-class MainScherm:
-    def __init__(main, root):
-        conColor = '#383838'
-        main.root = root
-        main.root.title("PID Regelaar Tank")
-        main.root.geometry("1200x700")
-        main.root.configure(bg="white")
-
-        main.conFrame = tk.Frame(main.root, bg=conColor, height=45)
-        main.conFrame.place(relwidth=1.0, x=50, y=4)
-
-        connectButton = tk.Button(main.conFrame, text="Connect",
-                                  bg=conColor, activebackground=conColor, fg="white", command=main.setTryConnect)
-        connectButton.place(x=830, y=10)
-
-        main.AdresLabel = tk.Label(main.conFrame, text="IP Adress:",
-                                   bg=conColor, fg="White", font=("Arial", 10))
-        main.AdresLabel.place(x=900, y=10)
-        main.Adres = tk.Entry(main.conFrame, bg=conColor,
-                              fg="White", font=("Arial", 10))
-        main.Adres.place(x=970, y=12.5)
-        main.Adres.insert(0, ip_adress)
-
-        main.MainFrame = tk.Frame(main.root, bg="white")
-        main.MainFrame.place(relwidth=1.0, relheight=1.0, x=50, y=50)
-
-    def setTryConnect(self):
-        global TryConnectPending, ip_adress
-        ip_adress = self.Adres.get()
-        TryConnectPending = True
-
-
-class TankScherm:
+class process:
 
     def __init__(main, MainFrame):
-        global refTank
+
         main.MainFrame = MainFrame
         main.canvas = tk.Canvas(
             MainFrame, width=1000, height=700, bg="white", border=0, highlightthickness=0)
@@ -104,7 +79,6 @@ class TankScherm:
 
         main.is_running = False
         main.update_id = None
-        refTank = main
 
         # Create control panel first (permanent widgets)
         main.create_control_panel()
@@ -443,14 +417,27 @@ class TankScherm:
             main.start_stop_btn.config(text="Stop Simulation", bg="#F44336")
             main.redrawTank()
 
+    def updateData(self, mainConfig: mainConfigClass, processConfig: tankSimConfigurationClass, processStatus: tankSimStatusClass) -> None:
+        global heating_power, inlet_valve, outlet_valve, water_level,  temperature
 
-class SettingsScherm:
+        processStatus.simRunning = self.is_running
+        water_level = processStatus.liquidVolume
+        temperature = processStatus.liquidTemperature
+
+        # only write if guiControl
+        if (mainConfig.plcGuiControl == "gui"):
+            processStatus.valveInOpenFraction = inlet_valve/100
+            processStatus.valveOutOpenFraction = outlet_valve/100
+            processStatus.heaterPowerFraction = heating_power/100
+
+
+class settings:
 
     def __init__(main, MainFrame):
 
         def ApplySettings():
             global SaveBreedte, SaveKleur, SaveDichtheid, SaveHoogtemeting
-            global SaveWeerstand, SaveKlepen, SaveDebietMaxIn, SaveHoogte, SaveControler
+            global SaveWeerstand, SaveKlepen, SaveDebietMaxIn, SaveHoogte
 
             SaveBreedte = Breedte.get()
             SaveKleur = KleurVloeistof.get().lower()
@@ -460,19 +447,9 @@ class SettingsScherm:
             SaveKlepen = RegelbareKlepen.get()
             SaveDebietMaxIn = DebietMaxIn.get()
             SaveHoogte = Hoogte.get()
-            SaveControler = SoortControler.get()
 
         SettingsFrame = tk.Frame(MainFrame, bg="white")
         SettingsFrame.place(relwidth=1.0, relheight=1.0, x=50)
-
-        SoortControlerlabel = tk.Label(
-            SettingsFrame, text="Soort Controle:", bg="white", fg="black", font=("Arial", 10))
-        SoortControlerlabel.grid(row=0, column=0, sticky="e")
-        SoortControler = tk.StringVar()
-        soortControlerMenu = tk.OptionMenu(
-            SettingsFrame, SoortControler, "Gui", "ModBusTCP", "PLC S7-1500/1200(G1-G2)/400/300/ET200 CPU", "logo!", "PLCSim advanced S7-1500", "PLCsim S7-1500/1200(G1-G2)/400/300/ET200 CPU")
-        soortControlerMenu.grid(row=0, column=1, sticky="ew")
-        SoortControler.set(SaveControler)
 
         DimensionLabel = tk.Label(
             SettingsFrame, text="Afmetingen Vat:", bg="white", fg="black", font=("Arial", 10))
@@ -563,138 +540,9 @@ class SettingsScherm:
             SettingsFrame, text="Load config", bg="white", activebackground="white", command=main.ImportConfig)
         LoadButton.grid(row=12, column=5, padx=(10, 0), pady=(10, 0))
 
-    def ExportConfig(self):
-        global exportCommand
-        exportCommand = True
-
-    def ImportConfig(self):
-        global importCommand
-        importCommand = True
-
-
-class NavigationFrame:
-    def __init__(nav, root, MainFrame):
-        navColor = '#383838'
-        nav = tk.Frame(root, bg=navColor)
-        nav.pack(side="left", fill=tk.Y, padx=3, pady=4)
-        nav.pack_propagate(flag=False)
-        nav.configure(width=45)
-
-        def navMenuAnimatie():
-            current_width = nav.winfo_width()
-            if current_width < 200:
-                current_width += 10
-                nav.config(width=current_width)
-                root.after(ms=8, func=navMenuAnimatie)
-
-        def navMenuAnimatieClose():
-            current_width = nav.winfo_width()
-            if current_width != 45:
-                current_width -= 10
-                nav.config(width=current_width)
-                root.after(ms=8, func=navMenuAnimatieClose)
-
-        def navMenuOpen():
-            navMenuAnimatie()
-            toggleNav.config(text="Close", command=navMenuClose)
-            HomeText = tk.Label(nav, text="Home", bg=navColor, fg="white")
-            HomeText.place(x=45, y=140)
-            HomeText.bind(
-                "<Button-1>", lambda e: welkePagina(home_indicator, TankScherm, MainFrame))
-            SettingsText = tk.Label(
-                nav, text="Settings", bg=navColor, fg="white")
-            SettingsText.place(x=45, y=200)
-            SettingsText.bind(
-                "<Button-1>", lambda e: welkePagina(settings_indicator, SettingsScherm, MainFrame))
-
-        def navMenuClose():
-            navMenuAnimatieClose()
-            toggleNav.config(text="nav", command=navMenuOpen)
-
-        toggleNav = tk.Button(nav, text="Nav", bg=navColor,
-                              bd=0, activebackground=navColor, command=navMenuOpen)
-        toggleNav.place(x=4, y=10, width=40, height=40)
-
-        home = tk.Button(nav, text="Home", bg=navColor,
-                         bd=0, activebackground=navColor, command=lambda: welkePagina(home_indicator, TankScherm, MainFrame))
-        home.place(x=4, y=130, width=40, height=40)
-        home_indicator = tk.Label(nav, bg=navColor)
-        home_indicator.place(x=3, y=130, width=3, height=40)
-
-        settings = tk.Button(nav, text="Settings",
-                             bg=navColor, bd=0, activebackground=navColor, command=lambda: welkePagina(settings_indicator, SettingsScherm, MainFrame))
-        settings.place(x=4, y=190, width=40, height=40)
-        settings_indicator = tk.Label(nav, bg=navColor)
-        settings_indicator.place(x=3, y=190, width=3, height=40)
-
-        def welkePagina(indicator_lb, page, MainFrame):
-            home_indicator.config(bg=navColor)
-            settings_indicator.config(bg=navColor)
-            indicator_lb.config(bg="white")
-            for frame in MainFrame.winfo_children():
-                frame.destroy()
-            page(MainFrame)
-            navMenuClose()
-
-
-kleuren = [
-    "Blue",
-    "Yellow",
-    "Gold",
-    "Green",
-    "Cyan",
-    "Orange",
-    "Red",
-    "Purple",
-    "Pink"
-]
-
-# maintain reference to current Tankscherm instance, instance is re-created when changing page to Tankscherm
-refTank: TankScherm
-
-
-class GuiClass:
-
-    def __init__(self) -> None:
-        global refTank
-
-        self.root = tk.Tk()
-        # when window is closed, stop the rest of the program
-        self.root.protocol("WM_DELETE_WINDOW", self.onExit)
-        self.Main = MainScherm(self.root)
-        self.nav = NavigationFrame(self.root, self.Main.MainFrame)
-        self.Tank = TankScherm(self.Main.MainFrame)
-        refTank = self.Tank
-
-    def updateGui(self) -> None:
-        self.root.update_idletasks()
-        self.root.update()
-
-    def updateData(self, config: configurationClass, status: statusClass) -> None:
-        global heating_power, inlet_valve, outlet_valve, water_level, tank_volume, temperature, SaveDebietMaxIn, SaveDichtheid
-        global exitProgram, TryConnectPending, ip_adress, SaveControler, refTank
-        global exportCommand, importCommand
-
-        # write data to status and config
-        if (SaveControler == "Gui"):
-            config.plcGuiControl = "gui"
-        else:
-            config.plcGuiControl = "plc"
-            config.plcProtocol = SaveControler
-
-        config.doExit = exitProgram
-        status.simRunning = refTank.is_running
-        config.tankVolume = tank_volume
-        if (TryConnectPending):
-            config.plcIpAdress = ip_adress
-            config.tryConnect = True  # set flag
-            TryConnectPending = False  # clear flag
-
-        # only write if guiControl
-        if (config.plcGuiControl == "gui"):
-            status.valveInOpenFraction = inlet_valve/100
-            status.valveOutOpenFraction = outlet_valve/100
-            status.heaterPowerFraction = heating_power/100
+    def updateData(self, mainConfig: mainConfigClass, processConfig: tankSimConfigurationClass, processStatus: tankSimStatusClass):
+        global exportCommand, importCommand, tank_volume, SaveDebietMaxIn, SaveDichtheid
+        processConfig.tankVolume = tank_volume
 
         # define csv fileType for filedialog functions
         csvFileType = [
@@ -704,19 +552,17 @@ class GuiClass:
         if (importCommand):
             file = filedialog.askopenfilename(
                 filetypes=csvFileType, defaultextension=csvFileType)
-            # only try to import when the was a file selected
+            # only try to import when there was a file selected
             if (file):
-                config.loadFromFile(file)
-                status.loadFromFile(file)
+                processConfig.loadFromFile(file)
+                processStatus.loadFromFile(file)
             importCommand = False  # reset import command flag
 
         # read data from status and config (can include our imported changes)
         # write data to status and config
-        tank_volume = config.tankVolume
-        water_level = status.liquidVolume
-        temperature = status.liquidTemperature
-        SaveDichtheid = config.liquidSpecificWeight*1000
-        SaveDebietMaxIn = config.valveInMaxFlow
+        tank_volume = processConfig.tankVolume
+        SaveDichtheid = processConfig.liquidSpecificWeight*1000
+        SaveDebietMaxIn = processConfig.valveInMaxFlow
 
         # export status and config after all changes are done
         if (exportCommand):
@@ -725,12 +571,16 @@ class GuiClass:
             # only try to export when the was a file selected
             if (file):
                 # create file, add header, add config variables
-                config.saveToFile(file, True)
+                processConfig.saveToFile(file, True)
                 # add status variables to file
-                status.saveToFile(file)
+                processStatus.saveToFile(file)
                 # reset export command flag
             exportCommand = False
 
-    def onExit(self) -> None:
-        global exitProgram
-        exitProgram = True
+    def ExportConfig(self):
+        global exportCommand
+        exportCommand = True
+
+    def ImportConfig(self):
+        global importCommand
+        importCommand = True
