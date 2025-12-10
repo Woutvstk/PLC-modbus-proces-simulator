@@ -1,268 +1,492 @@
-from tkinter import filedialog
-import tkinter as tk
-import pathlib
+import sys
 import os
-from PIL import Image, ImageTk
-import math
+import xml.etree.ElementTree as ET
 
-# import class definition of mainConfig
-from configuration import configuration as mainConfigClass
+from PyQt5.QtWidgets import (
+    QMainWindow, QApplication, QPushButton, QMenu, QAction,
+    QWidget, QVBoxLayout
+)
+from PyQt5.QtCore import QTimer, QSize
+from PyQt5.QtSvg import QSvgRenderer
+from PyQt5.QtGui import QPainter
 
+from QtDesignerLayout import Ui_MainWindow
 
-# kept for text color, autocomplete, ... TODO: change to base class
-from tankSim.status import status as tankSimStatusClass
-from tankSim.configuration import configuration as tankSimConfigurationClass
-
-
-# tankSim specific imports
-from tankSim.gui import process as tankSimProcessScreenClass
-from tankSim.gui import settings as tankSimSettingsScreenClass
-
-navColor = '#383838'
-
-defaultMainConfig: mainConfigClass = mainConfigClass()
+red = "#FF0000"
+orange = "#FFA500"
+blue = "#1100FF"
+green = "#00FF00"
 
 
-# flag to notify the rest of the program that the gui has been closed
-exitProgram = False
-TryConnectPending = False
-importCommand: bool = False
-exportCommand: bool = False
+maxHoogteVat = 2000
+weerstand = True
+tempVat = 100
+currentHoogteVat = 2000
 
 
-ip_adress = defaultMainConfig.plcIpAdress
-SaveControler = "PLC S7-1500/1200/400/300"
+class SvgDisplay(QWidget):
+    """Widget dat alleen de SVG rendert."""
 
-# TODO change to base class
-currenScreen: tankSimProcessScreenClass = None
+    def __init__(self, renderer):
+        super().__init__()
+        self.renderer = renderer
 
+    def sizeHint(self):
+        return QSize(300, 350)
 
-def getAbsolutePath(relativePath: str) -> str:
-    current_dir = pathlib.Path(__file__).parent.resolve()
-    return os.path.join(current_dir, relativePath)
-
-
-class MainScherm:
-    def __init__(main, root):
-        conColor = '#383838'
-        main.root = root
-        main.root.title("PID Regelaar Tank")
-        main.root.geometry("1200x700")
-        main.root.configure(bg="white")
-
-        main.conFrame = tk.Frame(main.root, bg=conColor, height=45)
-        main.conFrame.place(relwidth=1.0, x=50, y=4)
-
-        connectButton = tk.Button(main.conFrame, text="Connect",
-                                  bg=conColor, activebackground=conColor, fg="white", command=main.setTryConnect)
-        connectButton.place(x=830, y=10)
-
-        main.AdresLabel = tk.Label(main.conFrame, text="IP Adress:",
-                                   bg=conColor, fg="White", font=("Arial", 10))
-        main.AdresLabel.place(x=900, y=10)
-        main.Adres = tk.Entry(main.conFrame, bg=conColor,
-                              fg="White", font=("Arial", 10))
-        main.Adres.place(x=970, y=12.5)
-        main.Adres.insert(0, ip_adress)
-
-        main.MainFrame = tk.Frame(main.root, bg="white")
-        main.MainFrame.place(relwidth=1.0, relheight=1.0, x=50, y=50)
-
-    def setTryConnect(self):
-        global TryConnectPending, ip_adress
-        ip_adress = self.Adres.get()
-        TryConnectPending = True
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        self.renderer.render(painter)
 
 
-class NavigationFrame:
-    def __init__(nav, root, MainFrame):
-        global currenScreen
-        navColor = '#383838'
-        nav = tk.Frame(root, bg=navColor)
-        nav.pack(side="left", fill=tk.Y, padx=3, pady=4)
-        nav.pack_propagate(flag=False)
-        nav.configure(width=45)
+class VatWidget(QWidget):
+    def __init__(self):
+        super().__init__()
 
-        def navMenuAnimatie():
-            current_width = nav.winfo_width()
-            if current_width < 200:
-                current_width += 10
-                nav.config(width=current_width)
-                root.after(ms=8, func=navMenuAnimatie)
+        layout = QVBoxLayout(self)
 
-        def navMenuAnimatieClose():
-            current_width = nav.winfo_width()
-            if current_width != 45:
-                current_width -= 10
-                nav.config(width=current_width)
-                root.after(ms=8, func=navMenuAnimatieClose)
+        # DEFAULTS: zorg dat alle gebruikte attributes bestaan
+        # (worden later overschreven door MainWindow.update_values)
+        self.toekomendDebiet = 0
+        self.tempWeerstand = 20.0
+        self.regelbareKleppen = False
+        self.regelbareWeerstand = False
+        self.niveauschakelaar = False
+        self.analogeWaardeTemp = False
+        self.KlepStandBoven = 0
+        self.KlepStandBeneden = 0
+        self.kleurWater = blue
+        self.controler = "LOGO"
 
-        def navMenuOpen():
-            navMenuAnimatie()
-            toggleNav.config(text="Close", command=navMenuClose)
-            HomeText = tk.Label(nav, text="Home", bg=navColor, fg="white")
-            HomeText.place(x=45, y=140)
-            HomeText.bind("<Button-1>", lambda e: welkePagina(home_indicator,
-                          tankSimProcessScreenClass, MainFrame))
+        # extra defaults voor GUI elementen die mogelijk niet in SVG zitten
+        self.waterInVat = None
+        self.originalY = 0.0
+        self.originalHoogte = 0.0
+        self.maxHoogteGUI = 80
+        self.ondersteY = 0.0
 
-            SettingsText = tk.Label(
-                nav, text="Settings", bg=navColor, fg="white")
-            SettingsText.place(x=45, y=200)
-            SettingsText.bind("<Button-1>", lambda e: welkePagina(
-                settings_indicator, tankSimSettingsScreenClass, MainFrame))
+        # SVG inladen
+        try:
+            svg_path = os.path.join(base_path, "media", "SVGVat.svg")
+            self.tree = ET.parse(svg_path)
+            self.root = self.tree.getroot()
+            self.ns = {"svg": "http://www.w3.org/2000/svg"}
+        except Exception as e:
+            raise RuntimeError("Kan 'SVG vat.svg' niet inladen: " + str(e))
 
-            mainSettingsText = tk.Label(
-                nav, text="mainSettings", bg=navColor, fg="white")
-            mainSettingsText.place(x=45, y=260)
-            mainSettingsText.bind("<Button-1>", lambda e: welkePagina(
-                mainSettings_indicator, tankSimSettingsScreenClass, MainFrame))
+        # Renderer
+        self.renderer = QSvgRenderer()
+        self.svg_widget = SvgDisplay(self.renderer)
+        layout.addWidget(self.svg_widget)
 
-        def navMenuClose():
-            navMenuAnimatieClose()
-            toggleNav.config(text="nav", command=navMenuOpen)
+        # eerste render
+        self.rebuild()
 
-        toggleNav = tk.Button(nav, text="Nav", bg=navColor,
-                              bd=0, activebackground=navColor, command=navMenuOpen)
-        toggleNav.place(x=4, y=10, width=40, height=40)
+    def rebuild(self):
+        global currentHoogteVat, maxHoogteVat
 
-        home = tk.Button(nav, text="Home", bg=navColor,
-                         bd=0, activebackground=navColor, command=lambda: welkePagina(home_indicator, tankSimProcessScreenClass, MainFrame))
-        home.place(x=4, y=130, width=40, height=40)
-        home_indicator = tk.Label(nav, bg=navColor)
-        home_indicator.place(x=3, y=130, width=3, height=40)
+        # Kleur water
+        self.set_group_color("waterTotaal", self.kleurWater)
 
-        settings = tk.Button(nav, text="Settings",
-                             bg=navColor, bd=0, activebackground=navColor, command=lambda: welkePagina(settings_indicator, tankSimSettingsScreenClass, MainFrame))
-        settings.place(x=4, y=190, width=40, height=40)
-        settings_indicator = tk.Label(nav, bg=navColor)
-        settings_indicator.place(x=3, y=190, width=3, height=40)
+        # veilige ratio berekening voor temperatuurpercent
 
-        mainSettings = tk.Button(nav, text="mainSettings", bg=navColor,
-                                 bd=0, activebackground=navColor, command=lambda: welkePagina(mainSettings_indicator, mainSettingsScreenClass, MainFrame))
-        mainSettings.place(x=4, y=250, width=40, height=40)
-        mainSettings_indicator = tk.Label(nav, bg=navColor)
-        mainSettings_indicator.place(x=3, y=250, width=3, height=40)
-
-        def welkePagina(indicator_lb, page, MainFrame):
-            global currenScreen
-            home_indicator.config(bg=navColor)
-            settings_indicator.config(bg=navColor)
-            mainSettings_indicator.config(bg=navColor)
-            indicator_lb.config(bg="white")
-            for frame in MainFrame.winfo_children():
-                frame.destroy()
-            currenScreen = page(MainFrame)
-            navMenuClose()
-
-
-class mainSettingsScreenClass:
-
-    def __init__(main, MainFrame):
-
-        def ApplySettings():
-            global SaveControler
-            SaveControler = SoortControler.get()
-
-        SettingsFrame = tk.Frame(MainFrame, bg="white")
-        SettingsFrame.place(relwidth=1.0, relheight=1.0, x=50)
-
-        SoortControlerlabel = tk.Label(
-            SettingsFrame, text="Soort Controle:", bg="white", fg="black", font=("Arial", 10))
-        SoortControlerlabel.grid(row=0, column=0, sticky="e")
-        SoortControler = tk.StringVar()
-        soortControlerMenu = tk.OptionMenu(
-            SettingsFrame, SoortControler, "Gui", "ModBusTCP", "PLC S7-1500/1200/400/300", "logo!", "PLCSim")
-        soortControlerMenu.grid(row=0, column=1, sticky="ew")
-        SoortControler.set(SaveControler)
-
-        SaveButton = tk.Button(
-            SettingsFrame, text="Apply Settings", bg="white", activebackground="white", command=ApplySettings)
-        SaveButton.grid(row=12, column=3, pady=(10, 0))
-
-        ExportButton = tk.Button(
-            SettingsFrame, text="Export config", bg="white", activebackground="white", command=main.ExportConfig)
-        ExportButton.grid(row=12, column=4, padx=(30, 0), pady=(10, 0))
-
-        LoadButton = tk.Button(
-            SettingsFrame, text="Load config", bg="white", activebackground="white", command=main.ImportConfig)
-        LoadButton.grid(row=12, column=5, padx=(10, 0), pady=(10, 0))
-
-    def updateData(self, mainConfig: mainConfigClass, processConfig: tankSimConfigurationClass, processStatus: tankSimStatusClass):
-        global SaveControler, importCommand, exportCommand
-
-        # define csv fileType for filedialog functions
-        csvFileType = [
-            ('Comma-separated values', '*.csv'), ('All Files', '*.*'),]
-
-        # overwrite config and status after other changes done by gui
-        if (importCommand):
-            file = filedialog.askopenfilename(
-                filetypes=csvFileType, defaultextension=csvFileType)
-            # only try to import when there was a file selected
-            if (file):
-                mainConfig.loadFromFile(file)
-            importCommand = False  # reset import command flag
-
-        # write data to status and config
-        if (SaveControler == "Gui"):
-            mainConfig.plcGuiControl = "gui"
+        if self.tempWeerstand == 0:
+            tempVatProcent = 0.0
         else:
-            mainConfig.plcGuiControl = "plc"
-            mainConfig.plcProtocol = SaveControler
+            tempVatProcent = (tempVat * 100.0) / self.tempWeerstand
 
-        # export mainConfig after all changes are done
-        if (exportCommand):
-            file = filedialog.asksaveasfilename(
-                filetypes=csvFileType, defaultextension=csvFileType)
-            # only try to export when the was a file selected
-            if (file):
-                # create file, add header, add config variables
-                mainConfig.saveToFile(file, True)
-            exportCommand = False
+        tempVatProcent = max(0.0, min(100.0, tempVatProcent))
 
-    def ExportConfig(self):
-        global exportCommand
-        exportCommand = True
+        match tempVatProcent:
+            case x if 20 < x <= 40:
+                self.set_group_color("warmteweerstand", green)
+            case x if 40 < x <= 60:
+                self.set_group_color("warmteweerstand", blue)
+            case x if 60 < x <= 80:
+                self.set_group_color("warmteweerstand", orange)
+            case x if 80 < x < 100:
+                self.set_group_color("warmteweerstand", green)
+            case x if x >= 100:
+                self.set_group_color("warmteweerstand", red)
+            case _:
+                self.set_group_color("warmteweerstand", "#808080")
 
-    def ImportConfig(self):
-        global importCommand
-        importCommand = True
+        # Onzichtbaar maken van items
+        if self.niveauschakelaar:
+            self.visibility_group("niveauschakelaar", "shown")
+        else:
+            self.visibility_group("niveauschakelaar", "hidden")
+        if self.analogeWaardeTemp:
+            self.visibility_group("analogeWaardeTemp", "shown")
+        else:
+            self.visibility_group("analogeWaardeTemp", "hidden")
+        if self.regelbareKleppen:
+            self.visibility_group("regelbareKleppen", "shown")
+        else:
+            self.visibility_group("regelbareKleppen", "hidden")
+
+        if not self.regelbareWeerstand:
+            self.visibility_group("regelbareweerstand", "hidden")
+            if weerstand:
+                self.set_group_color("weerstandStand", green)
+            elif not weerstand:
+                self.set_group_color("weerstandStand", red)
+            else:
+                self.set_group_color("weerstandStand", "#FFFFFF")
+        else:
+            self.visibility_group("regelbareweerstand", "shown")
+
+        # Klep boven
+        if self.KlepStandBoven == 0:
+            self.klep_breete("waterval", 0)
+            self.set_group_color("KlepBoven", "#FFFFFF")
+
+        else:
+            self.klep_breete("waterval", self.KlepStandBoven)
+            self.set_group_color("KlepBoven", self.kleurWater)
+
+        # Klep beneden
+
+        if self.KlepStandBeneden == 0:
+            self.klep_breete("waterBeneden", 0)
+            self.set_group_color("KlepBeneden", "#FFFFFF")
+        else:
+            self.klep_breete("waterBeneden", self.KlepStandBeneden)
+            self.set_group_color("KlepBeneden", self.kleurWater)
+
+        # temperatuur vat kleur
+        if tempVat == self.tempWeerstand:
+            self.set_group_color("temperatuurVat", green)
+        else:
+            self.set_group_color("temperatuurVat", red)
+
+        # Teksten
+        self.set_svg_text("klepstandBoven", str(self.KlepStandBoven) + "%")
+        self.set_svg_text("KlepstandBeneden", str(self.KlepStandBeneden) + "%")
+        self.set_svg_text("debiet", str(self.toekomendDebiet) + "l/s")
+        self.set_svg_text("temperatuurWarmteweerstand",
+                          str(self.tempWeerstand) + "°C")
+        self.set_svg_text("temperatuurVatWaarde", str(tempVat) + "°C")
+
+        # water element
+        self.waterInVat = self.root.find(
+            f".//svg:*[@id='waterInVat']", self.ns)
+
+        if self.waterInVat is not None:
+            # beware: attributes uit SVG zijn strings
+            try:
+                self.originalY = float(self.waterInVat.get("y"))
+                self.originalHoogte = float(self.waterInVat.get("height"))
+            except Exception:
+                self.originalY = 0.0
+                self.originalHoogte = 0.0
+            self.maxHoogteGUI = 80
+            self.ondersteY = self.originalY + self.originalHoogte
+            self.vat_vullen_GUI()
+
+        self.update_svg()
+        self.svg_widget.update()
+
+    def update_svg(self):
+        xml_bytes = ET.tostring(self.root, encoding="utf-8")
+        self.renderer.load(xml_bytes)
+
+    def vat_vullen_GUI(self):
+        global currentHoogteVat, maxHoogteVat
+
+        if currentHoogteVat >= maxHoogteVat:
+            self.set_group_color("niveauschakelaar", green)
+        else:
+            self.set_group_color("niveauschakelaar", red)
+
+        hoogteVatGui = currentHoogteVat / maxHoogteVat * self.maxHoogteGUI
+        nieuweY = self.ondersteY - hoogteVatGui
+
+        if self.waterInVat is not None:
+            self.waterInVat.set("height", str(hoogteVatGui))
+            self.waterInVat.set("y", str(nieuweY))
+
+        self.set_hoogte_indicator("hoogteIndicator", nieuweY)
+        self.set_hoogte_indicator("hoogteTekst", nieuweY+2)
+        self.set_svg_text("hoogteTekst", str(int(currentHoogteVat)) + "mm")
+
+    def set_hoogte_indicator(self, itemId, hoogte):
+        item = self.root.find(f".//svg:*[@id='{itemId}']", self.ns)
+        if item is not None:
+            item.set("y", str(hoogte))
+        else:
+            print(
+                f"Waarschuwing: groep '{itemId}' niet gevonden om hoogte te wijzigen.")
+
+    def set_group_color(self, groupId, kleur):
+        group = self.root.find(f".//svg:g[@id='{groupId}']", self.ns)
+        if group is not None:
+            for element in group:
+                element.set("fill", kleur)
+        else:
+            print(
+                f"Waarschuwing: groep '{groupId}' niet gevonden om kleur te wijzigen.")
+
+    def visibility_group(self, groupId, visibility):
+        group = self.root.find(f".//svg:g[@id='{groupId}']", self.ns)
+        if group is not None:
+            group.set("visibility", visibility)
+        else:
+            print(
+                f"Waarschuwing: groep '{groupId}' niet gevonden om te" + visibility + ".")
+
+    def klep_breete(self, itemId, KlepStand):
+        item = self.root.find(f".//svg:*[@id='{itemId}']", self.ns)
+        if item is not None:
+
+            new_width = (KlepStand * 0.0645)
+            new_x = 105.745 - (KlepStand * 0.065) / 2
+            item.set("width", str(new_width))
+            item.set("x", str(new_x))
+        else:
+            print(
+                f"Waarschuwing: item '{itemId}' niet gevonden om breedte aan te passen.")
+
+    def set_svg_text(self, itemId, value):
+        item = self.root.find(f".//svg:*[@id='{itemId}']", self.ns)
+        if item is not None:
+
+            tspan = item.find("svg:tspan", self.ns)
+            if tspan is not None:
+                tspan.text = value
+            else:
+                item.text = value
+        else:
+            print(
+                f"Waarschuwing: item '{itemId}' niet gevonden om tekt te wijzigen.")
 
 
-class mainGui:
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super(MainWindow, self).__init__()
 
-    def __init__(self) -> None:
-        global currenScreen
+        self.ui = Ui_MainWindow()
+        self.ui.setupUi(self)
 
-        self.root = tk.Tk()
-        # when window is closed, stop the rest of the program
-        self.root.protocol("WM_DELETE_WINDOW", self.onExit)
-        self.Main = MainScherm(self.root)
-        self.nav = NavigationFrame(self.root, self.Main.MainFrame)
-        self.Tank = tankSimProcessScreenClass(self.Main.MainFrame)
-        currenScreen = self.Tank
+        self.ui.fullMenuWidget.hide()
+        self.ui.stackedWidget.setCurrentIndex(0)
+        self.ui.pushButton_simPage2.setChecked(True)
+        self.ui.regelingSimGui.setVisible(False)
 
-    def updateGui(self) -> None:
-        self.root.update_idletasks()
-        self.root.update()
+        # timer voor automatische updates
+        self.timer = QTimer()
+        self.timer.setInterval(100)   # 10x per seconde
+        self.timer.timeout.connect(self.update_values)
+        self.timer.start()
 
-    def updateDataMain(self, mainConfig: mainConfigClass) -> None:
-        global exitProgram, TryConnectPending, ip_adress
+        container = self.ui.vatWidgetContainer
+        self.vat_widget = VatWidget()
+        layout = container.layout()
+        layout.addWidget(self.vat_widget)
 
-        mainConfig.doExit = exitProgram
+        # --- Zet hier éénmalig de connecties voor synchronisatie van velden ---
+        self.entryGroupDebiet = [
+            self.ui.toekomendDebietEntry,
+            self.ui.toekomendDebietEntry1,
+            self.ui.toekomendDebietEntry2
+        ]
+        self.entryGroupTemp = [
+            self.ui.tempWeerstandEntry,
+            self.ui.tempWeerstandEntry1
+        ]
 
-        if (TryConnectPending):
-            mainConfig.plcIpAdress = ip_adress
-            mainConfig.tryConnect = True  # set flag
-            TryConnectPending = False  # clear flag
+        # Connecteer tekstveranderingen éénmalig; gebruik default-argument om groep te binden
+        for group in (self.entryGroupDebiet, self.entryGroupTemp):
+            for field in group:
+                field.textChanged.connect(
+                    lambda text, g=group: self.syncFields(text, g))
+        self.ui.kleurDropDown.clear()
 
-    # TODO: change process config and status to base class
+        kleuren = [
+            ("Blue",  "#0000FF"),
+            ("Red",   "#FB5C5C"),
+            ("Green",  "#00FF00"),
+            ("Yellow",   "#FAFA2B"),
+            ("Orange", "#FFB52B"),
+            ("Purple",  "#800080"),
+            ("Gray",  "#808080"),
+        ]
 
-    def updateData(self, mainConfig: mainConfigClass, processConfig: tankSimConfigurationClass, processStatus: tankSimStatusClass) -> None:
-        global currenScreen
-        currenScreen.updateData(
-            mainConfig, processConfig, processStatus)
+        for naam, hexcode in kleuren:
+            self.ui.kleurDropDown.addItem(naam, hexcode)
 
-    def onExit(self) -> None:
-        global exitProgram
-        exitProgram = True
+    def update_values(self):
+        try:
+            # Lees waarden uit UI en zet ze op vat_widget (geef types)
+            self.vat_widget.toekomendDebiet = int(
+                self.ui.toekomendDebietEntry.text() or 0)
+            self.vat_widget.tempWeerstand = float(
+                self.ui.tempWeerstandEntry.text() or 20.0)
+
+            self.volume = float(
+                self.ui.volumeEntry.text() or 2.0)
+            self.IPadress = str(
+                self.ui.IPAdress.text() or "192.168.0.1")
+
+            # Is het vat regelbaar?
+            regelbaarKleppen = self.ui.regelbareKlepenCheckBox.isChecked()
+            self.vat_widget.regelbareKleppen = regelbaarKleppen
+
+            regelbareWeerstand = self.ui.regelbareWeerstandCheckBox.isChecked()
+            self.vat_widget.regelbareWeerstand = regelbareWeerstand
+
+            self.ui.regelbareKlepenCheckBox.toggled.connect(
+                self.controlerOptie)
+
+            niveauschakelaar = self.ui.niveauschakelaarCheckBox.isChecked()
+            self.vat_widget.niveauschakelaar = niveauschakelaar
+
+            analogeWaardeTemp = self.ui.analogeWaardeTempCheckBox.isChecked()
+            self.vat_widget.analogeWaardeTemp = analogeWaardeTemp
+
+            if self.vat_widget.controler == "GUI":
+                if self.vat_widget.regelbareKleppen:
+                    self.ui.GUiSim.hide()
+                    self.ui.regelbareKlepenGUISim.show()
+
+                else:
+                    self.ui.regelbareKlepenGUISim.hide()
+                    self.ui.GUiSim.show()
+            else:
+                self.ui.GUiSim.hide()
+                self.ui.regelbareKlepenGUISim.hide()
+
+            if regelbaarKleppen:
+                # Gebruik waardes uit de QLineEdits
+                try:
+                    self.vat_widget.KlepStandBoven = int(
+                        self.ui.klepstandBovenEntry.text() or 0)
+                except ValueError:
+                    self.vat_widget.KlepStandBoven = 0
+                try:
+                    self.vat_widget.KlepStandBeneden = int(
+                        self.ui.klepstandBenedenEntry.text() or 0)
+                except ValueError:
+                    self.vat_widget.KlepStandBeneden = 0
+
+            else:
+                # Niet regelbaar → kijk naar de andere checkbox
+                boven_checked = self.ui.klepstandBovenCheckBox.isChecked()
+                beneden_checked = self.ui.klepstandBenedenCheckBox.isChecked()
+
+                self.vat_widget.KlepStandBoven = 100 if boven_checked else 0
+                self.vat_widget.KlepStandBeneden = 100 if beneden_checked else 0
+
+            self.ui.kleurDropDown.currentIndexChanged.connect(
+                self.kleurOptie)
+            self.ui.controlerDropDown.currentIndexChanged.connect(
+                self.controlerOptie)
+
+        except Exception as e:
+            # log fout zodat je weet wat er mis ging
+            print("Fout in update_values:", e)
+
+        # volledig opnieuw doorlopen van VatWidget
+        self.vat_widget.rebuild()
+
+    def controlerOptie(self):
+        self.vat_widget.controler = self.ui.controlerDropDown.currentText()
+
+    def kleurOptie(self):
+        self.vat_widget.kleurWater = self.ui.kleurDropDown.currentData()
+
+    def syncFields(self, text, group):
+        for field in group:
+            if field.text() != text:
+                field.blockSignals(True)
+                field.setText(text)
+                field.blockSignals(False)
+
+    def on_stackedWidget_currentChanged(self, index):
+        btn_list = self.ui.iconOnlyWidget.findChildren(QPushButton) \
+            + self.ui.fullMenuWidget.findChildren(QPushButton)
+        for btn in btn_list:
+            btn.setAutoExclusive(index not in [5, 6])
+            if index in [5, 6]:
+                btn.setChecked(False)
+
+    # overige toggle handlers blijven hetzelfde
+    def on_pushButton_settingsPage1_toggled(self):
+        self.ui.stackedWidget.setCurrentIndex(3)
+
+    def on_pushButton_settingsPage2_toggled(self):
+        self.ui.stackedWidget.setCurrentIndex(3)
+
+    def on_pushButton_IOPage1_toggled(self):
+        self.ui.stackedWidget.setCurrentIndex(4)
+
+    def on_pushButton_IOPage2_toggled(self):
+        self.ui.stackedWidget.setCurrentIndex(4)
+
+    def on_pushButton_simPage2_toggled(self):
+        self.ui.stackedWidget.setCurrentIndex(0)
+
+    def on_pushButton_simPage_toggled(self):
+        self.ui.stackedWidget.setCurrentIndex(0)
+
+    def on_pushButton_1Vat_toggled(self):
+        self.ui.stackedWidget.setCurrentIndex(0)
+
+    def on_pushButton_2Vatten_toggled(self):
+        self.ui.stackedWidget.setCurrentIndex(1)
+
+    def on_pushButton_transportband_toggled(self):
+        self.ui.stackedWidget.setCurrentIndex(2)
+
+    def simOptions(self):
+        options = ["PID regelaar 1 vat",
+                   "PID regelaar 2 vatten", "Transportband"]
+        button = self.ui.pushButton_simPage
+        self.showSimoptions(button, options)
+
+    def showSimoptions(self, button, options):
+        menu = QMenu(self)
+        menu.setStyleSheet("""
+            QMenu{
+                background-color: #fff;
+                color: #000;
+            }
+            QMenu::item:selected{
+                background-color: #ddd;
+                color: #000;
+            }
+        """)
+        for optionText in options:
+            action = QAction(optionText, self)
+            action.triggered.connect(self.HandleOptionsClick)
+            menu.addAction(action)
+        menu.move(button.mapToGlobal(button.rect().bottomLeft()))
+        menu.exec_()
+
+    def HandleOptionsClick(self):
+        text = self.sender().text()
+        if text == "PID regelaar 1 vat":
+            self.ui.stackedWidget.setCurrentIndex(0)
+        elif text == "PID regelaar 2 vatten":
+            self.ui.stackedWidget.setCurrentIndex(1)
+        elif text == "Transportband":
+            self.ui.stackedWidget.setCurrentIndex(2)
+
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    base_path = os.path.dirname(os.path.abspath(__file__))
+    style_path = os.path.join(base_path, "style.qss")
+
+    if os.path.exists(style_path):
+        with open(style_path, "r") as f:
+            app.setStyleSheet(f.read())
+    else:
+        print("style.qss niet gevonden")
+
+    window = MainWindow()
+    window.show()
+    sys.exit(app.exec())
+
+
+# pyuic5 -x QtDesignerLayout.ui -o QtDesignerLayout.py

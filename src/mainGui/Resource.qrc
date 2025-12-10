@@ -1,0 +1,45 @@
+<RCC>
+  <qresource prefix="Icon">
+    <file>icon/transportband.svg</file>
+    <file>icon/SVG vat.svg</file>
+    <file>icon/activity-feed-32 blauw.ico</file>
+    <file>icon/activity-feed-32.ico</file>
+    <file>icon/close-window-64 blauw.ico</file>
+    <file>icon/close-window-64.ico</file>
+    <file>icon/download-2-32.ico</file>
+    <file>icon/house-16.ico</file>
+    <file>icon/house-32 blauw.ico</file>
+    <file>icon/house-32.ico</file>
+    <file>icon/mainWindowPIDRegelaarSim.ui</file>
+    <file>icon/menu-4-32 blauw.ico</file>
+    <file>icon/menu-4-32.ico</file>
+    <file>icon/play-6-32 blauw.ico</file>
+    <file>icon/play-6-32.ico</file>
+    <file>icon/save-32 blauw.ico</file>
+    <file>icon/save-32.ico</file>
+    <file>icon/settings-5-32 blauw.ico</file>
+    <file>icon/settings-5-32.ico</file>
+    <file>icon/settings-12-32 blauw.ico</file>
+    <file>icon/settings-12-32.ico</file>
+    <file>icon/simulation.ico</file>
+    <file>icon/simulation.png</file>
+    <file>icon/usb-connected-32 blauw.ico</file>
+    <file>icon/usb-connected-32.ico</file>
+    <file>icon/usb-disconnected-32 blauw.ico</file>
+    <file>icon/usb-disconnected-32.ico</file>
+    <file>icon/simulation.ico</file>
+    <file>icon/activity-feed-32.ico</file>
+    <file>icon/close-window-64.ico</file>
+    <file>icon/download-2-32.ico</file>
+    <file>icon/house-16.ico</file>
+    <file>icon/house-32.ico</file>
+    <file>icon/mainWindowPIDRegelaarSim.ui</file>
+    <file>icon/menu-4-32.ico</file>
+    <file>icon/play-6-32.ico</file>
+    <file>icon/save-32.ico</file>
+    <file>icon/settings-5-32.ico</file>
+    <file>icon/settings-12-32.ico</file>
+    <file>icon/usb-connected-32.ico</file>
+    <file>icon/usb-disconnected-32.ico</file>
+  </qresource>
+</RCC>
