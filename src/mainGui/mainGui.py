@@ -67,8 +67,7 @@ class VatWidget(QWidget):
 
         # SVG inladen
         try:
-            svg_path = os.path.join(base_path, "media", "SVGVat.svg")
-            self.tree = ET.parse(svg_path)
+            self.tree = ET.parse("SVG vat.svg")
             self.root = self.tree.getroot()
             self.ns = {"svg": "http://www.w3.org/2000/svg"}
         except Exception as e:
@@ -490,3 +489,4 @@ if __name__ == "__main__":
 
 
 # pyuic5 -x QtDesignerLayout.ui -o QtDesignerLayout.py
+# pyrcc5 Resource.qrc -o Resource_rc.py

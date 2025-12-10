@@ -18,7 +18,7 @@ class Ui_MainWindow(object):
         MainWindow.setEnabled(True)
         MainWindow.resize(1460, 1080)
         icon = QtGui.QIcon()
-        icon.addPixmap(QtGui.QPixmap(":/Icon/icon/simulation.ico"),
+        icon.addPixmap(QtGui.QPixmap(":/Icon/icon/simulation.png"),
                        QtGui.QIcon.Normal, QtGui.QIcon.Off)
         MainWindow.setWindowIcon(icon)
         self.centralwidget = QtWidgets.QWidget(MainWindow)
@@ -629,7 +629,7 @@ class Ui_MainWindow(object):
         self.logo = QtWidgets.QLabel(self.iconOnlyWidget)
         self.logo.setMinimumSize(QtCore.QSize(50, 50))
         self.logo.setText("")
-        self.logo.setPixmap(QtGui.QPixmap(":/Icon/icon/simulation.ico"))
+        self.logo.setPixmap(QtGui.QPixmap(":/Icon/icon/simulation.png"))
         self.logo.setScaledContents(True)
         self.logo.setObjectName("logo")
         self.horizontalLayout_2.addWidget(self.logo)
@@ -752,8 +752,8 @@ class Ui_MainWindow(object):
         self.horizontalLayout_5 = QtWidgets.QHBoxLayout()
         self.horizontalLayout_5.setObjectName("horizontalLayout_5")
         self.logo2 = QtWidgets.QLabel(self.fullMenuWidget)
-        self.logo2.setMinimumSize(QtCore.QSize(40, 40))
-        self.logo2.setMaximumSize(QtCore.QSize(40, 40))
+        self.logo2.setMinimumSize(QtCore.QSize(0, 0))
+        self.logo2.setMaximumSize(QtCore.QSize(40, 16777215))
         self.logo2.setText("")
         self.logo2.setPixmap(QtGui.QPixmap("icon/simulation.png"))
         self.logo2.setScaledContents(True)
@@ -830,7 +830,7 @@ class Ui_MainWindow(object):
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
-        MainWindow.setWindowTitle(_translate("MainWindow", "MainWindow"))
+        MainWindow.setWindowTitle(_translate("MainWindow", "PID Simulation"))
         self.IPAdress.setText(_translate("MainWindow", "192.168.1.0"))
         self.label_14.setText(_translate("MainWindow", "Simulatie in GUI"))
         self.label_3.setText(_translate("MainWindow", "Klepstand bovenaan:"))

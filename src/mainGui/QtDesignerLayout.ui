@@ -14,11 +14,11 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>MainWindow</string>
+   <string>PID Simulation</string>
   </property>
   <property name="windowIcon">
    <iconset resource="Resource.qrc">
-    <normaloff>:/Icon/icon/simulation.ico</normaloff>:/Icon/icon/simulation.ico</iconset>
+    <normaloff>:/Icon/icon/simulation.png</normaloff>:/Icon/icon/simulation.png</iconset>
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QGridLayout" name="gridLayout">
@@ -1389,7 +1389,7 @@
             <string/>
            </property>
            <property name="pixmap">
-            <pixmap resource="Resource.qrc">:/Icon/icon/simulation.ico</pixmap>
+            <pixmap resource="Resource.qrc">:/Icon/icon/simulation.png</pixmap>
            </property>
            <property name="scaledContents">
             <bool>true</bool>
@@ -1664,14 +1664,14 @@
             <widget class="QLabel" name="logo2">
              <property name="minimumSize">
               <size>
-               <width>40</width>
-               <height>40</height>
+               <width>0</width>
+               <height>0</height>
               </size>
              </property>
              <property name="maximumSize">
               <size>
                <width>40</width>
-               <height>40</height>
+               <height>16777215</height>
               </size>
              </property>
              <property name="text">
