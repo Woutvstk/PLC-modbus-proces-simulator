@@ -1,0 +1,20 @@
+{
+  "offsets": {
+    "BoolInput": 0,
+    "BoolOutput": 0,
+    "DWORDInput": 2,
+    "DWORDOutput": 2
+  },
+  "signals": [
+    {
+      "name": "UpperValveClosed",
+      "type": "bool",
+      "byte": "0",
+      "bit": "0",
+      "address": "I0.0",
+      "status": "FALSE",
+      "description": "Upper valve is fully closed",
+      "range": "0-1"
+    }
+  ]
+}

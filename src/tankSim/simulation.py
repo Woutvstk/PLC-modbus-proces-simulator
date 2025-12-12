@@ -1,5 +1,5 @@
 import time
-from tankSim.configuration import configuration as configurationClass
+from tankSim.configurationTS import configuration as configurationClass
 from tankSim.status import status as statusClass
 
 

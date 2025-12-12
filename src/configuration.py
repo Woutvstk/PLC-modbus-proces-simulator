@@ -17,7 +17,7 @@ class configuration:
         """
         # written by: gui, import
         # options: "Gui","PLC S7-1500/1200/400/300/ET 200SP","PLC S7-300/400", "logo!",PLCSim S7-1500 advanced,"PLCSim S7-1500/1200/400/300/ET 200SP")
-        self.plcProtocol: str = "PLC S7-1500/1200/400/300"
+        self.plcProtocol: str = "PLC S7-1500/1200/400/300/ET 200SP"
         self.plcIpAdress: str = "192.168.0.1"
         self.plcPort: int = 502  # ModBusTCP default port
         self.plcRack: int = 0

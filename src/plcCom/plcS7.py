@@ -2,9 +2,9 @@ import snap7
 import snap7.util as s7util
 
 class plcS7:
-
     """Class for communication with a Siemens S7 PLC using Snap7."""
-
+    analogMax = 32767  # Max value for signed 16-bit integer
+    
     def __init__(self, ip: str, rack: int, slot: int, tcpport: int = 102):
         """
         Initialize the PLC client with IP, rack, slot, and TCP port.
