@@ -22,7 +22,7 @@
       "byte": "0",
       "bit": "1",
       "address": "I0.1",
-      "status": "TRUE",
+      "status": "FALSE",
       "description": "Tank lower level sensor",
       "range": "0-1"
     },
@@ -32,7 +32,7 @@
       "byte": "2",
       "bit": "",
       "address": "IW2",
-      "status": "16383",
+      "status": "13824",
       "description": "Tank level measurement",
       "range": "0-27648"
     },
@@ -42,7 +42,7 @@
       "byte": "4",
       "bit": "",
       "address": "IW4",
-      "status": "7876",
+      "status": "4608",
       "description": "Temperature sensor",
       "range": "0-27648"
     },
@@ -72,7 +72,7 @@
       "byte": "0",
       "bit": "2",
       "address": "Q0.2",
-      "status": "FTRUE",
+      "status": "FALSE",
       "description": "Heater digital control (ON/OFF)",
       "range": "0-1"
     },

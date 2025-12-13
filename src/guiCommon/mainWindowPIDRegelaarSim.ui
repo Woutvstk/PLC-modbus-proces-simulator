@@ -118,6 +118,32 @@
              <number>0</number>
             </property>
             <item>
+             <widget class="QComboBox" name="comboBox_networkPort">
+              <property name="minimumSize">
+               <size>
+                <width>300</width>
+                <height>30</height>
+               </size>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <spacer name="horizontalSpacer_22">
+              <property name="orientation">
+               <enum>Qt::Horizontal</enum>
+              </property>
+              <property name="sizeType">
+               <enum>QSizePolicy::Fixed</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>10</width>
+                <height>20</height>
+               </size>
+              </property>
+             </spacer>
+            </item>
+            <item>
              <widget class="QLineEdit" name="lineEdit_IPAddress">
               <property name="minimumSize">
                <size>
@@ -242,6 +268,19 @@
             </item>
            </layout>
           </item>
+          <item>
+           <spacer name="horizontalSpacer_21">
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>40</width>
+              <height>20</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
          </layout>
         </widget>
        </item>
@@ -254,7 +293,7 @@
           </size>
          </property>
          <property name="currentIndex">
-          <number>4</number>
+          <number>0</number>
          </property>
          <widget class="QWidget" name="vat1Page">
           <layout class="QGridLayout" name="gridLayout_9">
@@ -831,538 +870,7 @@
          </widget>
          <widget class="QWidget" name="settingsPage">
           <layout class="QGridLayout" name="gridLayout_7">
-           <item row="0" column="0">
-            <layout class="QHBoxLayout" name="horizontalLayout_15">
-             <item>
-              <spacer name="horizontalSpacer_4">
-               <property name="orientation">
-                <enum>Qt::Horizontal</enum>
-               </property>
-               <property name="sizeHint" stdset="0">
-                <size>
-                 <width>40</width>
-                 <height>20</height>
-                </size>
-               </property>
-              </spacer>
-             </item>
-             <item>
-              <widget class="QLabel" name="label_32">
-               <property name="font">
-                <font>
-                 <pointsize>18</pointsize>
-                </font>
-               </property>
-               <property name="text">
-                <string>Simulatie instellingen</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <spacer name="horizontalSpacer_7">
-               <property name="orientation">
-                <enum>Qt::Horizontal</enum>
-               </property>
-               <property name="sizeHint" stdset="0">
-                <size>
-                 <width>40</width>
-                 <height>20</height>
-                </size>
-               </property>
-              </spacer>
-             </item>
-            </layout>
-           </item>
-           <item row="1" column="0">
-            <layout class="QVBoxLayout" name="verticalLayout_9">
-             <item>
-              <layout class="QHBoxLayout" name="horizontalLayout_16">
-               <item>
-                <widget class="QLabel" name="label">
-                 <property name="font">
-                  <font>
-                   <pointsize>11</pointsize>
-                  </font>
-                 </property>
-                 <property name="text">
-                  <string>Soort controler:</string>
-                 </property>
-                </widget>
-               </item>
-               <item>
-                <widget class="QComboBox" name="controlerDropDown">
-                 <property name="font">
-                  <font>
-                   <pointsize>11</pointsize>
-                  </font>
-                 </property>
-                 <item>
-                  <property name="text">
-                   <string>Logo</string>
-                  </property>
-                 </item>
-                 <item>
-                  <property name="text">
-                   <string>S7-1200 PLC</string>
-                  </property>
-                 </item>
-                 <item>
-                  <property name="text">
-                   <string>S7-1500 PLC</string>
-                  </property>
-                 </item>
-                 <item>
-                  <property name="text">
-                   <string>PLC Sim</string>
-                  </property>
-                 </item>
-                 <item>
-                  <property name="text">
-                   <string>GUI</string>
-                  </property>
-                 </item>
-                </widget>
-               </item>
-               <item>
-                <spacer name="horizontalSpacer_12">
-                 <property name="orientation">
-                  <enum>Qt::Horizontal</enum>
-                 </property>
-                 <property name="sizeHint" stdset="0">
-                  <size>
-                   <width>40</width>
-                   <height>20</height>
-                  </size>
-                 </property>
-                </spacer>
-               </item>
-              </layout>
-             </item>
-             <item>
-              <widget class="QLabel" name="label_16">
-               <property name="font">
-                <font>
-                 <pointsize>12</pointsize>
-                </font>
-               </property>
-               <property name="text">
-                <string>Afmetingen vat:</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <layout class="QHBoxLayout" name="horizontalLayout_17">
-               <item>
-                <widget class="QLabel" name="label_17">
-                 <property name="font">
-                  <font>
-                   <pointsize>11</pointsize>
-                  </font>
-                 </property>
-                 <property name="text">
-                  <string>Volume:</string>
-                 </property>
-                </widget>
-               </item>
-               <item>
-                <widget class="QLineEdit" name="volumeEntry">
-                 <property name="maximumSize">
-                  <size>
-                   <width>80</width>
-                   <height>16777215</height>
-                  </size>
-                 </property>
-                 <property name="font">
-                  <font>
-                   <pointsize>11</pointsize>
-                  </font>
-                 </property>
-                 <property name="text">
-                  <string>2</string>
-                 </property>
-                </widget>
-               </item>
-               <item>
-                <widget class="QLabel" name="label_33">
-                 <property name="font">
-                  <font>
-                   <pointsize>11</pointsize>
-                  </font>
-                 </property>
-                 <property name="text">
-                  <string>m³</string>
-                 </property>
-                </widget>
-               </item>
-               <item>
-                <spacer name="horizontalSpacer_11">
-                 <property name="orientation">
-                  <enum>Qt::Horizontal</enum>
-                 </property>
-                 <property name="sizeHint" stdset="0">
-                  <size>
-                   <width>40</width>
-                   <height>20</height>
-                  </size>
-                 </property>
-                </spacer>
-               </item>
-              </layout>
-             </item>
-             <item>
-              <layout class="QHBoxLayout" name="horizontalLayout_19">
-               <item>
-                <widget class="QLabel" name="label_23">
-                 <property name="font">
-                  <font>
-                   <pointsize>11</pointsize>
-                  </font>
-                 </property>
-                 <property name="text">
-                  <string>Toekomend debiet:</string>
-                 </property>
-                </widget>
-               </item>
-               <item>
-                <widget class="QLineEdit" name="toekomendDebietEntry2">
-                 <property name="maximumSize">
-                  <size>
-                   <width>80</width>
-                   <height>16777215</height>
-                  </size>
-                 </property>
-                 <property name="font">
-                  <font>
-                   <pointsize>11</pointsize>
-                  </font>
-                 </property>
-                 <property name="inputMask">
-                  <string/>
-                 </property>
-                 <property name="text">
-                  <string>200</string>
-                 </property>
-                </widget>
-               </item>
-               <item>
-                <widget class="QLabel" name="label_35">
-                 <property name="font">
-                  <font>
-                   <pointsize>11</pointsize>
-                  </font>
-                 </property>
-                 <property name="text">
-                  <string>l/s</string>
-                 </property>
-                </widget>
-               </item>
-               <item>
-                <spacer name="horizontalSpacer_10">
-                 <property name="orientation">
-                  <enum>Qt::Horizontal</enum>
-                 </property>
-                 <property name="sizeHint" stdset="0">
-                  <size>
-                   <width>40</width>
-                   <height>20</height>
-                  </size>
-                 </property>
-                </spacer>
-               </item>
-              </layout>
-             </item>
-             <item>
-              <widget class="QLabel" name="label_26">
-               <property name="font">
-                <font>
-                 <pointsize>12</pointsize>
-                </font>
-               </property>
-               <property name="text">
-                <string>Regeling:</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <layout class="QHBoxLayout" name="horizontalLayout_20">
-               <item>
-                <widget class="QLabel" name="label_27">
-                 <property name="font">
-                  <font>
-                   <pointsize>11</pointsize>
-                  </font>
-                 </property>
-                 <property name="text">
-                  <string>Regelbare klepen:</string>
-                 </property>
-                </widget>
-               </item>
-               <item>
-                <widget class="QCheckBox" name="regelbareKlepenCheckBox">
-                 <property name="enabled">
-                  <bool>true</bool>
-                 </property>
-                 <property name="font">
-                  <font>
-                   <pointsize>11</pointsize>
-                  </font>
-                 </property>
-                 <property name="text">
-                  <string>Zichtbaar/onzichtbaar</string>
-                 </property>
-                 <property name="checked">
-                  <bool>false</bool>
-                 </property>
-                 <property name="autoRepeat">
-                  <bool>false</bool>
-                 </property>
-                 <property name="autoExclusive">
-                  <bool>false</bool>
-                 </property>
-                </widget>
-               </item>
-               <item>
-                <spacer name="horizontalSpacer_15">
-                 <property name="orientation">
-                  <enum>Qt::Horizontal</enum>
-                 </property>
-                 <property name="sizeHint" stdset="0">
-                  <size>
-                   <width>40</width>
-                   <height>20</height>
-                  </size>
-                 </property>
-                </spacer>
-               </item>
-              </layout>
-             </item>
-             <item>
-              <layout class="QHBoxLayout" name="horizontalLayout_21">
-               <item>
-                <widget class="QLabel" name="label_28">
-                 <property name="font">
-                  <font>
-                   <pointsize>11</pointsize>
-                  </font>
-                 </property>
-                 <property name="text">
-                  <string>Regelbare weerstand:</string>
-                 </property>
-                </widget>
-               </item>
-               <item>
-                <widget class="QCheckBox" name="regelbareWeerstandCheckBox">
-                 <property name="font">
-                  <font>
-                   <pointsize>11</pointsize>
-                  </font>
-                 </property>
-                 <property name="text">
-                  <string>Zichtbaar/onzichtbaar</string>
-                 </property>
-                </widget>
-               </item>
-               <item>
-                <spacer name="horizontalSpacer_17">
-                 <property name="orientation">
-                  <enum>Qt::Horizontal</enum>
-                 </property>
-                 <property name="sizeHint" stdset="0">
-                  <size>
-                   <width>40</width>
-                   <height>20</height>
-                  </size>
-                 </property>
-                </spacer>
-               </item>
-              </layout>
-             </item>
-             <item>
-              <layout class="QHBoxLayout" name="horizontalLayout_22">
-               <item>
-                <widget class="QLabel" name="label_29">
-                 <property name="font">
-                  <font>
-                   <pointsize>11</pointsize>
-                  </font>
-                 </property>
-                 <property name="text">
-                  <string>Niveauschakelaar:</string>
-                 </property>
-                </widget>
-               </item>
-               <item>
-                <widget class="QCheckBox" name="niveauschakelaarCheckBox">
-                 <property name="font">
-                  <font>
-                   <pointsize>11</pointsize>
-                  </font>
-                 </property>
-                 <property name="text">
-                  <string>Zichtbaar/onzichtbaar</string>
-                 </property>
-                </widget>
-               </item>
-               <item>
-                <spacer name="horizontalSpacer_16">
-                 <property name="orientation">
-                  <enum>Qt::Horizontal</enum>
-                 </property>
-                 <property name="sizeHint" stdset="0">
-                  <size>
-                   <width>40</width>
-                   <height>20</height>
-                  </size>
-                 </property>
-                </spacer>
-               </item>
-              </layout>
-             </item>
-             <item>
-              <layout class="QHBoxLayout" name="horizontalLayout_18">
-               <item>
-                <widget class="QLabel" name="label_18">
-                 <property name="font">
-                  <font>
-                   <pointsize>11</pointsize>
-                  </font>
-                 </property>
-                 <property name="text">
-                  <string>Analogewaarde temperatuur:</string>
-                 </property>
-                </widget>
-               </item>
-               <item>
-                <widget class="QCheckBox" name="analogeWaardeTempCheckBox">
-                 <property name="font">
-                  <font>
-                   <pointsize>11</pointsize>
-                  </font>
-                 </property>
-                 <property name="text">
-                  <string>Zichtbaar/onzichtbaar</string>
-                 </property>
-                </widget>
-               </item>
-               <item>
-                <spacer name="horizontalSpacer_13">
-                 <property name="orientation">
-                  <enum>Qt::Horizontal</enum>
-                 </property>
-                 <property name="sizeHint" stdset="0">
-                  <size>
-                   <width>40</width>
-                   <height>20</height>
-                  </size>
-                 </property>
-                </spacer>
-               </item>
-              </layout>
-             </item>
-             <item>
-              <widget class="QLabel" name="label_30">
-               <property name="font">
-                <font>
-                 <pointsize>12</pointsize>
-                </font>
-               </property>
-               <property name="text">
-                <string>Vloeistof:</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <layout class="QHBoxLayout" name="horizontalLayout_23">
-               <item>
-                <widget class="QLabel" name="label_31">
-                 <property name="font">
-                  <font>
-                   <pointsize>11</pointsize>
-                  </font>
-                 </property>
-                 <property name="text">
-                  <string>Kleur:</string>
-                 </property>
-                </widget>
-               </item>
-               <item>
-                <widget class="QComboBox" name="kleurDropDown">
-                 <property name="font">
-                  <font>
-                   <pointsize>11</pointsize>
-                  </font>
-                 </property>
-                 <property name="currentText">
-                  <string>Blue</string>
-                 </property>
-                 <item>
-                  <property name="text">
-                   <string comment="#0000FF">Blue</string>
-                  </property>
-                 </item>
-                 <item>
-                  <property name="text">
-                   <string>Rood</string>
-                  </property>
-                 </item>
-                 <item>
-                  <property name="text">
-                   <string>Groen</string>
-                  </property>
-                 </item>
-                 <item>
-                  <property name="text">
-                   <string>Geel</string>
-                  </property>
-                 </item>
-                 <item>
-                  <property name="text">
-                   <string>Oranje</string>
-                  </property>
-                 </item>
-                 <item>
-                  <property name="text">
-                   <string>Paars</string>
-                  </property>
-                 </item>
-                 <item>
-                  <property name="text">
-                   <string>Grijs</string>
-                  </property>
-                 </item>
-                </widget>
-               </item>
-               <item>
-                <spacer name="horizontalSpacer_9">
-                 <property name="orientation">
-                  <enum>Qt::Horizontal</enum>
-                 </property>
-                 <property name="sizeHint" stdset="0">
-                  <size>
-                   <width>40</width>
-                   <height>20</height>
-                  </size>
-                 </property>
-                </spacer>
-               </item>
-              </layout>
-             </item>
-             <item>
-              <spacer name="verticalSpacer_5">
-               <property name="orientation">
-                <enum>Qt::Vertical</enum>
-               </property>
-               <property name="sizeHint" stdset="0">
-                <size>
-                 <width>20</width>
-                 <height>40</height>
-                </size>
-               </property>
-              </spacer>
-             </item>
-            </layout>
-           </item>
-           <item row="1" column="1">
+           <item row="0" column="1">
             <spacer name="horizontalSpacer_14">
              <property name="orientation">
               <enum>Qt::Horizontal</enum>
@@ -1375,7 +883,7 @@
              </property>
             </spacer>
            </item>
-           <item row="1" column="3">
+           <item row="0" column="3">
             <spacer name="horizontalSpacer_8">
              <property name="orientation">
               <enum>Qt::Horizontal</enum>
@@ -1387,6 +895,723 @@
               </size>
              </property>
             </spacer>
+           </item>
+           <item row="0" column="0">
+            <layout class="QVBoxLayout" name="verticalLayout_9">
+             <item>
+              <widget class="QWidget" name="widget_3" native="true">
+               <property name="minimumSize">
+                <size>
+                 <width>300</width>
+                 <height>50</height>
+                </size>
+               </property>
+               <property name="maximumSize">
+                <size>
+                 <width>16777215</width>
+                 <height>800</height>
+                </size>
+               </property>
+               <property name="styleSheet">
+                <string notr="true">#widget_3{background-color: rgb(255, 255, 255);
+}</string>
+               </property>
+               <layout class="QVBoxLayout" name="verticalLayout_13">
+                <item>
+                 <widget class="QLabel" name="label_32">
+                  <property name="sizePolicy">
+                   <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
+                    <horstretch>0</horstretch>
+                    <verstretch>0</verstretch>
+                   </sizepolicy>
+                  </property>
+                  <property name="minimumSize">
+                   <size>
+                    <width>300</width>
+                    <height>30</height>
+                   </size>
+                  </property>
+                  <property name="maximumSize">
+                   <size>
+                    <width>16777215</width>
+                    <height>50</height>
+                   </size>
+                  </property>
+                  <property name="font">
+                   <font>
+                    <pointsize>18</pointsize>
+                   </font>
+                  </property>
+                  <property name="styleSheet">
+                   <string notr="true">background-color: rgb(255, 255, 255);
+border: 3px solid rgb(193, 193, 193);
+</string>
+                  </property>
+                  <property name="text">
+                   <string>Simulatie instellingen</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <layout class="QVBoxLayout" name="verticalLayout_15">
+                  <item>
+                   <widget class="QLabel" name="label_2">
+                    <property name="minimumSize">
+                     <size>
+                      <width>0</width>
+                      <height>30</height>
+                     </size>
+                    </property>
+                    <property name="font">
+                     <font>
+                      <pointsize>10</pointsize>
+                      <weight>75</weight>
+                      <bold>true</bold>
+                     </font>
+                    </property>
+                    <property name="styleSheet">
+                     <string notr="true"/>
+                    </property>
+                    <property name="text">
+                     <string>Configuratie</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <layout class="QHBoxLayout" name="horizontalLayout_15">
+                    <item>
+                     <widget class="QPushButton" name="pushButton_SaveConf">
+                      <property name="minimumSize">
+                       <size>
+                        <width>100</width>
+                        <height>30</height>
+                       </size>
+                      </property>
+                      <property name="maximumSize">
+                       <size>
+                        <width>100</width>
+                        <height>1000</height>
+                       </size>
+                      </property>
+                      <property name="text">
+                       <string>OPSLAAN</string>
+                      </property>
+                      <property name="icon">
+                       <iconset resource="Resource.qrc">
+                        <normaloff>:/icon/media/icon/save-32.ico</normaloff>
+                        <normalon>:/icon/media/icon/save-32 blauw.ico</normalon>:/icon/media/icon/save-32.ico</iconset>
+                      </property>
+                      <property name="checkable">
+                       <bool>false</bool>
+                      </property>
+                      <property name="autoExclusive">
+                       <bool>false</bool>
+                      </property>
+                     </widget>
+                    </item>
+                    <item>
+                     <widget class="QPushButton" name="pushButton_LoadConf">
+                      <property name="minimumSize">
+                       <size>
+                        <width>100</width>
+                        <height>0</height>
+                       </size>
+                      </property>
+                      <property name="maximumSize">
+                       <size>
+                        <width>100</width>
+                        <height>40</height>
+                       </size>
+                      </property>
+                      <property name="text">
+                       <string>LAAD</string>
+                      </property>
+                      <property name="icon">
+                       <iconset resource="Resource.qrc">
+                        <normaloff>:/icon/media/icon/icons_open.svg</normaloff>
+                        <normalon>:/icon/media/icon/icons_open_blue.svg</normalon>:/icon/media/icon/icons_open.svg</iconset>
+                      </property>
+                      <property name="iconSize">
+                       <size>
+                        <width>30</width>
+                        <height>20</height>
+                       </size>
+                      </property>
+                      <property name="checkable">
+                       <bool>false</bool>
+                      </property>
+                      <property name="autoExclusive">
+                       <bool>false</bool>
+                      </property>
+                     </widget>
+                    </item>
+                    <item>
+                     <spacer name="horizontalSpacer_4">
+                      <property name="orientation">
+                       <enum>Qt::Horizontal</enum>
+                      </property>
+                      <property name="sizeHint" stdset="0">
+                       <size>
+                        <width>40</width>
+                        <height>20</height>
+                       </size>
+                      </property>
+                     </spacer>
+                    </item>
+                   </layout>
+                  </item>
+                 </layout>
+                </item>
+                <item>
+                 <spacer name="verticalSpacer_5">
+                  <property name="orientation">
+                   <enum>Qt::Vertical</enum>
+                  </property>
+                  <property name="sizeHint" stdset="0">
+                   <size>
+                    <width>20</width>
+                    <height>10</height>
+                   </size>
+                  </property>
+                 </spacer>
+                </item>
+                <item>
+                 <layout class="QHBoxLayout" name="horizontalLayout_16">
+                  <item>
+                   <widget class="QLabel" name="label">
+                    <property name="font">
+                     <font>
+                      <pointsize>11</pointsize>
+                     </font>
+                    </property>
+                    <property name="text">
+                     <string>Soort controler:</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QComboBox" name="controlerDropDown">
+                    <property name="font">
+                     <font>
+                      <pointsize>11</pointsize>
+                     </font>
+                    </property>
+                    <item>
+                     <property name="text">
+                      <string>Logo</string>
+                     </property>
+                    </item>
+                    <item>
+                     <property name="text">
+                      <string>S7-1200 PLC</string>
+                     </property>
+                    </item>
+                    <item>
+                     <property name="text">
+                      <string>S7-1500 PLC</string>
+                     </property>
+                    </item>
+                    <item>
+                     <property name="text">
+                      <string>PLC Sim</string>
+                     </property>
+                    </item>
+                    <item>
+                     <property name="text">
+                      <string>GUI</string>
+                     </property>
+                    </item>
+                   </widget>
+                  </item>
+                  <item>
+                   <spacer name="horizontalSpacer_12">
+                    <property name="orientation">
+                     <enum>Qt::Horizontal</enum>
+                    </property>
+                    <property name="sizeHint" stdset="0">
+                     <size>
+                      <width>40</width>
+                      <height>20</height>
+                     </size>
+                    </property>
+                   </spacer>
+                  </item>
+                 </layout>
+                </item>
+                <item>
+                 <spacer name="verticalSpacer_7">
+                  <property name="orientation">
+                   <enum>Qt::Vertical</enum>
+                  </property>
+                  <property name="sizeHint" stdset="0">
+                   <size>
+                    <width>20</width>
+                    <height>10</height>
+                   </size>
+                  </property>
+                 </spacer>
+                </item>
+                <item>
+                 <widget class="QLabel" name="label_16">
+                  <property name="font">
+                   <font>
+                    <pointsize>12</pointsize>
+                    <weight>75</weight>
+                    <bold>true</bold>
+                   </font>
+                  </property>
+                  <property name="text">
+                   <string>Afmetingen vat:</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <layout class="QHBoxLayout" name="horizontalLayout_17">
+                  <item>
+                   <widget class="QLabel" name="label_17">
+                    <property name="font">
+                     <font>
+                      <pointsize>11</pointsize>
+                     </font>
+                    </property>
+                    <property name="text">
+                     <string>Volume:</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QLineEdit" name="volumeEntry">
+                    <property name="maximumSize">
+                     <size>
+                      <width>80</width>
+                      <height>16777215</height>
+                     </size>
+                    </property>
+                    <property name="font">
+                     <font>
+                      <pointsize>11</pointsize>
+                     </font>
+                    </property>
+                    <property name="text">
+                     <string>2</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QLabel" name="label_33">
+                    <property name="font">
+                     <font>
+                      <pointsize>11</pointsize>
+                     </font>
+                    </property>
+                    <property name="text">
+                     <string>m³</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <spacer name="horizontalSpacer_11">
+                    <property name="orientation">
+                     <enum>Qt::Horizontal</enum>
+                    </property>
+                    <property name="sizeHint" stdset="0">
+                     <size>
+                      <width>40</width>
+                      <height>20</height>
+                     </size>
+                    </property>
+                   </spacer>
+                  </item>
+                 </layout>
+                </item>
+                <item>
+                 <layout class="QHBoxLayout" name="horizontalLayout_19">
+                  <item>
+                   <widget class="QLabel" name="label_23">
+                    <property name="font">
+                     <font>
+                      <pointsize>11</pointsize>
+                     </font>
+                    </property>
+                    <property name="text">
+                     <string>Toekomend debiet:</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QLineEdit" name="toekomendDebietEntry2">
+                    <property name="maximumSize">
+                     <size>
+                      <width>80</width>
+                      <height>16777215</height>
+                     </size>
+                    </property>
+                    <property name="font">
+                     <font>
+                      <pointsize>11</pointsize>
+                     </font>
+                    </property>
+                    <property name="inputMask">
+                     <string/>
+                    </property>
+                    <property name="text">
+                     <string>200</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QLabel" name="label_35">
+                    <property name="font">
+                     <font>
+                      <pointsize>11</pointsize>
+                     </font>
+                    </property>
+                    <property name="text">
+                     <string>l/s</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <spacer name="horizontalSpacer_10">
+                    <property name="orientation">
+                     <enum>Qt::Horizontal</enum>
+                    </property>
+                    <property name="sizeHint" stdset="0">
+                     <size>
+                      <width>40</width>
+                      <height>20</height>
+                     </size>
+                    </property>
+                   </spacer>
+                  </item>
+                 </layout>
+                </item>
+                <item>
+                 <spacer name="verticalSpacer_8">
+                  <property name="orientation">
+                   <enum>Qt::Vertical</enum>
+                  </property>
+                  <property name="sizeHint" stdset="0">
+                   <size>
+                    <width>20</width>
+                    <height>10</height>
+                   </size>
+                  </property>
+                 </spacer>
+                </item>
+                <item>
+                 <widget class="QLabel" name="label_26">
+                  <property name="font">
+                   <font>
+                    <pointsize>12</pointsize>
+                    <weight>75</weight>
+                    <bold>true</bold>
+                   </font>
+                  </property>
+                  <property name="text">
+                   <string>Regeling:</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <layout class="QHBoxLayout" name="horizontalLayout_20">
+                  <item>
+                   <widget class="QLabel" name="label_27">
+                    <property name="font">
+                     <font>
+                      <pointsize>11</pointsize>
+                     </font>
+                    </property>
+                    <property name="text">
+                     <string>Regelbare klepen:</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QCheckBox" name="regelbareKlepenCheckBox">
+                    <property name="enabled">
+                     <bool>true</bool>
+                    </property>
+                    <property name="font">
+                     <font>
+                      <pointsize>11</pointsize>
+                     </font>
+                    </property>
+                    <property name="text">
+                     <string>Zichtbaar/onzichtbaar</string>
+                    </property>
+                    <property name="checked">
+                     <bool>false</bool>
+                    </property>
+                    <property name="autoRepeat">
+                     <bool>false</bool>
+                    </property>
+                    <property name="autoExclusive">
+                     <bool>false</bool>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <spacer name="horizontalSpacer_15">
+                    <property name="orientation">
+                     <enum>Qt::Horizontal</enum>
+                    </property>
+                    <property name="sizeHint" stdset="0">
+                     <size>
+                      <width>40</width>
+                      <height>20</height>
+                     </size>
+                    </property>
+                   </spacer>
+                  </item>
+                 </layout>
+                </item>
+                <item>
+                 <layout class="QHBoxLayout" name="horizontalLayout_21">
+                  <item>
+                   <widget class="QLabel" name="label_28">
+                    <property name="font">
+                     <font>
+                      <pointsize>11</pointsize>
+                     </font>
+                    </property>
+                    <property name="text">
+                     <string>Regelbare weerstand:</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QCheckBox" name="regelbareWeerstandCheckBox">
+                    <property name="font">
+                     <font>
+                      <pointsize>11</pointsize>
+                     </font>
+                    </property>
+                    <property name="text">
+                     <string>Zichtbaar/onzichtbaar</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <spacer name="horizontalSpacer_17">
+                    <property name="orientation">
+                     <enum>Qt::Horizontal</enum>
+                    </property>
+                    <property name="sizeHint" stdset="0">
+                     <size>
+                      <width>40</width>
+                      <height>20</height>
+                     </size>
+                    </property>
+                   </spacer>
+                  </item>
+                 </layout>
+                </item>
+                <item>
+                 <layout class="QHBoxLayout" name="horizontalLayout_22">
+                  <item>
+                   <widget class="QLabel" name="label_29">
+                    <property name="font">
+                     <font>
+                      <pointsize>11</pointsize>
+                     </font>
+                    </property>
+                    <property name="text">
+                     <string>Niveauschakelaar:</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QCheckBox" name="niveauschakelaarCheckBox">
+                    <property name="font">
+                     <font>
+                      <pointsize>11</pointsize>
+                     </font>
+                    </property>
+                    <property name="text">
+                     <string>Zichtbaar/onzichtbaar</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <spacer name="horizontalSpacer_16">
+                    <property name="orientation">
+                     <enum>Qt::Horizontal</enum>
+                    </property>
+                    <property name="sizeHint" stdset="0">
+                     <size>
+                      <width>40</width>
+                      <height>20</height>
+                     </size>
+                    </property>
+                   </spacer>
+                  </item>
+                 </layout>
+                </item>
+                <item>
+                 <layout class="QHBoxLayout" name="horizontalLayout_18">
+                  <item>
+                   <widget class="QLabel" name="label_18">
+                    <property name="font">
+                     <font>
+                      <pointsize>11</pointsize>
+                     </font>
+                    </property>
+                    <property name="text">
+                     <string>Analogewaarde temperatuur:</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QCheckBox" name="analogeWaardeTempCheckBox">
+                    <property name="font">
+                     <font>
+                      <pointsize>11</pointsize>
+                     </font>
+                    </property>
+                    <property name="text">
+                     <string>Zichtbaar/onzichtbaar</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <spacer name="horizontalSpacer_13">
+                    <property name="orientation">
+                     <enum>Qt::Horizontal</enum>
+                    </property>
+                    <property name="sizeHint" stdset="0">
+                     <size>
+                      <width>40</width>
+                      <height>20</height>
+                     </size>
+                    </property>
+                   </spacer>
+                  </item>
+                 </layout>
+                </item>
+                <item>
+                 <spacer name="verticalSpacer_9">
+                  <property name="orientation">
+                   <enum>Qt::Vertical</enum>
+                  </property>
+                  <property name="sizeHint" stdset="0">
+                   <size>
+                    <width>20</width>
+                    <height>10</height>
+                   </size>
+                  </property>
+                 </spacer>
+                </item>
+                <item>
+                 <widget class="QLabel" name="label_30">
+                  <property name="font">
+                   <font>
+                    <pointsize>12</pointsize>
+                    <weight>75</weight>
+                    <bold>true</bold>
+                   </font>
+                  </property>
+                  <property name="text">
+                   <string>Vloeistof:</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <layout class="QHBoxLayout" name="horizontalLayout_23">
+                  <item>
+                   <widget class="QLabel" name="label_31">
+                    <property name="font">
+                     <font>
+                      <pointsize>11</pointsize>
+                     </font>
+                    </property>
+                    <property name="text">
+                     <string>Kleur:</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QComboBox" name="kleurDropDown">
+                    <property name="font">
+                     <font>
+                      <pointsize>11</pointsize>
+                     </font>
+                    </property>
+                    <property name="currentText">
+                     <string>Blue</string>
+                    </property>
+                    <item>
+                     <property name="text">
+                      <string comment="#0000FF">Blue</string>
+                     </property>
+                    </item>
+                    <item>
+                     <property name="text">
+                      <string>Rood</string>
+                     </property>
+                    </item>
+                    <item>
+                     <property name="text">
+                      <string>Groen</string>
+                     </property>
+                    </item>
+                    <item>
+                     <property name="text">
+                      <string>Geel</string>
+                     </property>
+                    </item>
+                    <item>
+                     <property name="text">
+                      <string>Oranje</string>
+                     </property>
+                    </item>
+                    <item>
+                     <property name="text">
+                      <string>Paars</string>
+                     </property>
+                    </item>
+                    <item>
+                     <property name="text">
+                      <string>Grijs</string>
+                     </property>
+                    </item>
+                   </widget>
+                  </item>
+                  <item>
+                   <spacer name="horizontalSpacer_9">
+                    <property name="orientation">
+                     <enum>Qt::Horizontal</enum>
+                    </property>
+                    <property name="sizeHint" stdset="0">
+                     <size>
+                      <width>40</width>
+                      <height>20</height>
+                     </size>
+                    </property>
+                   </spacer>
+                  </item>
+                 </layout>
+                </item>
+                <item>
+                 <layout class="QHBoxLayout" name="horizontalLayout_29"/>
+                </item>
+               </layout>
+              </widget>
+             </item>
+             <item>
+              <spacer name="verticalSpacer_6">
+               <property name="orientation">
+                <enum>Qt::Vertical</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>20</width>
+                 <height>40</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+            </layout>
            </item>
           </layout>
          </widget>
@@ -1459,7 +1684,7 @@ border: 1px solid rgb(182, 182, 182);
                     <string notr="true">border: 2px solid rgb(193, 193, 193);</string>
                    </property>
                    <property name="text">
-                    <string>IN-OUTPUTS</string>
+                    <string>BESCHIKBARE IN/UITGANGEN</string>
                    </property>
                    <property name="alignment">
                     <set>Qt::AlignCenter</set>
@@ -1476,7 +1701,7 @@ border: 1px solid rgb(182, 182, 182);
                    </property>
                    <column>
                     <property name="text">
-                     <string notr="true">IN/OUTPUTS</string>
+                     <string notr="true">SIMULATIES</string>
                     </property>
                    </column>
                   </widget>
@@ -1807,7 +2032,7 @@ border: 3px solid rgb(193, 193, 193);
                       <string notr="true"/>
                      </property>
                      <property name="text">
-                      <string>APPLY</string>
+                      <string>TOEPASSEN</string>
                      </property>
                     </widget>
                    </item>
@@ -1827,14 +2052,20 @@ border: 3px solid rgb(193, 193, 193);
                  <layout class="QHBoxLayout" name="horizontalLayout_28">
                   <item>
                    <widget class="QPushButton" name="pushButton_SaveIO">
+                    <property name="minimumSize">
+                     <size>
+                      <width>100</width>
+                      <height>0</height>
+                     </size>
+                    </property>
                     <property name="maximumSize">
                      <size>
-                      <width>80</width>
+                      <width>100</width>
                       <height>16777215</height>
                      </size>
                     </property>
                     <property name="text">
-                     <string>SAVE</string>
+                     <string>OPSLAAN</string>
                     </property>
                     <property name="icon">
                      <iconset resource="Resource.qrc">
@@ -1844,14 +2075,20 @@ border: 3px solid rgb(193, 193, 193);
                   </item>
                   <item>
                    <widget class="QPushButton" name="pushButton_LoadIO">
+                    <property name="minimumSize">
+                     <size>
+                      <width>100</width>
+                      <height>0</height>
+                     </size>
+                    </property>
                     <property name="maximumSize">
                      <size>
-                      <width>80</width>
+                      <width>100</width>
                       <height>16777215</height>
                      </size>
                     </property>
                     <property name="text">
-                     <string>LOAD</string>
+                     <string>LAAD</string>
                     </property>
                     <property name="icon">
                      <iconset resource="Resource.qrc">
@@ -1868,7 +2105,7 @@ border: 3px solid rgb(193, 193, 193);
                      </font>
                     </property>
                     <property name="text">
-                     <string>RELOAD NEW CONFIG</string>
+                     <string>ACTIVEER CONFIGURATIE</string>
                     </property>
                     <property name="icon">
                      <iconset>
@@ -1893,13 +2130,13 @@ border: 3px solid rgb(193, 193, 193);
                    <widget class="QPushButton" name="pushButton_AllowForce">
                     <property name="minimumSize">
                      <size>
-                      <width>150</width>
+                      <width>215</width>
                       <height>0</height>
                      </size>
                     </property>
                     <property name="maximumSize">
                      <size>
-                      <width>150</width>
+                      <width>215</width>
                       <height>16777215</height>
                      </size>
                     </property>
@@ -1918,7 +2155,7 @@ border: 3px solid rgb(193, 193, 193);
 }</string>
                     </property>
                     <property name="text">
-                     <string>ALLOW FORCE</string>
+                     <string>FORCEER STATUS INSCHAKELEN</string>
                     </property>
                     <property name="checkable">
                      <bool>true</bool>
@@ -1990,7 +2227,7 @@ border: 3px solid rgb(193, 193, 193);
                   <row/>
                   <column>
                    <property name="text">
-                    <string>NAME</string>
+                    <string>NAAM</string>
                    </property>
                    <property name="font">
                     <font>
@@ -2098,7 +2335,7 @@ border: 3px solid rgb(193, 193, 193);
                   </column>
                   <column>
                    <property name="text">
-                    <string>DESCRIPTION</string>
+                    <string>BESCHRIJVING</string>
                    </property>
                    <property name="font">
                     <font>
@@ -2116,7 +2353,7 @@ border: 3px solid rgb(193, 193, 193);
                   </column>
                   <column>
                    <property name="text">
-                    <string>RANGE</string>
+                    <string>BEREIK</string>
                    </property>
                    <property name="font">
                     <font>
@@ -2316,9 +2553,9 @@ border: 3px solid rgb(193, 193, 193);
           <string>EXIT</string>
          </property>
          <property name="icon">
-          <iconset>
-           <normaloff>:/Icon/icon/close-window-64.ico</normaloff>
-           <normalon>:/Icon/icon/close-window-64 blauw.ico</normalon>:/Icon/icon/close-window-64.ico</iconset>
+          <iconset resource="Resource.qrc">
+           <normaloff>:/icon/media/icon/close-window-64.ico</normaloff>
+           <normalon>:/icon/media/icon/close-window-64 blauw.ico</normalon>:/icon/media/icon/close-window-64.ico</iconset>
          </property>
          <property name="iconSize">
           <size>
@@ -2392,64 +2629,6 @@ border: 3px solid rgb(193, 193, 193);
             </widget>
            </item>
           </layout>
-         </item>
-         <item>
-          <widget class="QPushButton" name="pushButton_Save2">
-           <property name="font">
-            <font>
-             <pointsize>10</pointsize>
-            </font>
-           </property>
-           <property name="text">
-            <string>SAVE</string>
-           </property>
-           <property name="icon">
-            <iconset resource="Resource.qrc">
-             <normaloff>:/icon/media/icon/save-32.ico</normaloff>
-             <normalon>:/icon/media/icon/save-32 blauw.ico</normalon>:/icon/media/icon/save-32.ico</iconset>
-           </property>
-           <property name="iconSize">
-            <size>
-             <width>20</width>
-             <height>20</height>
-            </size>
-           </property>
-           <property name="checkable">
-            <bool>true</bool>
-           </property>
-           <property name="autoExclusive">
-            <bool>true</bool>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QPushButton" name="pushButton_Load2">
-           <property name="font">
-            <font>
-             <pointsize>10</pointsize>
-            </font>
-           </property>
-           <property name="text">
-            <string>LOAD</string>
-           </property>
-           <property name="icon">
-            <iconset resource="Resource.qrc">
-             <normaloff>:/icon/media/icon/icons_open.svg</normaloff>
-             <normalon>:/icon/media/icon/icons_open_blue.svg</normalon>:/icon/media/icon/icons_open.svg</iconset>
-           </property>
-           <property name="iconSize">
-            <size>
-             <width>20</width>
-             <height>20</height>
-            </size>
-           </property>
-           <property name="checkable">
-            <bool>true</bool>
-           </property>
-           <property name="autoExclusive">
-            <bool>true</bool>
-           </property>
-          </widget>
          </item>
          <item>
           <widget class="QPushButton" name="pushButton_settingsPage2">
@@ -2598,60 +2777,6 @@ border: 3px solid rgb(193, 193, 193);
          <property name="spacing">
           <number>0</number>
          </property>
-         <item>
-          <widget class="QPushButton" name="pushButton_Save">
-           <property name="maximumSize">
-            <size>
-             <width>50</width>
-             <height>40</height>
-            </size>
-           </property>
-           <property name="text">
-            <string/>
-           </property>
-           <property name="icon">
-            <iconset resource="Resource.qrc">
-             <normaloff>:/icon/media/icon/save-32.ico</normaloff>
-             <normalon>:/icon/media/icon/save-32 blauw.ico</normalon>:/icon/media/icon/save-32.ico</iconset>
-           </property>
-           <property name="checkable">
-            <bool>true</bool>
-           </property>
-           <property name="autoExclusive">
-            <bool>true</bool>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QPushButton" name="pushButton_Load">
-           <property name="maximumSize">
-            <size>
-             <width>50</width>
-             <height>40</height>
-            </size>
-           </property>
-           <property name="text">
-            <string/>
-           </property>
-           <property name="icon">
-            <iconset resource="Resource.qrc">
-             <normaloff>:/icon/media/icon/icons_open.svg</normaloff>
-             <normalon>:/icon/media/icon/icons_open_blue.svg</normalon>:/icon/media/icon/icons_open.svg</iconset>
-           </property>
-           <property name="iconSize">
-            <size>
-             <width>30</width>
-             <height>20</height>
-            </size>
-           </property>
-           <property name="checkable">
-            <bool>true</bool>
-           </property>
-           <property name="autoExclusive">
-            <bool>true</bool>
-           </property>
-          </widget>
-         </item>
          <item>
           <widget class="QPushButton" name="pushButton_settingsPage">
            <property name="maximumSize">
@@ -2912,22 +3037,6 @@ border: 3px solid rgb(193, 193, 193);
    </hints>
   </connection>
   <connection>
-   <sender>controlerDropDown</sender>
-   <signal>currentIndexChanged(QString)</signal>
-   <receiver>regelingSimGui</receiver>
-   <slot>show()</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>499</x>
-     <y>113</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>1022</x>
-     <y>559</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
    <sender>pushButton_menu</sender>
    <signal>toggled(bool)</signal>
    <receiver>fullMenuWidget</receiver>
@@ -2956,6 +3065,22 @@ border: 3px solid rgb(193, 193, 193);
     <hint type="destinationlabel">
      <x>30</x>
      <y>403</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>controlerDropDown</sender>
+   <signal>currentIndexChanged(QString)</signal>
+   <receiver>regelingSimGui</receiver>
+   <slot>show()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>499</x>
+     <y>113</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>1022</x>
+     <y>559</y>
     </hint>
    </hints>
   </connection>
