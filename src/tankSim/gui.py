@@ -13,9 +13,9 @@ blue = "#1100FF"
 green = "#00FF00"
 
 # Global variables
-maxHoogteVat = 200
-weerstand = True
-currentHoogteVat = 0
+
+heatingCoil = True
+liquidVolume = 0
 tempVat = 0
 
 
@@ -63,21 +63,22 @@ class VatWidget(QWidget):
         # Default attribute values
         self.valveInMaxFlowValue = 0
         self.valveOutMaxFlowValue = 0
-        self.powerValue = 20.0
+        self.powerValue = 10000.0
         self.adjustableValve = False
         self.adjustableHeatingCoil = False
         self.levelSwitches = False
         self.analogValueTemp = False
         self.adjustableValveInValue = 0
         self.adjustableValveOutValue = 0
-        self.kleurWater = blue
+        self.waterColor = blue
         self.controler = "GUI"
+        self.maxVolume = 2.0
 
         self.waterInVat = None
         self.originalY = 0.0
-        self.originalHoogte = 0.0
-        self.maxHoogteGUI = 80
-        self.ondersteY = 0.0
+        self.originalHeight = 0.0
+        self.maxheightGUI = 80
+        self.lowestY = 0.0
 
         try:
             svg_path = Path(__file__).parent.parent / \
@@ -115,9 +116,9 @@ class VatWidget(QWidget):
 
     def rebuild(self):
         """Complete rebuild of the SVG based on current values"""
-        global currentHoogteVat, maxHoogteVat
+        global liquidVolume
 
-        self.set_group_color("WaterGroup", self.kleurWater)
+        self.set_group_color("WaterGroup", self.waterColor)
 
         if self.powerValue == 0:
             tempVatProcent = 0.0
@@ -160,9 +161,9 @@ class VatWidget(QWidget):
             self.visibility_group("adjustableValve", "hidden")
         if not self.adjustableHeatingCoil:
             self.visibility_group("adjustableHeatingCoil", "hidden")
-            if weerstand:
+            if heatingCoil:
                 self.set_group_color("heatingCoilValue", green)
-            elif not weerstand:
+            elif not heatingCoil:
                 self.set_group_color("heatingCoilValue", red)
             else:
                 self.set_group_color("heatingCoilValue", "#FFFFFF")
@@ -175,14 +176,14 @@ class VatWidget(QWidget):
             self.set_group_color("valveIn", "#FFFFFF")
         else:
             self.klep_breete("waterValveIn", self.adjustableValveInValue)
-            self.set_group_color("valveIn", self.kleurWater)
+            self.set_group_color("valveIn", self.waterColor)
 
         if self.adjustableValveOutValue == 0:
             self.klep_breete("waterValveOut", 0)
             self.set_group_color("valveOut", "#FFFFFF")
         else:
             self.klep_breete("waterValveOut", self.adjustableValveOutValue)
-            self.set_group_color("valveOut", self.kleurWater)
+            self.set_group_color("valveOut", self.waterColor)
         if tempVat == self.powerValue:
             self.set_group_color("tempVat", green)
         else:
@@ -206,12 +207,12 @@ class VatWidget(QWidget):
         if self.waterInVat is not None:
             try:
                 self.originalY = float(self.waterInVat.get("y"))
-                self.originalHoogte = float(self.waterInVat.get("height"))
+                self.originalHeight = float(self.waterInVat.get("height"))
             except Exception:
                 self.originalY = 0.0
-                self.originalHoogte = 0.0
-            self.maxHoogteGUI = 80
-            self.ondersteY = self.originalY + self.originalHoogte
+                self.originalHeight = 0.0
+
+            self.lowestY = self.originalY + self.originalHeight
             self.vat_vullen_GUI()
 
         self.update_svg()
@@ -223,28 +224,28 @@ class VatWidget(QWidget):
         self.renderer.load(xml_bytes)
 
     def vat_vullen_GUI(self):
-        """Fill the tank based on currentHoogteVat"""
-        global currentHoogteVat, maxHoogteVat
+        """Fill the tank based on liquidVolume"""
+        global liquidVolume
 
-        if currentHoogteVat >= maxHoogteVat:
+        if liquidVolume >= self.maxVolume:
             self.set_group_color("levelSwitchMax", green)
         else:
             self.set_group_color("levelSwitchMax", red)
-        if currentHoogteVat == 0:
+        if liquidVolume == 0:
             self.set_group_color("levelSwitchMin", green)
         else:
             self.set_group_color("levelSwitchMin", red)
 
-        hoogteVatGui = currentHoogteVat / maxHoogteVat * self.maxHoogteGUI
-        nieuweY = self.ondersteY - hoogteVatGui
+        realGUIHeight = liquidVolume/(self.maxVolume * 100) * self.maxheightGUI
+        newY = self.lowestY - realGUIHeight
 
         if self.waterInVat is not None:
-            self.waterInVat.set("height", str(hoogteVatGui))
-            self.waterInVat.set("y", str(nieuweY))
-
-        self.set_hoogte_indicator("levelIndicator", nieuweY)
-        self.set_hoogte_indicator("levelValue", nieuweY + 2)
-        self.set_svg_text("levelValue", str(int(currentHoogteVat)) + "%")
+            self.waterInVat.set("height", str(realGUIHeight))
+            self.waterInVat.set("y", str(newY))
+        self.set_hoogte_indicator("levelIndicator", newY)
+        self.set_hoogte_indicator("levelValue", newY + 2)
+        self.set_svg_text("levelValue", str(
+            int(liquidVolume/self.maxVolume)) + "%")
 
     def set_hoogte_indicator(self, itemId, hoogte):
         """Set the Y-position of an indicator"""

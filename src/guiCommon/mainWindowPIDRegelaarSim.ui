@@ -788,9 +788,9 @@
               </size>
              </property>
              <property name="currentIndex">
-              <number>0</number>
+              <number>1</number>
              </property>
-             <widget class="QWidget" name="regelbareKlepenGUISim">
+             <widget class="QWidget" name="adjustableVavleGUISim">
               <property name="minimumSize">
                <size>
                 <width>300</width>
@@ -803,7 +803,7 @@
                 <height>350</height>
                </size>
               </property>
-              <widget class="QWidget" name="">
+              <widget class="QWidget" name="layoutWidget">
                <property name="geometry">
                 <rect>
                  <x>11</x>
@@ -870,7 +870,7 @@
                    </widget>
                   </item>
                   <item>
-                   <widget class="QLineEdit" name="klepstandBovenEntry">
+                   <widget class="QLineEdit" name="valveInEntry">
                     <property name="font">
                      <font>
                       <pointsize>11</pointsize>
@@ -910,7 +910,7 @@
                    </widget>
                   </item>
                   <item>
-                   <widget class="QLineEdit" name="klepstandBenedenEntry">
+                   <widget class="QLineEdit" name="valveOutEntry">
                     <property name="font">
                      <font>
                       <pointsize>11</pointsize>
@@ -950,14 +950,14 @@
                    </widget>
                   </item>
                   <item>
-                   <widget class="QLineEdit" name="tempWeerstandEntry">
+                   <widget class="QLineEdit" name="powerHeatingCoilEntry">
                     <property name="font">
                      <font>
                       <pointsize>11</pointsize>
                      </font>
                     </property>
                     <property name="text">
-                     <string>20</string>
+                     <string>10000.0</string>
                     </property>
                    </widget>
                   </item>
@@ -990,7 +990,7 @@
                    </widget>
                   </item>
                   <item>
-                   <widget class="QLineEdit" name="toekomendDebietEntry">
+                   <widget class="QLineEdit" name="maxFlowInEntry">
                     <property name="font">
                      <font>
                       <pointsize>11</pointsize>
@@ -1030,7 +1030,7 @@
                    </widget>
                   </item>
                   <item>
-                   <widget class="QLineEdit" name="toekomendDebietEntry_2">
+                   <widget class="QLineEdit" name="maxFlowOutEntry">
                     <property name="font">
                      <font>
                       <pointsize>11</pointsize>
@@ -1071,12 +1071,12 @@
                 <height>350</height>
                </size>
               </property>
-              <widget class="QWidget" name="">
+              <widget class="QWidget" name="layoutWidget">
                <property name="geometry">
                 <rect>
                  <x>11</x>
                  <y>11</y>
-                 <width>281</width>
+                 <width>286</width>
                  <height>328</height>
                 </rect>
                </property>
@@ -1138,7 +1138,7 @@
                    </widget>
                   </item>
                   <item>
-                   <widget class="QCheckBox" name="klepstandBovenCheckBox">
+                   <widget class="QCheckBox" name="valveInCheckBox">
                     <property name="font">
                      <font>
                       <pointsize>10</pointsize>
@@ -1166,7 +1166,7 @@
                    </widget>
                   </item>
                   <item>
-                   <widget class="QCheckBox" name="klepstandBenedenCheckBox">
+                   <widget class="QCheckBox" name="valveOutCheckBox">
                     <property name="font">
                      <font>
                       <pointsize>10</pointsize>
@@ -1194,7 +1194,7 @@
                    </widget>
                   </item>
                   <item>
-                   <widget class="QLineEdit" name="tempWeerstandEntry1">
+                   <widget class="QLineEdit" name="powerHeatingCoilEntry1">
                     <property name="font">
                      <font>
                       <pointsize>11</pointsize>
@@ -1234,7 +1234,7 @@
                    </widget>
                   </item>
                   <item>
-                   <widget class="QLineEdit" name="toekomendDebietEntry1">
+                   <widget class="QLineEdit" name="maxFlowInEntry1">
                     <property name="font">
                      <font>
                       <pointsize>11</pointsize>
@@ -1274,7 +1274,7 @@
                    </widget>
                   </item>
                   <item>
-                   <widget class="QLineEdit" name="toekomendDebietEntry1_3">
+                   <widget class="QLineEdit" name="maxFlowOutEntry1">
                     <property name="font">
                      <font>
                       <pointsize>11</pointsize>
@@ -1676,7 +1676,7 @@ border: 3px solid rgb(193, 193, 193);
                   </widget>
                  </item>
                  <item>
-                  <widget class="QLineEdit" name="toekomendDebietEntry2">
+                  <widget class="QLineEdit" name="maxFlowInEntry2">
                    <property name="maximumSize">
                     <size>
                      <width>80</width>
@@ -1741,7 +1741,7 @@ border: 3px solid rgb(193, 193, 193);
                   </widget>
                  </item>
                  <item>
-                  <widget class="QLineEdit" name="lineEdit">
+                  <widget class="QLineEdit" name="maxFlowOutEntry2">
                    <property name="maximumSize">
                     <size>
                      <width>80</width>
@@ -1814,7 +1814,7 @@ border: 3px solid rgb(193, 193, 193);
                   </widget>
                  </item>
                  <item>
-                  <widget class="QCheckBox" name="regelbareKlepenCheckBox">
+                  <widget class="QCheckBox" name="adjustableValveCheckBox">
                    <property name="enabled">
                     <bool>true</bool>
                    </property>
@@ -1867,7 +1867,7 @@ border: 3px solid rgb(193, 193, 193);
                   </widget>
                  </item>
                  <item>
-                  <widget class="QCheckBox" name="regelbareWeerstandCheckBox">
+                  <widget class="QCheckBox" name="adjustableHeatingCoilCheckBox">
                    <property name="font">
                     <font>
                      <pointsize>11</pointsize>
@@ -1908,7 +1908,7 @@ border: 3px solid rgb(193, 193, 193);
                   </widget>
                  </item>
                  <item>
-                  <widget class="QCheckBox" name="niveauschakelaarCheckBox">
+                  <widget class="QCheckBox" name="levelSwitchesCheckBox">
                    <property name="font">
                     <font>
                      <pointsize>11</pointsize>
@@ -1955,7 +1955,7 @@ border: 3px solid rgb(193, 193, 193);
                   </widget>
                  </item>
                  <item>
-                  <widget class="QCheckBox" name="analogeWaardeTempCheckBox">
+                  <widget class="QCheckBox" name="analogValueTempCheckBox">
                    <property name="font">
                     <font>
                      <pointsize>11</pointsize>
@@ -1996,7 +1996,7 @@ border: 3px solid rgb(193, 193, 193);
                   </widget>
                  </item>
                  <item>
-                  <widget class="QLineEdit" name="lineEdit_2">
+                  <widget class="QLineEdit" name="timeDelayfillingEntry">
                    <property name="maximumSize">
                     <size>
                      <width>80</width>
@@ -2055,7 +2055,7 @@ border: 3px solid rgb(193, 193, 193);
                   </widget>
                  </item>
                  <item>
-                  <widget class="QLineEdit" name="lineEdit_3">
+                  <widget class="QLineEdit" name="ambientTempEntry">
                    <property name="maximumSize">
                     <size>
                      <width>80</width>
@@ -2114,7 +2114,7 @@ border: 3px solid rgb(193, 193, 193);
                   </widget>
                  </item>
                  <item>
-                  <widget class="QLineEdit" name="lineEdit_4">
+                  <widget class="QLineEdit" name="powerHeatingCoilEntry2">
                    <property name="maximumSize">
                     <size>
                      <width>80</width>
@@ -2176,7 +2176,7 @@ border: 3px solid rgb(193, 193, 193);
                   </widget>
                  </item>
                  <item>
-                  <widget class="QLineEdit" name="lineEdit_5">
+                  <widget class="QLineEdit" name="heatLossVatEntry">
                    <property name="maximumSize">
                     <size>
                      <width>80</width>
@@ -2249,7 +2249,7 @@ border: 3px solid rgb(193, 193, 193);
                   </widget>
                  </item>
                  <item>
-                  <widget class="QLineEdit" name="lineEdit_6">
+                  <widget class="QLineEdit" name="timeDelayTempEntry">
                    <property name="maximumSize">
                     <size>
                      <width>80</width>
@@ -2308,7 +2308,7 @@ border: 3px solid rgb(193, 193, 193);
                   </widget>
                  </item>
                  <item>
-                  <widget class="QLineEdit" name="lineEdit_7">
+                  <widget class="QLineEdit" name="specificWeightEntry">
                    <property name="maximumSize">
                     <size>
                      <width>80</width>
@@ -2321,7 +2321,7 @@ border: 3px solid rgb(193, 193, 193);
                     </font>
                    </property>
                    <property name="text">
-                    <string>2</string>
+                    <string>4186.0</string>
                    </property>
                   </widget>
                  </item>
@@ -2367,7 +2367,7 @@ border: 3px solid rgb(193, 193, 193);
                   </widget>
                  </item>
                  <item>
-                  <widget class="QLineEdit" name="lineEdit_8">
+                  <widget class="QLineEdit" name="specificHeatCapacity">
                    <property name="maximumSize">
                     <size>
                      <width>80</width>
@@ -2380,7 +2380,7 @@ border: 3px solid rgb(193, 193, 193);
                     </font>
                    </property>
                    <property name="text">
-                    <string>4186.0</string>
+                    <string>0.997</string>
                    </property>
                   </widget>
                  </item>
@@ -2426,7 +2426,7 @@ border: 3px solid rgb(193, 193, 193);
                   </widget>
                  </item>
                  <item>
-                  <widget class="QLineEdit" name="lineEdit_9">
+                  <widget class="QLineEdit" name="boilingTempEntry">
                    <property name="maximumSize">
                     <size>
                      <width>80</width>
@@ -2485,7 +2485,7 @@ border: 3px solid rgb(193, 193, 193);
                   </widget>
                  </item>
                  <item>
-                  <widget class="QComboBox" name="kleurDropDown">
+                  <widget class="QComboBox" name="colorDropDown">
                    <property name="font">
                     <font>
                      <pointsize>11</pointsize>

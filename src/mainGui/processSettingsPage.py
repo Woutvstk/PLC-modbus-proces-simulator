@@ -72,7 +72,7 @@ class ProcessSettingsMixin:
     def _init_color_dropdown(self):
         """Initialize color dropdown"""
         try:
-            self.kleurDropDown.clear()
+            self.colorDropDown.clear()
             colors = [
                 ("Blue", "#0000FF"),
                 ("Red", "#FB5C5C"),
@@ -83,9 +83,9 @@ class ProcessSettingsMixin:
                 ("Gray", "#808080"),
             ]
             for name, hexcode in colors:
-                self.kleurDropDown.addItem(name, hexcode)
+                self.colorDropDown.addItem(name, hexcode)
 
-            self.kleurDropDown.currentIndexChanged.connect(
+            self.colorDropDown.currentIndexChanged.connect(
                 self.on_kleur_changed)
             # Removed unnecessary print
         except AttributeError as e:
@@ -127,13 +127,13 @@ class ProcessSettingsMixin:
     def _init_checkboxes(self):
         """Connect all checkboxes"""
         try:
-            self.regelbareKlepenCheckBox.toggled.connect(
+            self.adjustableValveCheckBox.toggled.connect(
                 self.on_config_changed)
-            self.regelbareWeerstandCheckBox.toggled.connect(
+            self.adjustableHeatingCoilCheckBox.toggled.connect(
                 self.on_config_changed)
-            self.niveauschakelaarCheckBox.toggled.connect(
+            self.levelSwitchesCheckBox.toggled.connect(
                 self.on_config_changed)
-            self.analogeWaardeTempCheckBox.toggled.connect(
+            self.analogValueTempCheckBox.toggled.connect(
                 self.on_config_changed)
         except AttributeError as e:
             # Removed unnecessary print
@@ -142,17 +142,23 @@ class ProcessSettingsMixin:
     def _init_entry_fields(self):
         """Synchronize entry fields (flow and temp)"""
         try:
-            self.entryGroupDebiet = [
-                self.toekomendDebietEntry,
-                self.toekomendDebietEntry1,
-                self.toekomendDebietEntry2
+            self.entryGroupFlowIn = [
+                self.maxFlowInEntry,
+                self.maxFlowInEntry1,
+                self.maxFlowInEntry2
             ]
-            self.entryGroupTemp = [
-                self.tempWeerstandEntry,
-                self.tempWeerstandEntry1
+            self.entryGroupFlowOut = [
+                self.maxFlowOutEntry,
+                self.maxFlowOutEntry1,
+                self.maxFlowOutEntry2
+            ]
+            self.entryGroupPower = [
+                self.powerHeatingCoilEntry,
+                self.powerHeatingCoilEntry1,
+                self.powerHeatingCoilEntry2
             ]
 
-            for group in (self.entryGroupDebiet, self.entryGroupTemp):
+            for group in (self.entryGroupFlowIn, self.entryGroupFlowOut, self.entryGroupPower):
                 for field in group:
                     field.textChanged.connect(
                         lambda text, g=group: self.syncFields(text, g))
@@ -190,58 +196,71 @@ class ProcessSettingsMixin:
         try:
             # Read values from UI
             self.vat_widget.valveInMaxFlowValue = int(
-                self.toekomendDebietEntry.text() or 0)
+                self.maxFlowInEntry.text() or 5)
+            self.vat_widget.valveOutMaxFlowValue = int(
+                self.maxFlowOutEntry.text() or 2)
             self.vat_widget.powerValue = float(
-                self.tempWeerstandEntry.text() or 20.0)
+                self.powerHeatingCoilEntry.text() or 10000.0)
+            self.vat_widget.maxVolume = float(self.volumeEntry.text() or 2.0)
+            """ self.timeDelayFilling = float(
+                self.timeDelayfillingEntry.text() or 0.0)
+            self.ambientTemp = float(self.ambientTempEntry.text() or 21.0)
+            self.heatLoss = float(self.heatLossVatEntry.text() or 150.0)
+            self.timeDelayTemp = float(self.timeDelayTempEntry.text() or 0.0)
+            self.specificWeight = float(
+                self.specificWeightEntry.text() or 4186.0)
+            self.specificHeatCapacity = float(
+                self.specificHeatCapacityEntry.text() or 0.997)
+            self.boilingTemp = float(self.boilingTempEntry.text() or 100.0)"""
 
             # Checkbox states
-            self.vat_widget.adjustableValve = self.regelbareKlepenCheckBox.isChecked()
-            self.vat_widget.adjustableHeatingCoil = self.regelbareWeerstandCheckBox.isChecked()
-            self.vat_widget.levelSwitches = self.niveauschakelaarCheckBox.isChecked()
-            self.vat_widget.analogValueTemp = self.analogeWaardeTempCheckBox.isChecked()
+            self.vat_widget.adjustableValve = self.adjustableValveCheckBox.isChecked()
+            self.vat_widget.adjustableHeatingCoil = self.adjustableHeatingCoilCheckBox.isChecked()
+            self.vat_widget.levelSwitches = self.levelSwitchesCheckBox.isChecked()
+            self.vat_widget.analogValueTemp = self.analogValueTempCheckBox.isChecked()
 
             # Controller mode
             controller_mode = self.controlerDropDown.currentText()
             self.vat_widget.controler = controller_mode
 
             # Water color
-            self.vat_widget.kleurWater = self.kleurDropDown.currentData()
+            self.vat_widget.waterColor = self.colorDropDown.currentData()
 
             # UI Elements visibility
             is_gui_mode = (controller_mode == "GUI")
 
             try:
                 if is_gui_mode and self.vat_widget.adjustableValve:
-                    if not self.regelbareKlepenGUISim.isVisible():
+                    if not self.adjustableVavleGUISim.isVisible():
                         self.GUiSim.hide()
-                        self.regelbareKlepenGUISim.show()
+                        self.adjustableVavleGUISim.show()
                 elif is_gui_mode and not self.vat_widget.adjustableValve:
                     if not self.GUiSim.isVisible():
-                        self.regelbareKlepenGUISim.hide()
+                        self.adjustableVavleGUISim.hide()
                         self.GUiSim.show()
                 else:
-                    if self.GUiSim.isVisible() or self.regelbareKlepenGUISim.isVisible():
+                    if self.GUiSim.isVisible() or self.adjustableVavleGUISim.isVisible():
                         self.GUiSim.hide()
-                        self.regelbareKlepenGUISim.hide()
+                        self.adjustableVavleGUISim.hide()
             except AttributeError:
                 pass
 
             # Valve positions (Klep standen)
             if self.vat_widget.adjustableValve:
                 try:
-                    self.vat_widget.adjustableValveInValue = int(
-                        self.klepstandBovenEntry.text() or 0)
+                    self.vat_widget.adjustableValveInValue = min(100, int(
+                        self.valveInEntry.text() or 0))
                 except (ValueError, AttributeError):
                     self.vat_widget.adjustableValveInValue = 0
                 try:
-                    self.vat_widget.adjustableValveOutValue = int(
-                        self.klepstandBenedenEntry.text() or 0)
+                    self.vat_widget.adjustableValveOutValue = min(100, int(
+                        self.valveOutEntry.text() or 0))
                 except (ValueError, AttributeError):
                     self.vat_widget.adjustableValveOutValue = 0
             else:
                 try:
-                    top_checked = self.klepstandBovenCheckBox.isChecked()
-                    bottom_checked = self.klepstandBenedenCheckBox.isChecked()
+                    top_checked = self.valveInCheckBox.isChecked()
+                    bottom_checked = self.valveOutCheckBox.isChecked()
                     self.vat_widget.adjustableValveInValue = 100 if top_checked else 0
                     self.vat_widget.adjustableValveOutValue = 100 if bottom_checked else 0
                 except AttributeError:
@@ -274,7 +293,7 @@ class ProcessSettingsMixin:
         # Read back status for visual feedback
         if hasattr(self, 'tanksim_status') and self.tanksim_status:
             import tankSim.gui as gui_module
-            gui_module.currentHoogteVat = self.tanksim_status.liquidVolume
+            gui_module.liquidVolume = self.tanksim_status.liquidVolume
             gui_module.tempVat = self.tanksim_status.liquidTemperature
 
         # Rebuild SVG
@@ -282,8 +301,8 @@ class ProcessSettingsMixin:
 
     def on_kleur_changed(self):
         """Callback when color dropdown changes"""
-        new_color = self.kleurDropDown.currentData()
-        self.vat_widget.kleurWater = new_color
+        new_color = self.colorDropDown.currentData()
+        self.vat_widget.waterColor = new_color
 
     def on_config_changed(self):
         """Callback when configuration checkbox changes"""
