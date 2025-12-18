@@ -27,8 +27,10 @@ class logoS7:
             self.tsapServer = tsapServer
             self.tcpport = tcpport
             self.logo = snap7.logo.Logo()
+            
         except Exception as e:
             print(f"__init__ error: {e}")
+
 
     def connect(self, instance_name: str | None = None) -> bool:
         """
@@ -108,7 +110,7 @@ class logoS7:
         """
         try:
             if 0 <= bit < 8:
-                address = f"V{byte + 1064}.{bit}"
+                address = f"V{byte}.{bit}"
                 data = self.logo.read(address)
                 return int(bool(data))
             return -1
@@ -150,7 +152,7 @@ class logoS7:
         """
         try:
             if byte % 2 == 0:
-                address = f"VW{byte + 1072}"
+                address = f"VW{byte }"
                 data = self.logo.read(address)
                 return int(data)
             return -1
@@ -172,7 +174,7 @@ class logoS7:
         """
         try:
             if 0 <= bit < 8:
-                address = f"V{byte + 1064}.{bit}"
+                address = f"V{byte}.{bit}"
                 self.logo.write(address, int(bool(value)))
                 return int(bool(value))
             return -1
@@ -194,7 +196,7 @@ class logoS7:
         try:
             if byte >= 0 and byte % 2 == 0:
                 val = int(value) & 0xFFFF
-                address = f"VW{byte + 1072}"
+                address = f"VW{byte }"
                 self.logo.write(address, val)
                 return val
             return -1

@@ -1,1 +1,3 @@
 **/__pycache__/
+src/tankSim/io_configuration.json
+src/guiCommon/Resource_rc.py
