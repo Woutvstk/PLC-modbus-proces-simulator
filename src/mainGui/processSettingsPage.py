@@ -17,6 +17,11 @@ class ProcessSettingsMixin:
 
     def init_process_settings_page(self):
         """Initialize all process settings page components"""
+        # Initialize debounce timer for entry field updates
+        self._entry_update_timer = QTimer()
+        self._entry_update_timer.setSingleShot(True)
+        self._entry_update_timer.timeout.connect(self._apply_entry_field_updates)
+        
         self._init_vat_widget()
         self._init_transportband_widget()
         self._init_color_dropdown()
@@ -319,9 +324,13 @@ class ProcessSettingsMixin:
         self.update_process_values()
 
     def on_entry_field_changed(self):
-        """Callback when entry field value changes"""
-        # Entry field changes are handled by the main update loop
-        # This provides immediate visual feedback for critical settings
+        """Callback when entry field value changes - debounced"""
+        # Restart the timer on every change (debouncing)
+        self._entry_update_timer.stop()
+        self._entry_update_timer.start(300)  # 300ms delay
+
+    def _apply_entry_field_updates(self):
+        """Apply entry field updates to VatWidget after debounce delay"""
         try:
             # Update only the display text values that depend on entry fields
             debiet_text = self.toekomendDebietEntry.text().strip()
