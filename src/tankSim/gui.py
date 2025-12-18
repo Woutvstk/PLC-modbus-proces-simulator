@@ -12,7 +12,8 @@ orange = "#FFA500"
 blue = "#1100FF"
 green = "#00FF00"
 
-# Global variables
+# Deprecated global variables (for backward compatibility only)
+# These should not be used in new code - use instance variables instead
 maxHoogteVat = 200
 weerstand = True
 currentHoogteVat = 0
@@ -72,6 +73,12 @@ class VatWidget(QWidget):
         self.kleurWater = blue
         self.controler = "GUI"
 
+        # Instance-based state (replaces global variables)
+        self.currentHoogteVat = 0
+        self.maxHoogteVat = 200
+        self.tempVat = 0
+        self.weerstand = True
+
         self.waterInVat = None
         self.originalY = 0.0
         self.originalHoogte = 0.0
@@ -112,16 +119,38 @@ class VatWidget(QWidget):
         self.update_svg()
         self.svg_widget.update()
 
+    def update_from_status(self, status, config=None):
+        """
+        Update internal state from status and config objects.
+        This method should be called before rebuild() to ensure proper data binding.
+        
+        Args:
+            status: tankSim.status.status object with current simulation state
+            config: tankSim.configuration.configuration object (optional)
+        """
+        if status:
+            # Update liquid volume and temperature from status
+            self.currentHoogteVat = status.liquidVolume
+            self.tempVat = status.liquidTemperature
+            
+            # Update heater state from status
+            if status.heaterPowerFraction > 0:
+                self.weerstand = True
+            else:
+                self.weerstand = False
+        
+        if config:
+            # Update max height from config if provided
+            self.maxHoogteVat = config.tankVolume
+
     def rebuild(self):
         """Complete rebuild of the SVG based on current values"""
-        global currentHoogteVat, maxHoogteVat
-
         self.set_group_color("waterTotaal", self.kleurWater)
 
         if self.tempWeerstand == 0:
             tempVatProcent = 0.0
         else:
-            tempVatProcent = (tempVat * 100.0) / self.tempWeerstand
+            tempVatProcent = (self.tempVat * 100.0) / self.tempWeerstand
 
         tempVatProcent = max(0.0, min(100.0, tempVatProcent))
 
@@ -159,9 +188,9 @@ class VatWidget(QWidget):
 
         if not self.regelbareWeerstand:
             self.visibility_group("regelbareweerstand", "hidden")
-            if weerstand:
+            if self.weerstand:
                 self.set_group_color("weerstandStand", green)
-            elif not weerstand:
+            elif not self.weerstand:
                 self.set_group_color("weerstandStand", red)
             else:
                 self.set_group_color("weerstandStand", "#FFFFFF")
@@ -183,8 +212,13 @@ class VatWidget(QWidget):
             self.klep_breete("waterBeneden", self.KlepStandBeneden)
             self.set_group_color("KlepBeneden", self.kleurWater)
 
-        if tempVat == self.tempWeerstand:
-            self.set_group_color("temperatuurVat", green)
+        # Show green if within 5% of target temperature, red otherwise
+        if self.tempWeerstand > 0:
+            temp_diff_percent = abs(self.tempVat - self.tempWeerstand) / self.tempWeerstand * 100.0
+            if temp_diff_percent <= 5.0:
+                self.set_group_color("temperatuurVat", green)
+            else:
+                self.set_group_color("temperatuurVat", red)
         else:
             self.set_group_color("temperatuurVat", red)
 
@@ -193,7 +227,7 @@ class VatWidget(QWidget):
         self.set_svg_text("debiet", str(self.toekomendDebiet) + "l/s")
         self.set_svg_text("temperatuurWarmteweerstand",
                           str(self.tempWeerstand) + "°C")
-        self.set_svg_text("temperatuurVatWaarde", str(tempVat) + "°C")
+        self.set_svg_text("temperatuurVatWaarde", str(int(self.tempVat)) + "°C")
 
         self.waterInVat = self.root.find(
             f".//svg:*[@id='waterInVat']", self.ns)
@@ -219,14 +253,12 @@ class VatWidget(QWidget):
 
     def vat_vullen_GUI(self):
         """Fill the tank based on currentHoogteVat"""
-        global currentHoogteVat, maxHoogteVat
-
-        if currentHoogteVat >= maxHoogteVat:
+        if self.currentHoogteVat >= self.maxHoogteVat:
             self.set_group_color("niveauschakelaar", green)
         else:
             self.set_group_color("niveauschakelaar", red)
 
-        hoogteVatGui = currentHoogteVat / maxHoogteVat * self.maxHoogteGUI
+        hoogteVatGui = self.currentHoogteVat / self.maxHoogteVat * self.maxHoogteGUI
         nieuweY = self.ondersteY - hoogteVatGui
 
         if self.waterInVat is not None:
@@ -235,42 +267,62 @@ class VatWidget(QWidget):
 
         self.set_hoogte_indicator("hoogteIndicator", nieuweY)
         self.set_hoogte_indicator("hoogteTekst", nieuweY + 2)
-        self.set_svg_text("hoogteTekst", str(int(currentHoogteVat)) + "mm")
+        self.set_svg_text("hoogteTekst", str(int(self.currentHoogteVat)) + "mm")
 
     def set_hoogte_indicator(self, itemId, hoogte):
         """Set the Y-position of an indicator"""
-        item = self.root.find(f".//svg:*[@id='{itemId}']", self.ns)
-        if item is not None:
-            item.set("y", str(hoogte))
+        try:
+            item = self.root.find(f".//svg:*[@id='{itemId}']", self.ns)
+            if item is not None:
+                item.set("y", str(hoogte))
+        except Exception as e:
+            # Silently handle missing SVG elements
+            pass
 
     def set_group_color(self, groupId, kleur):
         """Set the color of an SVG group"""
-        group = self.root.find(f".//svg:g[@id='{groupId}']", self.ns)
-        if group is not None:
-            for element in group:
-                element.set("fill", kleur)
+        try:
+            group = self.root.find(f".//svg:g[@id='{groupId}']", self.ns)
+            if group is not None:
+                for element in group:
+                    element.set("fill", kleur)
+        except Exception as e:
+            # Silently handle missing SVG elements
+            pass
 
     def visibility_group(self, groupId, visibility):
         """Set the visibility of a group"""
-        group = self.root.find(f".//svg:g[@id='{groupId}']", self.ns)
-        if group is not None:
-            group.set("visibility", visibility)
+        try:
+            group = self.root.find(f".//svg:g[@id='{groupId}']", self.ns)
+            if group is not None:
+                group.set("visibility", visibility)
+        except Exception as e:
+            # Silently handle missing SVG elements
+            pass
 
     def klep_breete(self, itemId, KlepStand):
         """Adjust the width of a valve based on its position"""
-        item = self.root.find(f".//svg:*[@id='{itemId}']", self.ns)
-        if item is not None:
-            new_width = (KlepStand * 0.0645)
-            new_x = 105.745 - (KlepStand * 0.065) / 2
-            item.set("width", str(new_width))
-            item.set("x", str(new_x))
+        try:
+            item = self.root.find(f".//svg:*[@id='{itemId}']", self.ns)
+            if item is not None:
+                new_width = (KlepStand * 0.0645)
+                new_x = 105.745 - (KlepStand * 0.065) / 2
+                item.set("width", str(new_width))
+                item.set("x", str(new_x))
+        except Exception as e:
+            # Silently handle missing SVG elements
+            pass
 
     def set_svg_text(self, itemId, value):
         """Set the text of an SVG text element"""
-        item = self.root.find(f".//svg:*[@id='{itemId}']", self.ns)
-        if item is not None:
-            tspan = item.find("svg:tspan", self.ns)
-            if tspan is not None:
-                tspan.text = value
-            else:
-                item.text = value
+        try:
+            item = self.root.find(f".//svg:*[@id='{itemId}']", self.ns)
+            if item is not None:
+                tspan = item.find("svg:tspan", self.ns)
+                if tspan is not None:
+                    tspan.text = value
+                else:
+                    item.text = value
+        except Exception as e:
+            # Silently handle missing SVG elements
+            pass

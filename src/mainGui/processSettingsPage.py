@@ -271,11 +271,10 @@ class ProcessSettingsMixin:
                 except:
                     self.tanksim_status.heaterPowerFraction = 0.0
 
-        # Read back status for visual feedback
+        # Read back status for visual feedback and update widget state
         if hasattr(self, 'tanksim_status') and self.tanksim_status:
-            import tankSim.gui as gui_module
-            gui_module.currentHoogteVat = self.tanksim_status.liquidVolume
-            gui_module.tempVat = self.tanksim_status.liquidTemperature
+            config = self.tanksim_config if hasattr(self, 'tanksim_config') else None
+            self.vat_widget.update_from_status(self.tanksim_status, config)
 
         # Rebuild SVG
         self.vat_widget.rebuild()
