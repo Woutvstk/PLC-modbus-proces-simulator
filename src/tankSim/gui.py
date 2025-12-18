@@ -128,6 +128,8 @@ class VatWidget(QWidget):
             status: tankSim.status.status object with current simulation state
             config: tankSim.configuration.configuration object (optional)
         """
+        global currentHoogteVat, maxHoogteVat, tempVat, weerstand
+        
         if status:
             # Update liquid volume and temperature from status
             self.currentHoogteVat = status.liquidVolume
@@ -138,10 +140,17 @@ class VatWidget(QWidget):
                 self.weerstand = True
             else:
                 self.weerstand = False
+            
+            # Update deprecated global variables for backward compatibility
+            currentHoogteVat = self.currentHoogteVat
+            tempVat = self.tempVat
+            weerstand = self.weerstand
         
         if config:
             # Update max height from config if provided
             self.maxHoogteVat = config.tankVolume
+            # Update deprecated global variable for backward compatibility
+            maxHoogteVat = self.maxHoogteVat
 
     def rebuild(self):
         """Complete rebuild of the SVG based on current values"""
