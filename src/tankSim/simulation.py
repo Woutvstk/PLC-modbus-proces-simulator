@@ -83,6 +83,12 @@ class simulation:
     """
 
     def doSimulation(self, config: configurationClass, status: statusClass) -> None:
+        """
+        INPUT:  config (max flows, heater power, etc.)
+                status (actuele actuator posities)
+        
+        OUTPUT: status (nieuwe liquidVolume, liquidTemperature)
+        """
         self.delayHandler.queueAdd(status, config)
         """check if simRunning before changing any data"""
         if (status.simRunning == True):

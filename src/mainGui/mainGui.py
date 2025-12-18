@@ -241,6 +241,46 @@ class MainWindow(QMainWindow, Ui_MainWindow, ProcessSettingsMixin, IOConfigMixin
         except AttributeError:
             pass
 
+    def start_simulation(self, sim_index):
+        """Start a specific simulation"""
+        self.current_sim_page = sim_index
+        self.MainScreen.setCurrentIndex(sim_index)
+        
+        # NIEUW: Update stacked widget in simulation settings page
+        try:
+            if sim_index == 0:  # Tank with valves
+                # Show tank settings
+                self.stackedWidget_SimSettings.setCurrentIndex(0)
+            elif sim_index == 1:  # Tank with motor  
+                # Show tank settings (same as index 0 for now)
+                self.stackedWidget_SimSettings.setCurrentIndex(0)
+            elif sim_index == 2:  # Conveyor
+                # Show conveyor settings (placeholder for now)
+                self.stackedWidget_SimSettings.setCurrentIndex(1)
+        except AttributeError:
+            pass
+        
+        print(f"Started simulation {sim_index}")
+
+    def go_to_sim_settings(self, checked):
+        """Navigate to simulation settings page"""
+        if checked:
+            self.MainScreen.setCurrentIndex(6)
+            
+            # NIEUW: Update stacked widget based on current active sim
+            try:
+                if self.current_sim_page is not None:
+                    if self.current_sim_page in [0, 1]:  # Tank simulations
+                        self.stackedWidget_SimSettings.setCurrentIndex(0)
+                    elif self.current_sim_page == 2:  # Conveyor
+                        self.stackedWidget_SimSettings.setCurrentIndex(1)
+                else:
+                    # No active sim - show tank settings by default
+                    self.stackedWidget_SimSettings.setCurrentIndex(0)
+            except AttributeError:
+                pass
+
+
     def go_to_settings(self, checked):
         """Navigate to general settings page"""
         if checked:
