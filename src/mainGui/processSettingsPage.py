@@ -324,14 +324,16 @@ class ProcessSettingsMixin:
         # This provides immediate visual feedback for critical settings
         try:
             # Update only the display text values that depend on entry fields
-            self.vat_widget.toekomendDebiet = int(
-                self.toekomendDebietEntry.text() or 0)
-            self.vat_widget.tempWeerstand = float(
-                self.tempWeerstandEntry.text() or 20.0)
-            # Update text displays in SVG
-            self.vat_widget.set_svg_text("debiet", str(self.vat_widget.toekomendDebiet) + "l/s")
+            debiet_text = self.toekomendDebietEntry.text().strip()
+            self.vat_widget.toekomendDebiet = int(debiet_text) if debiet_text else 0
+            
+            temp_text = self.tempWeerstandEntry.text().strip()
+            self.vat_widget.tempWeerstand = float(temp_text) if temp_text else 20.0
+            
+            # Update text displays in SVG using f-strings
+            self.vat_widget.set_svg_text("debiet", f"{self.vat_widget.toekomendDebiet}l/s")
             self.vat_widget.set_svg_text("temperatuurWarmteweerstand",
-                                          str(self.vat_widget.tempWeerstand) + "°C")
+                                          f"{self.vat_widget.tempWeerstand}°C")
             self.vat_widget.update_svg()
             self.vat_widget.svg_widget.update()
         except (ValueError, AttributeError):
@@ -372,13 +374,13 @@ class ProcessSettingsMixin:
             if self.vat_widget.regelbareKleppen:
                 # Update valve positions from entry fields
                 try:
-                    self.vat_widget.KlepStandBoven = int(
-                        self.klepstandBovenEntry.text() or 0)
+                    boven_text = self.klepstandBovenEntry.text().strip()
+                    self.vat_widget.KlepStandBoven = int(boven_text) if boven_text else 0
                 except (ValueError, AttributeError):
                     self.vat_widget.KlepStandBoven = 0
                 try:
-                    self.vat_widget.KlepStandBeneden = int(
-                        self.klepstandBenedenEntry.text() or 0)
+                    beneden_text = self.klepstandBenedenEntry.text().strip()
+                    self.vat_widget.KlepStandBeneden = int(beneden_text) if beneden_text else 0
                 except (ValueError, AttributeError):
                     self.vat_widget.KlepStandBeneden = 0
                 # Trigger rebuild to update visuals
