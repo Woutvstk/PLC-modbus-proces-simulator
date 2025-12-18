@@ -136,10 +136,7 @@ class VatWidget(QWidget):
             self.tempVat = status.liquidTemperature
             
             # Update heater state from status
-            if status.heaterPowerFraction > 0:
-                self.weerstand = True
-            else:
-                self.weerstand = False
+            self.weerstand = status.heaterPowerFraction > 0
             
             # Update deprecated global variables for backward compatibility
             currentHoogteVat = self.currentHoogteVat
@@ -228,7 +225,11 @@ class VatWidget(QWidget):
                 self.set_group_color("temperatuurVat", green)
             else:
                 self.set_group_color("temperatuurVat", red)
+        elif self.tempWeerstand == 0 and self.tempVat == 0:
+            # Both temperatures are 0 - this is a match
+            self.set_group_color("temperatuurVat", green)
         else:
+            # Target is 0 but actual is not, or other edge case
             self.set_group_color("temperatuurVat", red)
 
         self.set_svg_text("klepstandBoven", str(self.KlepStandBoven) + "%")
