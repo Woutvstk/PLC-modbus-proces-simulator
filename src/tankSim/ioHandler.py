@@ -1,5 +1,5 @@
 from configuration import configuration as mainConfigClass
-from tankSim.configurationTS import configuration as configurationClass
+from tankSim.configuration import configuration as configurationClass
 from tankSim.status import status as statusClass
 from plcCom.logoS7 import logoS7
 

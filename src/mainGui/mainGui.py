@@ -284,6 +284,9 @@ class MainWindow(QMainWindow, Ui_MainWindow, ProcessSettingsMixin, IOConfigMixin
     def go_to_settings(self, checked):
         """Navigate to general settings page"""
         if checked:
+            # Check IO config when leaving IO page
+            if self.MainScreen.currentIndex() == 4:  # Coming from IO page
+                self.check_io_config_loaded()
             self.MainScreen.setCurrentIndex(3)
 
     def go_to_io(self, checked):
@@ -294,14 +297,15 @@ class MainWindow(QMainWindow, Ui_MainWindow, ProcessSettingsMixin, IOConfigMixin
     def go_to_sim_or_selection(self, checked):
         """Navigate to active sim or selection page"""
         if checked:
+            # Check IO config when leaving IO page
+            if self.MainScreen.currentIndex() == 4:  # Coming from IO page
+                self.check_io_config_loaded()
+            
             if self.current_sim_page is not None:
-                # Active simulation - go there
                 self.MainScreen.setCurrentIndex(self.current_sim_page)
             else:
-                # No active simulation - go to selection page
                 self.MainScreen.setCurrentIndex(5)
             
-            # Ensure menu is open
             if not self.fullMenuWidget.isVisible():
                 self.pushButton_menu.setChecked(True)
 
@@ -447,8 +451,25 @@ class MainWindow(QMainWindow, Ui_MainWindow, ProcessSettingsMixin, IOConfigMixin
         """Handle connect button"""
         if not self.mainConfig:
             return
+        
         if checked:
+            # User wants to connect
             self.mainConfig.tryConnect = True
+        else:
+            # User wants to disconnect
+            if self.validPlcConnection and hasattr(self, 'plc') and self.plc:
+                try:
+                    print("Disconnecting from PLC...")
+                    self.plc.disconnect()
+                except Exception as e:
+                    print(f"Error during disconnect: {e}")
+                
+                self.validPlcConnection = False
+                self.plc = None
+                self.update_connection_status_icon()
+                
+                # Clear all forces when disconnecting
+                self.clear_all_forces()
 
     def on_ip_changed(self, text):
         """Update IP with throttling"""
@@ -558,6 +579,52 @@ class MainWindow(QMainWindow, Ui_MainWindow, ProcessSettingsMixin, IOConfigMixin
                 self.mainConfig.selectedNetworkAdapter = selected_adapter
         except:
             pass
+
+    def closeEvent(self, event):
+        """Handle window close event with cleanup"""
+        print("\n" + "="*60)
+        print("Shutting down...")
+        print("="*60)
+        
+        try:
+            # 1. Stop simulation
+            if hasattr(self, 'tanksim_status') and self.tanksim_status:
+                self.tanksim_status.simRunning = False
+            
+            # 2. Disconnect PLC
+            if hasattr(self, 'validPlcConnection') and self.validPlcConnection:
+                if hasattr(self, 'plc') and self.plc:
+                    try:
+                        print("Disconnecting PLC...")
+                        self.plc.disconnect()
+                    except Exception as e:
+                        print(f"Error during PLC disconnect: {e}")
+            
+            # 3. Stop NetToPLCSim.exe
+            try:
+                print("Stopping NetToPLCSim.exe...")
+                import subprocess
+                subprocess.run(
+                    ['taskkill', '/F', '/IM', 'NetToPLCSim.exe'],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    timeout=2
+                )
+            except Exception as e:
+                print(f"Note: {e}")
+            
+            # 4. Signal main loop to exit
+            if hasattr(self, 'mainConfig') and self.mainConfig:
+                self.mainConfig.doExit = True
+            
+            print("Cleanup complete")
+            print("="*60 + "\n")
+            
+        except Exception as e:
+            print(f"Error during cleanup: {e}")
+        
+        # Accept the close event
+        event.accept()
 
 
 if __name__ == "__main__":

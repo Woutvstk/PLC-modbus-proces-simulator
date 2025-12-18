@@ -496,7 +496,7 @@
 border: thick double #32a1ce;}</string>
          </property>
          <property name="currentIndex">
-          <number>5</number>
+          <number>4</number>
          </property>
          <widget class="QWidget" name="vat1Page">
           <layout class="QHBoxLayout" name="horizontalLayout_21">
@@ -1536,7 +1536,7 @@ border: 1px solid rgb(182, 182, 182);
                     <string notr="true">border: 2px solid rgb(193, 193, 193);</string>
                    </property>
                    <property name="text">
-                    <string>BESCHIKBARE IN/UITGANGEN</string>
+                    <string>AVAILABLE IN/OUTPUTS</string>
                    </property>
                    <property name="alignment">
                     <set>Qt::AlignCenter</set>
@@ -1553,7 +1553,7 @@ border: 1px solid rgb(182, 182, 182);
                    </property>
                    <column>
                     <property name="text">
-                     <string notr="true">SIMULATIES</string>
+                     <string notr="true">SIMULATIONS</string>
                     </property>
                    </column>
                   </widget>
@@ -1884,7 +1884,7 @@ border: 3px solid rgb(193, 193, 193);
                       <string notr="true"/>
                      </property>
                      <property name="text">
-                      <string>TOEPASSEN</string>
+                      <string>APPLY</string>
                      </property>
                     </widget>
                    </item>
@@ -1917,7 +1917,7 @@ border: 3px solid rgb(193, 193, 193);
                      </size>
                     </property>
                     <property name="text">
-                     <string>OPSLAAN</string>
+                     <string>SAVE</string>
                     </property>
                     <property name="icon">
                      <iconset resource="Resource.qrc">
@@ -1940,7 +1940,7 @@ border: 3px solid rgb(193, 193, 193);
                      </size>
                     </property>
                     <property name="text">
-                     <string>LAAD</string>
+                     <string>LOAD</string>
                     </property>
                     <property name="icon">
                      <iconset resource="Resource.qrc">
@@ -1957,7 +1957,7 @@ border: 3px solid rgb(193, 193, 193);
                      </font>
                     </property>
                     <property name="text">
-                     <string>ACTIVEER CONFIGURATIE</string>
+                     <string>UPDATE CONFIGURATION</string>
                     </property>
                     <property name="icon">
                      <iconset>
@@ -2007,7 +2007,7 @@ border: 3px solid rgb(193, 193, 193);
 }</string>
                     </property>
                     <property name="text">
-                     <string>FORCEER STATUS INSCHAKELEN</string>
+                     <string>ENABLE FORCE MODE</string>
                     </property>
                     <property name="checkable">
                      <bool>true</bool>
@@ -2079,7 +2079,7 @@ border: 3px solid rgb(193, 193, 193);
                   <row/>
                   <column>
                    <property name="text">
-                    <string>NAAM</string>
+                    <string>NAME</string>
                    </property>
                    <property name="font">
                     <font>
@@ -2187,7 +2187,7 @@ border: 3px solid rgb(193, 193, 193);
                   </column>
                   <column>
                    <property name="text">
-                    <string>BESCHRIJVING</string>
+                    <string>DESCRIPTION</string>
                    </property>
                    <property name="font">
                     <font>
@@ -2205,7 +2205,7 @@ border: 3px solid rgb(193, 193, 193);
                   </column>
                   <column>
                    <property name="text">
-                    <string>BEREIK</string>
+                    <string>RANGE</string>
                    </property>
                    <property name="font">
                     <font>
@@ -2325,7 +2325,7 @@ border: 3px solid rgb(193, 193, 193);
                   }
                   #PIDMotor:hover {
                     border-color: #3daee9;
-                    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                    ;
                   }
                 </string>
              </property>
@@ -2459,7 +2459,7 @@ border: 3px solid rgb(193, 193, 193);
                   }
                   #PIDValves:hover {
                     border-color: #3daee9;
-                    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                    ;
                   }
                 </string>
              </property>
@@ -2593,7 +2593,7 @@ border: 3px solid rgb(193, 193, 193);
                   }
                   #PIDConv:hover {
                     border-color: #3daee9;
-                    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                    ;
                   }
                 </string>
              </property>
@@ -2835,8 +2835,8 @@ border: 3px solid rgb(193, 193, 193);
                    <rect>
                     <x>0</x>
                     <y>0</y>
-                    <width>1003</width>
-                    <height>1042</height>
+                    <width>466</width>
+                    <height>1013</height>
                    </rect>
                   </property>
                   <layout class="QVBoxLayout" name="verticalLayout_scroll">

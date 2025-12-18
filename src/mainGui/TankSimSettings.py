@@ -1,27 +1,26 @@
 # tankSimSettingsPage.py - Tank Simulation Specific Settings
-# Handles:
-# - VatWidget (tank visualization)
-# - Tank-specific UI elements (valves, heater, color, etc.)
-# - Reading from simulation status
-# - Writing GUI inputs to simulation status
-
-# tankSimSettingsPage.py - Tank Simulation Specific Settings
-# WITH STACKED WIDGET SUPPORT
+# REFACTORED: Now uses interface.py for all logic
 
 from pathlib import Path
 from PyQt5.QtWidgets import QWidget, QVBoxLayout
-from tankSim.gui import VatWidget
+
+# Import the interface
+from tankSim.SVGinterface import TankSimInterface
 
 
 class TankSimSettingsMixin:
     """
-    Mixin class for tank simulation specific functionality
-    Combined with MainWindow via multiple inheritance
+    Mixin class for tank simulation GUI setup
+    All logic is delegated to TankSimInterface
     """
 
     def init_tanksim_settings_page(self):
-        """Initialize all tank simulation page components"""
-        self._init_vat_widget()
+        """Initialize tank simulation page components"""
+        # Create interface
+        self.tanksim_interface = TankSimInterface(self)
+        self.tanksim_interface.initialize()
+        
+        # Setup GUI elements
         self._init_color_dropdown()
         self._init_checkboxes()
         self._init_entry_fields()
@@ -34,25 +33,7 @@ class TankSimSettingsMixin:
         except AttributeError:
             pass
 
-    def _init_vat_widget(self):
-        """Initialize VatWidget (tank visualization)"""
-        try:
-            self.vat_widget = VatWidget()
-            container = self.findChild(QWidget, "vatWidgetContainer")
-
-            if container:
-                existing_layout = container.layout()
-                if existing_layout is None:
-                    container_layout = QVBoxLayout(container)
-                    container_layout.setContentsMargins(0, 0, 0, 0)
-                else:
-                    container_layout = existing_layout
-                    container_layout.setContentsMargins(0, 0, 0, 0)
-
-                container_layout.addWidget(self.vat_widget)
-        except Exception as e:
-            pass
-
+    # GUI setup methods remain unchanged
     def _init_color_dropdown(self):
         """Initialize water color dropdown"""
         try:
@@ -68,7 +49,7 @@ class TankSimSettingsMixin:
             ]
             for name, hexcode in colors:
                 self.kleurDropDown.addItem(name, hexcode)
-
+            
             self.kleurDropDown.currentIndexChanged.connect(self.on_kleur_changed)
         except AttributeError:
             pass
@@ -84,7 +65,7 @@ class TankSimSettingsMixin:
             pass
 
     def _init_entry_fields(self):
-        """Synchronize entry fields (flow and temp)"""
+        """Synchronize entry fields"""
         try:
             self.entryGroupDebiet = [
                 self.toekomendDebietEntry,
@@ -126,218 +107,43 @@ class TankSimSettingsMixin:
         """Connect apply button"""
         try:
             self.pushButton_applyPIDValveSettings.clicked.connect(
-                self.write_gui_values_to_config)
+                self.apply_tanksim_settings)
         except AttributeError:
             pass
 
     # =========================================================================
-    # STACKED WIDGET CONTROL
-    # =========================================================================
-    
-    def show_sim_settings_page(self):
-        """Show the settings page in the stacked widget"""
-        try:
-            self.stackedWidget_SimSettings.setCurrentIndex(0)
-        except AttributeError:
-            pass
-    
-    def show_active_simulation_page(self):
-        """Show the active simulation page in the stacked widget"""
-        try:
-            self.stackedWidget_SimSettings.setCurrentIndex(1)
-        except AttributeError:
-            pass
-
-    # =========================================================================
-    # HELPER: Safe attribute getter with default value
-    # =========================================================================
-    def _get_entry_value(self, attr_name, default):
-        """
-        Safely get value from a QLineEdit widget
-        Returns default value if widget doesn't exist or has invalid value
-        """
-        try:
-            widget = getattr(self, attr_name, None)
-            if widget and widget.text():
-                return type(default)(widget.text())
-            return default
-        except (ValueError, AttributeError):
-            return default
-
-    # =========================================================================
-    # UPDATE LOOP - Called from main timer
+    # DELEGATION TO INTERFACE
     # =========================================================================
     
     def update_tanksim_display(self):
-        """
-        Update tank visualization from simulation status
-        Called from main update loop
-        
-        DATAFLOW: status → GUI display → SVG
-        """
-        if not hasattr(self, 'tanksim_status') or self.tanksim_status is None:
-            return
-
-        # Step 1: Read simulation values from status object
-        import tankSim.gui as gui_module
-        gui_module.currentHoogteVat = self.tanksim_status.liquidVolume
-        gui_module.tempVat = self.tanksim_status.liquidTemperature
-
-        # Step 2: Update VatWidget configuration from UI
-        try:
-            self.vat_widget.toekomendDebiet = self._get_entry_value('toekomendDebietEntry', 200)
-            self.vat_widget.tempWeerstand = self._get_entry_value('tempWeerstandEntry', 20.0)
-            
-            # Checkbox states
-            self.vat_widget.regelbareKleppen = self.regelbareKlepenCheckBox.isChecked()
-            self.vat_widget.regelbareWeerstand = self.regelbareWeerstandCheckBox.isChecked()
-            self.vat_widget.niveauschakelaar = self.niveauschakelaarCheckBox.isChecked()
-            self.vat_widget.analogeWaardeTemp = self.analogeWaardeTempCheckBox.isChecked()
-
-            self.vat_widget.valveInMaxFlowValue = self._get_entry_value('maxFlowInEntry', 5)
-            self.vat_widget.valveOutMaxFlowValue = self._get_entry_value('maxFlowOutEntry', 2)
-            self.vat_widget.powerValue = self._get_entry_value('powerHeatingCoilEntry', 1000.0)
-            self.vat_widget.maxVolume = self._get_entry_value('volumeEntry', 200.0)
-            
-            # Water color
-            self.vat_widget.kleurWater = self.kleurDropDown.currentData()
-            
-            # Controller mode (from general settings)
-            if hasattr(self, 'mainConfig') and self.mainConfig:
-                controller_mode = self.mainConfig.plcProtocol
-                self.vat_widget.controler = controller_mode
-            
-            # Step 3: Update GUI panel visibility
-            self._update_gui_panel_visibility()
-            
-            # Step 4: Read valve positions from GUI
-            self._read_valve_positions()
-            
-        except Exception:
-            pass
-
-        # Step 5: Rebuild SVG with new values
-        self.vat_widget.rebuild()
-
-    def _update_gui_panel_visibility(self):
-        """Show/hide GUI control panels based on controller mode"""
-        try:
-            is_gui_mode = (hasattr(self, 'mainConfig') and 
-                          self.mainConfig and 
-                          self.mainConfig.plcGuiControl == "gui")
-            
-            if is_gui_mode and self.vat_widget.regelbareKleppen:
-                if not self.regelbareKlepenGUISim.isVisible():
-                    self.GUiSim.hide()
-                    self.regelbareKlepenGUISim.show()
-            elif is_gui_mode and not self.vat_widget.regelbareKleppen:
-                if not self.GUiSim.isVisible():
-                    self.regelbareKlepenGUISim.hide()
-                    self.GUiSim.show()
-            else:
-                if self.GUiSim.isVisible() or self.regelbareKlepenGUISim.isVisible():
-                    self.GUiSim.hide()
-                    self.regelbareKlepenGUISim.hide()
-        except AttributeError:
-            pass
-
-    def _read_valve_positions(self):
-        """Read valve positions from GUI controls"""
-        if self.vat_widget.regelbareKleppen:
-            # Analog control (0-100%)
-            self.vat_widget.KlepStandBoven = self._get_entry_value('klepstandBovenEntry', 0)
-            self.vat_widget.KlepStandBeneden = self._get_entry_value('klepstandBenedenEntry', 0)
-        else:
-            # Digital control (ON/OFF)
-            try:
-                top_checked = self.klepstandBovenCheckBox.isChecked()
-                bottom_checked = self.klepstandBenedenCheckBox.isChecked()
-                self.vat_widget.KlepStandBoven = 100 if top_checked else 0
-                self.vat_widget.KlepStandBeneden = 100 if bottom_checked else 0
-            except AttributeError:
-                pass
+        """Delegate to interface"""
+        if hasattr(self, 'tanksim_interface'):
+            self.tanksim_interface.update(
+                self.tanksim_config, 
+                self.tanksim_status
+            )
     
-    def write_gui_values_to_config(self):
-        """
-        Write GUI values to tanksim_config - COMPLETE VERSION
-        These are the REAL simulation parameters!
-        """
-        if not hasattr(self, 'tanksim_config') or self.tanksim_config is None:
-            print("⚠️ Config not available")
-            return
-        
-        try:
-            # Use safe getter with default values
-            self.tanksim_config.valveInMaxFlow = self._get_entry_value('maxFlowInEntry', 5.0)
-            self.tanksim_config.valveOutMaxFlow = self._get_entry_value('maxFlowOutEntry', 2.0)
-            self.tanksim_config.heaterMaxPower = self._get_entry_value('powerHeatingCoilEntry', 10000.0)
-            self.tanksim_config.tankVolume = self._get_entry_value('volumeEntry', 200.0)
-            
-            self.tanksim_config.digitalLevelSensorHighTriggerLevel = self._get_entry_value(
-                'levelSwitchMaxHeightEntry', 180.0)
-            self.tanksim_config.digitalLevelSensorLowTriggerLevel = self._get_entry_value(
-                'levelSwitchMinHeightEntry', 20.0)
-            
-            self.tanksim_config.liquidVolumeTimeDelay = self._get_entry_value(
-                'timeDelayFillingEntry', 0.0)
-            self.tanksim_config.ambientTemp = self._get_entry_value('ambientTempEntry', 21.0)
-            self.tanksim_config.tankHeatLoss = self._get_entry_value('heatLossVatEntry', 150.0)
-            self.tanksim_config.liquidTempTimeDelay = self._get_entry_value(
-                'timeDelayTempEntry', 0.0)
-            self.tanksim_config.liquidSpecificHeatCapacity = self._get_entry_value(
-                'specificHeatCapacityEntry', 4186.0)
-            self.tanksim_config.liquidSpecificWeight = self._get_entry_value(
-                'specificWeightEntry', 0.997)
-            self.tanksim_config.liquidBoilingTemp = self._get_entry_value(
-                'boilingTempEntry', 100.0)
-            
-            print("Settings successfully applied to config!")
-            print(f"   - Tank volume: {self.tanksim_config.tankVolume} L")
-            print(f"   - Max flow in: {self.tanksim_config.valveInMaxFlow} L/s")
-            print(f"   - Max flow out: {self.tanksim_config.valveOutMaxFlow} L/s")
-            print(f"   - Heater power: {self.tanksim_config.heaterMaxPower} W")
-            
-        except Exception as e:
-            print(f"❌ Error writing GUI values to config: {e}")
-
     def write_gui_values_to_status(self):
-        """
-        Write actuator positions to status
-        These are the CONTROL values (valves, heater)
-        """
-        if not hasattr(self, 'tanksim_status') or self.tanksim_status is None:
-            return
-        
-        # Only in GUI mode
-        if self.mainConfig.plcGuiControl != "gui":
-            return
-        
-        # Write to STATUS object (actual actuator values)
-        self.tanksim_status.valveInOpenFraction = self.vat_widget.KlepStandBoven / 100.0
-        self.tanksim_status.valveOutOpenFraction = self.vat_widget.KlepStandBeneden / 100.0
-        
-        # Heater
-        if self.vat_widget.regelbareWeerstand:
-            self.tanksim_status.heaterPowerFraction = 0.5  
-        else:
-            try:
-                heater_on = self.weerstandCheckBox.isChecked()
-                self.tanksim_status.heaterPowerFraction = 1.0 if heater_on else 0.0
-            except AttributeError:
-                self.tanksim_status.heaterPowerFraction = 0.0
+        """Delegate to interface"""
+        if hasattr(self, 'tanksim_interface'):
+            self.tanksim_interface.write_gui_to_status(self.tanksim_status)
+    
+    def apply_tanksim_settings(self):
+        """Called when user clicks Apply button"""
+        if hasattr(self, 'tanksim_interface'):
+            self.tanksim_interface.write_gui_to_config(self.tanksim_config)
 
     # =========================================================================
-    # UI CALLBACKS
+    # CALLBACKS
     # =========================================================================
 
     def on_kleur_changed(self):
-        """Callback when water color changes"""
-        new_color = self.kleurDropDown.currentData()
-        self.vat_widget.kleurWater = new_color
+        """Color changed - handled by update loop"""
+        pass
 
     def on_tank_config_changed(self):
-        """Callback when tank configuration changes"""
-        pass  # Handled by update loop
+        """Config changed - handled by update loop"""
+        pass
 
     def syncFields(self, text, group):
         """Synchronize linked entry fields"""
@@ -347,14 +153,9 @@ class TankSimSettingsMixin:
                 field.setText(text)
                 field.blockSignals(False)
 
-    # =========================================================================
-    # SIMULATION CONTROL
-    # =========================================================================
-
     def toggle_simulation(self, checked):
-        """Toggle simulation on/off with visual feedback"""
+        """Toggle simulation on/off"""
         if checked:
-            # Start simulation engine
             if hasattr(self, 'tanksim_status') and self.tanksim_status:
                 self.tanksim_status.simRunning = True
                 
@@ -370,7 +171,6 @@ class TankSimSettingsMixin:
                 }
             """)
         else:
-            # Stop simulation engine
             if hasattr(self, 'tanksim_status') and self.tanksim_status:
                 self.tanksim_status.simRunning = False
                 

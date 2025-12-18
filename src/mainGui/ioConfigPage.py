@@ -432,9 +432,15 @@ class DroppableTableWidget(QTableWidget):
     
     def _clear_row_data(self, row):
         """Clear all data of a row"""
+        # Only delete from forced_rows if the row is actually forced
+        if row in self.forced_rows:
+            del self.forced_rows[row]
+        
+        # Delete row data if it exists
         if row in self.row_data:
-            del self.forced_rows[row]  # Also clear force when clearing data
             del self.row_data[row]
+        
+        # Clear all cells
         for col in range(self.columnCount()):
             if col in [2, 3]:
                 self.setItem(row, col, EditableTableWidgetItem(""))
@@ -1055,6 +1061,50 @@ class IOConfigMixin:
                         'range': signal.get('range', '')
                     }
                     self.treeWidget_IO.signal_data[signal_name] = signal_info
+
+    def _load_initial_io_config(self):
+        """Load IO config into table at startup"""
+        try:
+            project_root = Path(__file__).resolve().parent.parent
+            io_config_path = project_root / "tankSim" / "io_configuration.json"
+            
+            if not io_config_path.exists():
+                print("⚠️  No IO configuration file found at startup")
+                return
+            
+            # Load JSON
+            with open(io_config_path, 'r', encoding='utf-8') as f:
+                config_data = json.load(f)
+            
+            if 'signals' not in config_data or not config_data['signals']:
+                print("⚠️  No signals in IO configuration")
+                return
+            
+            table = self.tableWidget_IO
+            table.blockSignals(True)
+            
+            # Load signals into table
+            loaded_count = 0
+            for idx, signal in enumerate(config_data['signals']):
+                if idx >= table.rowCount():
+                    break
+                
+                table.setItem(idx, 0, ReadOnlyTableWidgetItem(signal.get('name', '')))
+                table.setItem(idx, 1, ReadOnlyTableWidgetItem(signal.get('type', '')))
+                table.setItem(idx, 2, EditableTableWidgetItem(signal.get('byte', '')))
+                table.setItem(idx, 3, EditableTableWidgetItem(signal.get('bit', '')))
+                table.setItem(idx, 4, ReadOnlyTableWidgetItem(signal.get('address', '')))
+                table.setItem(idx, 5, ReadOnlyTableWidgetItem(signal.get('status', '')))
+                table.setItem(idx, 6, ReadOnlyTableWidgetItem(signal.get('description', '')))
+                table.setItem(idx, 7, ReadOnlyTableWidgetItem(signal.get('range', '')))
+                table._save_row_data(idx)
+                loaded_count += 1
+            
+            table.blockSignals(False)
+            print(f"✅ Loaded {loaded_count} signals into IO table at startup")
+            
+        except Exception as e:
+            print(f"❌ Failed to load IO config at startup: {e}")
     
     def apply_offsets(self):
         """Apply offset values"""
@@ -1141,21 +1191,122 @@ class IOConfigMixin:
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to save: {str(e)}")
 
+    def load_io_config_from_file(self, config_file_path):
+        """
+        Load IO configuration from JSON file and update internal mappings.
+        SAFE VERSION - always completes
+        """
+        try:
+            # Convert to Path object if needed
+            from pathlib import Path
+            if not isinstance(config_file_path, Path):
+                config_file_path = Path(config_file_path)
+            
+            print(f"\n{'='*60}")
+            print(f"Loading IO config from: {config_file_path}")
+            print(f"{'='*60}")
+            
+            # Check file exists
+            if not config_file_path.exists():
+                print(f"❌ File does not exist!")
+                return 0
+            
+            # Load JSON
+            with open(config_file_path, 'r', encoding='utf-8') as f:
+                config_data = json.load(f)
+            
+            print(f"✓ JSON loaded successfully")
+            
+            # Check signals key
+            if 'signals' not in config_data:
+                print("❌ No 'signals' key found!")
+                return 0
+            
+            signals = config_data['signals']
+            print(f"✓ Found {len(signals)} signals in file")
+            print(f"✓ Mapping has {len(self.io_signal_mapping)} entries\n")
+            
+            loaded_count = 0
+            
+            for signal in signals:
+                try:
+                    signal_name = signal.get('name', '')
+                    address = signal.get('address', '')
+                    
+                    # Skip if not in mapping
+                    if signal_name not in self.io_signal_mapping:
+                        print(f"  ⊘ {signal_name:20s} - not in mapping (skipped)")
+                        continue
+                    
+                    attr_name = self.io_signal_mapping[signal_name]
+                    
+                    # Parse digital (I0.0, Q0.1)
+                    if '.' in address:
+                        parts = address.split('.')
+                        byte_str = parts[0][1:]  # Remove I/Q/V
+                        bit_str = parts[1]
+                        
+                        byte_val = int(byte_str)
+                        bit_val = int(bit_str)
+                        
+                        setattr(self, attr_name, {"byte": byte_val, "bit": bit_val})
+                        print(f"  ✓ {signal_name:20s} → {attr_name:25s} @ {address}")
+                        loaded_count += 1
+                    
+                    # Parse analog (IW2, QW4)
+                    elif 'W' in address:
+                        byte_str = address.split('W')[1]
+                        byte_val = int(byte_str)
+                        
+                        setattr(self, attr_name, {"byte": byte_val})
+                        print(f"  ✓ {signal_name:20s} → {attr_name:25s} @ {address}")
+                        loaded_count += 1
+                    
+                    else:
+                        print(f"  ⚠ {signal_name:20s} - unknown address format: {address}")
+                
+                except Exception as e:
+                    print(f"  ❌ Error processing {signal.get('name', 'unknown')}: {e}")
+                    continue
+            
+            # Update byte range
+            self.update_io_range()
+            
+            # Summary
+            print(f"\n{'='*60}")
+            print(f"✅ Loaded {loaded_count}/{len(signals)} signals")
+            print(f"   Byte range: {self.lowestByte} - {self.highestByte}")
+            print(f"{'='*60}\n")
+            
+            return loaded_count
+        
+        except Exception as e:
+            print(f"\n❌ FATAL ERROR in load_io_config_from_file:")
+            print(f"   {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
+            return 0
+        
     def load_io_configuration(self):
-        """Load IO configuration"""
+        """Load IO configuration from file dialog"""
         try:
             file_path, _ = QFileDialog.getOpenFileName(
                 self, "Load IO Configuration", "",
                 "JSON Files (*.json);;All Files (*)")
             
             if not file_path:
+                print("No file selected")
                 return
+            
+            print(f"\n{'='*60}")
+            print(f"Loading IO configuration from: {file_path}")
+            print(f"{'='*60}")
             
             with open(file_path, 'r', encoding='utf-8') as f:
                 config_data = json.load(f)
             
             if 'signals' not in config_data:
-                QMessageBox.warning(self, "Invalid File", "Invalid configuration")
+                QMessageBox.warning(self, "Invalid File", "No signals found in configuration")
                 return
             
             reply = QMessageBox.question(
@@ -1173,6 +1324,7 @@ class IOConfigMixin:
             for row in range(table.rowCount()):
                 table._clear_row_data(row)
             
+            # Load offsets if present
             if 'offsets' in config_data:
                 self.io_screen.byte_offsets = config_data['offsets'].copy()
                 self.QLineEdit_BoolInput.setText(str(config_data['offsets'].get('BoolInput', 0)))
@@ -1180,6 +1332,8 @@ class IOConfigMixin:
                 self.QLineEdit_DWORDInput.setText(str(config_data['offsets'].get('DWORDInput', 2)))
                 self.QLineEdit_DWORDOutput.setText(str(config_data['offsets'].get('DWORDOutput', 2)))
             
+            # Load signals into table
+            loaded_count = 0
             for idx, signal in enumerate(config_data['signals']):
                 if idx >= table.rowCount():
                     break
@@ -1193,14 +1347,29 @@ class IOConfigMixin:
                 table.setItem(idx, 6, ReadOnlyTableWidgetItem(signal.get('description', '')))
                 table.setItem(idx, 7, ReadOnlyTableWidgetItem(signal.get('range', '')))
                 table._save_row_data(idx)
+                loaded_count += 1
             
             table.blockSignals(False)
-            QMessageBox.information(self, "Success", "Configuration loaded")
+            
+            print(f"Loaded {loaded_count} signals into table")
+            QMessageBox.information(self, "Success", f"Loaded {loaded_count} signals from configuration")
+            
+            # Also update the tanksim_config if it exists
+            if hasattr(self, 'tanksim_config') and self.tanksim_config:
+                from pathlib import Path
+                self.tanksim_config.load_io_config_from_file(Path(file_path))
+            
             self.io_screen.save_configuration()
             
+        except FileNotFoundError:
+            QMessageBox.critical(self, "Error", "File not found")
+        except json.JSONDecodeError:
+            QMessageBox.critical(self, "Error", "Invalid JSON file")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to load: {str(e)}")
-
+            import traceback
+            traceback.print_exc()   
+        
     def reload_io_config(self):
         """Reload IO configuration"""
         try:
@@ -1265,7 +1434,31 @@ class IOConfigMixin:
             
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to reload: {str(e)}")
-        
+
+    def check_io_config_loaded(self):
+        """Check if IO configuration is loaded and warn if not"""
+        try:
+            table = self.tableWidget_IO
+            
+            # Check if any signals are loaded
+            has_signals = False
+            for row in range(table.rowCount()):
+                name_item = table.item(row, 0)
+                if name_item and name_item.text():
+                    has_signals = True
+                    break
+            
+            if not has_signals:
+                QMessageBox.warning(
+                    self, 
+                    "No IO Configuration", 
+                    "No I/O configuration is loaded!\n\n"
+                    "Please load a configuration using the 'Load IO' or 'Reload Config' button "
+                    "to use the configured I/O signals."
+                )
+        except Exception as e:
+            pass
+            
     def _update_table_from_config(self):
         """Update the GUI table with addresses from the config"""
         try:

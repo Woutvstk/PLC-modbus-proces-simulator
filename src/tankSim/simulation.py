@@ -1,6 +1,6 @@
 import time
 import copy
-from tankSim.configurationTS import configuration as configurationClass
+from tankSim.configuration import configuration as configurationClass
 from tankSim.status import status as statusClass
 
 
