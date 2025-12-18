@@ -197,51 +197,15 @@ class TankSimSettingsMixin:
 
         # Step 2: Update VatWidget configuration from UI
         try:
-<<<<<<< HEAD
-            self.vat_widget.toekomendDebiet = self._get_entry_value('toekomendDebietEntry', 200)
-            self.vat_widget.tempWeerstand = self._get_entry_value('tempWeerstandEntry', 20.0)
+            self.vat_widget.toekomendDebiet = int(self.toekomendDebietEntry.text() or 0)
+            self.vat_widget.tempWeerstand = float(self.tempWeerstandEntry.text() or 20.0)
             
             # Checkbox states
             self.vat_widget.regelbareKleppen = self.regelbareKlepenCheckBox.isChecked()
             self.vat_widget.regelbareWeerstand = self.regelbareWeerstandCheckBox.isChecked()
             self.vat_widget.niveauschakelaar = self.niveauschakelaarCheckBox.isChecked()
             self.vat_widget.analogeWaardeTemp = self.analogeWaardeTempCheckBox.isChecked()
-
-            self.vat_widget.valveInMaxFlowValue = self._get_entry_value('maxFlowInEntry', 5)
-            self.vat_widget.valveOutMaxFlowValue = self._get_entry_value('maxFlowOutEntry', 2)
-            self.vat_widget.powerValue = self._get_entry_value('powerHeatingCoilEntry', 1000.0)
-            self.vat_widget.maxVolume = self._get_entry_value('volumeEntry', 200.0)
             
-=======
-            self.vat_widget.valveInMaxFlowValue = int(
-                self.maxFlowInEntry.text() or 5)
-            self.vat_widget.valveOutMaxFlowValue = int(
-                self.maxFlowOutEntry.text() or 2)
-            self.vat_widget.powerValue = float(
-                self.powerHeatingCoilEntry.text() or 10000.0)
-            self.vat_widget.maxVolume = float(self.volumeEntry.text() or 2.0)
-            self.vat_widget.levelSwitchMaxHeight = float(
-                self.levelSwitchMaxHeightEntry.text() or 2.0)
-            self.vat_widget.levelSwitchMinHeight = float(
-                self.levelSwitchMinHeightEntry.text() or 2.0)
-            """ self.timeDelayFilling = float(
-                self.timeDelayfillingEntry.text() or 0.0)
-            self.ambientTemp = float(self.ambientTempEntry.text() or 21.0)
-            self.heatLoss = float(self.heatLossVatEntry.text() or 150.0)
-            self.timeDelayTemp = float(self.timeDelayTempEntry.text() or 0.0)
-            self.specificWeight = float(
-                self.specificWeightEntry.text() or 4186.0)
-            self.specificHeatCapacity = float(
-                self.specificHeatCapacityEntry.text() or 0.997)
-            self.boilingTemp = float(self.boilingTempEntry.text() or 100.0)"""
-
-            # Checkbox states
-            self.vat_widget.adjustableValve = self.adjustableValveCheckBox.isChecked()
-            self.vat_widget.adjustableHeatingCoil = self.adjustableHeatingCoilCheckBox.isChecked()
-            self.vat_widget.levelSwitches = self.levelSwitchesCheckBox.isChecked()
-            self.vat_widget.analogValueTemp = self.analogValueTempCheckBox.isChecked()
-
->>>>>>> ccd5c146433fbfe0fa7aa7ce20293ff44e10a43a
             # Water color
             self.vat_widget.waterColor = self.colorDropDown.currentData()
 
@@ -301,8 +265,7 @@ class TankSimSettingsMixin:
                 self.vat_widget.adjustableValveOutValue = int(
                     self.valveOutEntry.text() or 0)
             except (ValueError, AttributeError):
-                self.vat_widget.adjustableValveOutValue = 0
->>>>>>> ccd5c146433fbfe0fa7aa7ce20293ff44e10a43a
+                self.vat_widget.KlepStandBeneden = 0
         else:
             # Digital control (ON/OFF)
             try:
