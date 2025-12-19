@@ -1,0 +1,37 @@
+```
+/src/
+├── main.py                      # Legacy entry point (kept for compatibility)
+├── main_new.py                  # New architecture entry point
+├── requirements.txt
+├── core/                        # Core module - Central configuration and managers
+│   ├── __init__.py
+│   ├── configuration.py         # Main config with Save/Load functionality
+│   ├── interface.py             # Abstract base class for simulations
+│   ├── simulationManager.py     # Manages simulation instances
+│   └── protocolManager.py       # Protocol activation and lifecycle
+├── IO/                          # IO module - All input/output operations
+│   ├── __init__.py
+│   ├── handler.py               # Generic IO handler (simulation-agnostic)
+│   ├── IO_treeList.xml          # Data/presets per simulation
+│   ├── IO_configuration.json    # IO configuration data
+│   └── protocols/               # Communication protocols (UNCHANGED)
+│       ├── __init__.py
+│       ├── logoS7.py            # Logo S7 protocol
+│       ├── plcS7.py             # PLC S7 protocol
+│       └── PLCSimAPI/           # PLCSimAPI protocols
+│           ├── PLCSimAPI.py
+│           ├── SiemensAPI.DLL
+│           └── PLCSimS7/
+│               ├── PLCSimS7.py
+│               └── NetToPLCsim/
+├── gui/                         # GUI module (in progress)
+│   └── media/                   # GUI assets, icons, styles
+├── simulations/                 # Simulations module
+│   ├── __init__.py
+│   └── PIDtankValve/            # Tank simulation
+│       ├── __init__.py
+│       ├── simulation.py        # Implements SimulationInterface
+│       ├── status.py            # Runtime status
+│       ├── config.py            # Configuration parameters
+│       ├── SimGui.py            # Visualization widget
+│       └── media/               # Simulation-specific assets

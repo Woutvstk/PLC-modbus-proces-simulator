@@ -50,6 +50,8 @@ mainConfig = mainConfigClass()
 
 # Initialize simulation manager
 simulationManager = SimulationManager()
+# Expose simulation manager via mainConfig so GUI/mixins can query active simulation
+mainConfig.simulationManager = simulationManager
 
 # Register available simulations
 simulationManager.register_simulation("PIDtankValve", PIDTankSimulation)

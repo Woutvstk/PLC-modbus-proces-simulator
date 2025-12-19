@@ -31,7 +31,7 @@
             </Analog>
         </Outputs>
     </GeneralControls>
-    <TankSim>
+    <PIDtankValve>
         <Inputs>
             <Digital>
                 <!-- Digitale inputs (boolean) - PLC Inputs = Simulator Outputs -->
@@ -58,8 +58,5 @@
                 <Signal description="Heater analog power (0-100%)" type="int" range="0-27648" io_prefix="Q" status="0">HeaterFraction</Signal>
             </Analog>
         </Outputs>
-    </TankSim>
-    <ConveyorSim>
-        <Note>Coming soon - Conveyor belt simulation</Note>
-    </ConveyorSim>
+    </PIDtankValve>
 </Simulation>

@@ -581,6 +581,32 @@ class MainWindow(QMainWindow, Ui_MainWindow, ProcessSettingsMixin, IOConfigMixin
         
         # Navigate to the specific simulation page
         self.MainScreen.setCurrentIndex(sim_index)
+
+        # Update active simulation name in simulationManager for IO tree loading
+        try:
+            sim_map = {0: "PIDtankValve", 1: "conveyor", 2: "conveyor"}
+            sim_name = sim_map.get(sim_index)
+            if sim_name and hasattr(self, 'mainConfig') and hasattr(self.mainConfig, 'simulationManager'):
+                sm = self.mainConfig.simulationManager
+                if sim_name == "PIDtankValve":
+                    # Already loaded at startup; just mark active name for IO tree
+                    sm._active_simulation_name = sim_name
+                elif sim_name in sm.get_registered_simulations():
+                    sm.load_simulation(sim_name)
+                else:
+                    sm._active_simulation_name = sim_name  # IO tree fallback
+            # Reload IO tree based on active simulation
+            if hasattr(self, 'load_io_tree'):
+                self.load_io_tree()
+        except Exception:
+            pass
+        
+        # Reload IO tree for the active simulation
+        try:
+            if hasattr(self, 'load_io_tree'):
+                self.load_io_tree()
+        except Exception:
+            pass
         
         # Update button states - ALL instances (sidebar and ActiveSimulation page)
         try:

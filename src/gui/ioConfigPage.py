@@ -8,6 +8,7 @@
 # - Real-time I/O status display
 
 import json
+import logging
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -17,6 +18,8 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt, QMimeData
 from PyQt5.QtGui import QDrag, QColor
+
+logger = logging.getLogger(__name__)
 
 
 # =============================================================================
@@ -946,11 +949,8 @@ class IOConfigMixin:
         self._connect_io_buttons()
         self._connect_force_button()
         
-        # Ensure tree widget is set before loading
-        if hasattr(self, 'treeWidget_IO') and self.treeWidget_IO is not None:
-            self.load_io_tree()
-        else:
-            print("WARNING: treeWidget_IO not initialized")
+        # Don't load tree at startup - only load when simulation is started
+        # Tree will be loaded when start_simulation() is called
     
     def _replace_table_widget(self):
         """Replace standard table widget with custom DroppableTableWidget"""
@@ -1014,33 +1014,62 @@ class IOConfigMixin:
             pass # Removed print
     
     def load_io_tree(self):
-        """Load IO signals from XML file"""
+        """Load IO signals from XML file based on active simulation"""
         if not hasattr(self, 'treeWidget_IO') or self.treeWidget_IO is None:
             return
         
+        # Clear existing tree
+        self.treeWidget_IO.clear()
+        
+        # Get active simulation name from simulationManager
+        active_sim = None
+        try:
+            if hasattr(self, 'mainConfig') and self.mainConfig and hasattr(self.mainConfig, 'simulationManager'):
+                active_sim = self.mainConfig.simulationManager.get_active_simulation_name()
+        except Exception as e:
+            pass
+        
+        # Determine which XML file to load
         current_dir = Path(__file__).parent
-        xml_file = current_dir.parent / "guiCommon" / "io_treeList.xml"
+        io_dir = current_dir.parent / "IO"
+        
+        xml_file = None
+        if active_sim == "PIDtankValve":
+            xml_file = io_dir / "IO_treeList_PIDtankValve.xml"
+        elif active_sim == "conveyor":
+            xml_file = io_dir / "IO_treeList_conveyor.xml"
+        
+        # If no active simulation or file doesn't exist, don't load anything
+        if xml_file is None or not xml_file.exists():
+            return
         
         try:
             tree = ET.parse(str(xml_file))
             root = tree.getroot()
             
-            tanksim = root.find('TankSim')
-            if tanksim is not None:
-                self._load_tanksim_signals(tanksim)
-            
-            conveyorsim = root.find('ConveyorSim')
-            if conveyorsim is not None:
-                self._load_conveyorsim_signals(conveyorsim)
-
+            # Always load GeneralControls first
             general = root.find('GeneralControls')
             if general is not None:
                 self._load_generalcontrols_signals(general)
             
+            # Load simulation-specific signals
+            pidtank = root.find('PIDtankValve')
+            if pidtank is not None:
+                self._load_simulation_signals(pidtank, "PIDtankValve")
+            
+            conveyor = root.find('ConveyorSim')
+            if conveyor is not None:
+                self._load_simulation_signals(conveyor, "ConveyorSim")
+            
+            # Legacy support for old format
+            tanksim = root.find('TankSim')
+            if tanksim is not None:
+                self._load_tanksim_signals(tanksim)
+            
             self.treeWidget_IO.expandAll()
             
         except Exception as e:
-            pass # Removed print
+            logger.error(f"Error loading IO tree: {e}")
     
     def _load_tanksim_signals(self, tanksim):
         """Load TankSim signals"""
@@ -1057,6 +1086,23 @@ class IOConfigMixin:
         outputs_root = tanksim.find('Outputs')
         if outputs_root is not None:
             outputs_item = QTreeWidgetItem(tanksim_item, ["Outputs"])
+            self._load_signal_category(outputs_root, outputs_item)
+    
+    def _load_simulation_signals(self, sim_element, sim_name):
+        """Load simulation-specific signals (generic for any simulation)"""
+        if not hasattr(self, 'treeWidget_IO') or self.treeWidget_IO is None:
+            return
+        
+        sim_item = QTreeWidgetItem(self.treeWidget_IO, [sim_name])
+        
+        inputs_root = sim_element.find('Inputs')
+        if inputs_root is not None:
+            inputs_item = QTreeWidgetItem(sim_item, ["Inputs"])
+            self._load_signal_category(inputs_root, inputs_item)
+        
+        outputs_root = sim_element.find('Outputs')
+        if outputs_root is not None:
+            outputs_item = QTreeWidgetItem(sim_item, ["Outputs"])
             self._load_signal_category(outputs_root, outputs_item)
     
     def _load_conveyorsim_signals(self, conveyorsim):
