@@ -1,12 +1,19 @@
+import sys
 from pathlib import Path
 from PyQt5.QtWidgets import QWidget, QVBoxLayout
 from PyQt5.QtCore import QTimer
 
-from tankSim.gui import VatWidget
-from conveyor.gui import TransportbandWidget
+# Add src to path for imports
+src_dir = Path(__file__).resolve().parent.parent
+if str(src_dir) not in sys.path:
+    sys.path.insert(0, str(src_dir))
+
+from simulations.PIDtankValve.SimGui import VatWidget
+# TODO: conveyor simulation not yet migrated
+# from simulations.conveyorSim.SimGui import TransportbandWidget
 
 # Import for address updates
-from mainGui.customWidgets import ReadOnlyTableWidgetItem
+from gui.customWidgets import ReadOnlyTableWidgetItem
 
 
 class ProcessSettingsMixin:
@@ -18,7 +25,8 @@ class ProcessSettingsMixin:
     def init_process_settings_page(self):
         """Initialize all process settings page components"""
         self._init_vat_widget()
-        self._init_transportband_widget()
+        # TODO: Conveyor simulation not yet migrated
+        # self._init_transportband_widget()
         self._init_color_dropdown()
         self._init_controller_dropdown()
         self._init_checkboxes()
@@ -49,26 +57,28 @@ class ProcessSettingsMixin:
 
     def _init_transportband_widget(self):
         """Initialize TransportbandWidget (Conveyor Belt Widget)"""
-        try:
-            self.transportband_widget = TransportbandWidget()
-            # Find the SVG container that replaced the spacer
-            svg_container = self.findChild(QWidget, "svgContainer")
-
-            if svg_container:
-                # Clear any existing layout
-                layout = svg_container.layout()
-                if layout is not None:
-                    # Clear all widgets from layout
-                    while layout.count():
-                        layout.takeAt(0)
-                else:
-                    layout = QVBoxLayout(svg_container)
-                    layout.setContentsMargins(0, 0, 0, 0)
-                    layout.setSpacing(0)
-                
-                layout.addWidget(self.transportband_widget, 1)
-        except Exception as e:
-            pass  # Silently fail if widget container is missing
+        # TODO: Conveyor simulation not yet migrated - commenting out for now
+        pass
+        # try:
+        #     self.transportband_widget = TransportbandWidget()
+        #     # Find the SVG container that replaced the spacer
+        #     svg_container = self.findChild(QWidget, "svgContainer")
+        #
+        #     if svg_container:
+        #         # Clear any existing layout
+        #         layout = svg_container.layout()
+        #         if layout is not None:
+        #             # Clear all widgets from layout
+        #             while layout.count():
+        #                 layout.takeAt(0)
+        #         else:
+        #             layout = QVBoxLayout(svg_container)
+        #             layout.setContentsMargins(0, 0, 0, 0)
+        #             layout.setSpacing(0)
+        #         
+        #         layout.addWidget(self.transportband_widget, 1)
+        # except Exception as e:
+        #     pass  # Silently fail if widget container is missing
 
     def _init_color_dropdown(self):
         """Initialize color dropdown"""

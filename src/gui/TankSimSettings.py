@@ -5,9 +5,16 @@
 # - Reading from simulation status
 # - Writing GUI inputs to simulation status
 
+import sys
 from pathlib import Path
 from PyQt5.QtWidgets import QWidget, QVBoxLayout
-from tankSim.gui import VatWidget
+
+# Add src to path for imports
+src_dir = Path(__file__).resolve().parent.parent
+if str(src_dir) not in sys.path:
+    sys.path.insert(0, str(src_dir))
+
+from simulations.PIDtankValve.SimGui import VatWidget
 
 
 class TankSimSettingsMixin:

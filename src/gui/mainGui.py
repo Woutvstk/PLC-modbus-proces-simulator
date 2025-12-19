@@ -11,38 +11,43 @@ from PyQt5.QtCore import QTimer, Qt, QPropertyAnimation, QEasingCurve
 from PyQt5 import uic
 
 # ============================================================================
-# ABSOLUTE IMPORTS - Add mainGui directory to path
+# ABSOLUTE IMPORTS - Add gui and src directories to path
 # ============================================================================
 current_dir = Path(__file__).parent
+src_dir = current_dir.parent
 if str(current_dir) not in sys.path:
     sys.path.insert(0, str(current_dir))
+if str(src_dir) not in sys.path:
+    sys.path.insert(0, str(src_dir))
 
 # Now import from same directory
 from GeneralSettings import ProcessSettingsMixin
 from ioConfigPage import IOConfigMixin
 from TankSimSettings import TankSimSettingsMixin  
 
-from tankSim.gui import VatWidget
-from conveyor.gui import TransportbandWidget
-from configuration import configuration
+# Import from new structure
+from simulations.PIDtankValve.SimGui import VatWidget
+# TODO: conveyor simulation not yet migrated
+# from simulations.conveyorSim.SimGui import TransportbandWidget
+from core.configuration import configuration
 
 # =============================================================================
 # Resource and UI compilation (dynamic)
 # =============================================================================
-gui_common_dir = current_dir.parent / "guiCommon"
+gui_media_dir = current_dir / "media"
 
-qrc_file = gui_common_dir / "Resource.qrc"
-rc_py_file = gui_common_dir / "Resource_rc.py"
+qrc_file = gui_media_dir / "Resource.qrc" if (gui_media_dir / "Resource.qrc").exists() else None
+rc_py_file = gui_media_dir / "Resource_rc.py"
 
-if qrc_file.exists():
+if qrc_file and qrc_file.exists():
     try:
         subprocess.run(
             ["pyrcc5", str(qrc_file), "-o", str(rc_py_file)],
             check=True
         )
 
-        if str(gui_common_dir) not in sys.path:
-            sys.path.insert(0, str(gui_common_dir))
+        if str(gui_media_dir) not in sys.path:
+            sys.path.insert(0, str(gui_media_dir))
 
         try:
             import Resource_rc  # type: ignore[import-not-found]
@@ -55,12 +60,13 @@ if qrc_file.exists():
         pass
 
 # Load UI
-ui_file = gui_common_dir / "mainWindowPIDRegelaarSim.ui"
+ui_file = gui_media_dir / "mainWindowPIDRegelaarSim.ui"
 
 if ui_file.exists():
     Ui_MainWindow, QtBaseClass = uic.loadUiType(str(ui_file))
 else:
     raise FileNotFoundError(f"Cannot find {ui_file}! Searched in: {ui_file}")
+
 
 
 # =============================================================================

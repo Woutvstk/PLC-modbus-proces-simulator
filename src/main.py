@@ -1,93 +1,130 @@
-# general imports
+"""
+Main Entry Point - Industrial Simulation Framework
+
+This is the refactored main entry point using the new modular architecture.
+It initializes core components, registers simulations, and runs the main loop.
+"""
 import sys
 import os
-from pathlib import Path
 import time
+import logging
+from pathlib import Path
 
-from plcCom.plcS7 import plcS7
-from plcCom.logoS7 import logoS7
-from plcCom.PLCSimAPI import plcSimAPI
-from plcCom.PLCSimS7 import plcSimS7
-from configuration import configuration as mainConfigClass
+# Add src to path for imports
+src_dir = Path(__file__).resolve().parent
+if str(src_dir) not in sys.path:
+    sys.path.insert(0, str(src_dir))
 
-from PyQt5.QtWidgets import (
-    QMainWindow, QApplication, QPushButton, QMenu, QAction,
-    QWidget, QVBoxLayout)
+# Core imports
+from core.configuration import configuration as mainConfigClass
+from core.simulationManager import SimulationManager
+from core.protocolManager import ProtocolManager
 
-from PyQt5.QtCore import QTimer, QSize
-from PyQt5.QtSvg import QSvgRenderer
-from PyQt5.QtGui import QPainter
+# IO imports
+from IO.handler import IOHandler
+from IO.protocols.plcS7 import plcS7
+from IO.protocols.logoS7 import logoS7
+from IO.protocols.PLCSimAPI.PLCSimAPI import plcSimAPI
+from IO.protocols.PLCSimAPI.PLCSimS7.PLCSimS7 import plcSimS7
 
-# tankSim specific imports
-from tankSim.simulation import simulation as tankSimClass
-from tankSim.status import status as tankSimStatusClass
-from tankSim.configurationTS import configuration as tankSimConfigurationClass
-from tankSim.ioHandler import ioHandler as tankSimIoHandlerClass
-from mainGui.mainGui import MainWindow
+# Simulation imports
+from simulations.PIDtankValve.simulation import PIDTankSimulation
 
-"""Initialize objects for main GUI setup (Part 1 of original structure)"""
+# GUI imports
+from PyQt5.QtWidgets import QApplication
+from gui.mainGui import MainWindow
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# ============================================================================
+# INITIALIZATION
+# ============================================================================
+
+# Initialize core configuration
 mainConfig = mainConfigClass()
-validPlcConnection: bool = False
 
+# Initialize simulation manager
+simulationManager = SimulationManager()
 
-PlcCom = None  # Initialize PlcCom here to ensure it's defined for the global scope usage later
+# Register available simulations
+simulationManager.register_simulation("PIDtankValve", PIDTankSimulation)
+logger.info("Registered simulations: " + str(simulationManager.get_registered_simulations()))
 
+# Load the tank simulation by default
+if simulationManager.load_simulation("PIDtankValve", "tankSimSimulation0"):
+    logger.info("Default simulation loaded successfully")
+else:
+    logger.error("Failed to load default simulation")
+    sys.exit(1)
 
-"""Initialize objects for tankSim (Part 2 of original structure)"""
-# Initialize configuration instance
-tankSimConfig = tankSimConfigurationClass()
-# Initialize status instance
-tankSimStatus = tankSimStatusClass()
-# Initialize ioHandler instance
-tankSimIO = tankSimIoHandlerClass()
-# Initialize simulation object
-tankSim = tankSimClass("tankSimSimulation0")
+# Initialize protocol manager
+protocolManager = ProtocolManager()
 
-# set chosen process to tankSim
-currentProcessConfig: tankSimConfigurationClass = tankSimConfig
-currentProcessStatus: tankSimStatusClass = tankSimStatus
-currentProcessIoHandler: tankSimIoHandlerClass = tankSimIO
-currentProcessSim: tankSimClass = tankSim
+# Initialize IO handler
+ioHandler = IOHandler()
+
+# Get references to the active simulation objects (for backward compatibility with old GUI)
+active_sim = simulationManager.get_active_simulation()
+tankSimConfig = active_sim.config
+tankSimStatus = active_sim.status
+tankSimIO = ioHandler  # Use new IO handler
+
+# Set current process references (backward compatibility)
+currentProcessConfig = tankSimConfig
+currentProcessStatus = tankSimStatus
+currentProcessIoHandler = tankSimIO
+currentProcessSim = active_sim._simulation  # Access wrapped simulation
 
 # Load IO configuration from JSON file
-project_root = Path(__file__).resolve().parent
-io_config_path = project_root / "tankSim" / "io_configuration.json"
+io_config_path = src_dir / "IO" / "IO_configuration.json"
 if io_config_path.exists():
     tankSimConfig.load_io_config_from_file(io_config_path)
+    logger.info(f"IO configuration loaded from: {io_config_path}")
 else:
-    pass  # Removed unnecessary print
+    logger.warning(f"IO configuration not found: {io_config_path}")
 
+# Initialize Qt Application
 app = QApplication(sys.argv)
 
-# Determine the project root path (already defined above, remove duplicate)
-style_path = project_root / "guiCommon" / "style.qss"
-
 # Load QSS style sheet
-if os.path.exists(style_path):
+style_path = src_dir / "gui" / "media" / "style.qss"
+if style_path.exists():
     with open(style_path, "r") as f:
         app.setStyleSheet(f.read())
-else:
-    pass  # Removed unnecessary print
+    logger.info("Style sheet loaded")
 
+# Initialize main window
 window = MainWindow()
 
-# Give MainWindow access to configurations
+# Give MainWindow access to configurations (backward compatibility)
 window.mainConfig = mainConfig
 window.tanksim_config = tankSimConfig
 window.tanksim_status = tankSimStatus
 
 window.show()
 
-# remember at what time we started
+# Remember start time
 startTime = time.time()
+
+# ============================================================================
+# PLC CONNECTION HANDLING
+# ============================================================================
+
+validPlcConnection: bool = False
+PlcCom = None
 
 
 def tryConnectToPlc():
     """Initializes or attempts to connect/reconnect to the configured PLC"""
-    # Use global variables
-    global mainConfig, validPlcConnection, PlcCom
+    global mainConfig, validPlcConnection, PlcCom, protocolManager
+    
     window.clear_all_forces()
-
+    
     # Don't connect in GUI mode
     if mainConfig.plcGuiControl == "gui":
         validPlcConnection = False
@@ -101,89 +138,94 @@ def tryConnectToPlc():
             window.pushButton_connect.blockSignals(False)
         except:
             pass
+        protocolManager.deactivate()
         return
-
-    """Initialize plc communication object based on protocol"""
+    
+    # Initialize PLC communication object based on protocol
+    logger.info(f"Initializing protocol: {mainConfig.plcProtocol}")
+    
     if mainConfig.plcProtocol == "PLC S7-1500/1200/400/300/ET 200SP":
-        PlcCom = plcS7(mainConfig.plcIpAdress,
-                       mainConfig.plcRack, mainConfig.plcSlot)
+        PlcCom = plcS7(mainConfig.plcIpAdress, mainConfig.plcRack, mainConfig.plcSlot)
     elif mainConfig.plcProtocol == "logo!":
-        PlcCom = logoS7(mainConfig.plcIpAdress,
-                        mainConfig.tsapLogo, mainConfig.tsapServer)
+        PlcCom = logoS7(mainConfig.plcIpAdress, mainConfig.tsapLogo, mainConfig.tsapServer)
     elif mainConfig.plcProtocol == "PLCSim S7-1500 advanced":
         PlcCom = plcSimAPI()
     elif mainConfig.plcProtocol == "PLCSim S7-1500/1200/400/300/ET 200SP":
-        PlcCom = plcSimS7(mainConfig.plcIpAdress,
-                          mainConfig.plcRack, mainConfig.plcSlot)
+        PlcCom = plcSimS7(mainConfig.plcIpAdress, mainConfig.plcRack, mainConfig.plcSlot)
     else:
         validPlcConnection = False
         window.validPlcConnection = False
         window.plc = None
         window.update_connection_status_icon()
         return
-
-    '''connect/reconnect logic'''
-    if PlcCom.connect():  # run connect, returns True/False
+    
+    # Activate protocol in protocol manager
+    protocolManager.activate_protocol(mainConfig.plcProtocol, PlcCom)
+    
+    # Attempt connection
+    if protocolManager.connect():
         validPlcConnection = True
-        # Use byte ranges from current process config
-
+        logger.info(f"Connected to {mainConfig.plcProtocol}")
+        
         # Reset INPUTS (sensors from simulator to PLC)
-        PlcCom.resetSendInputs(
+        protocolManager.reset_inputs(
             currentProcessConfig.lowestByte,
             currentProcessConfig.highestByte
         )
-
-        # Reset OUTPUTS (actuators from PLC to simulator) - important for force!
-        PlcCom.resetSendOutputs(
+        
+        # Reset OUTPUTS (actuators from PLC to simulator)
+        protocolManager.reset_outputs(
             currentProcessConfig.lowestByte,
             currentProcessConfig.highestByte
         )
-
     else:
         validPlcConnection = False
-
+        logger.warning("Connection failed")
+    
     # Update GUI
     window.validPlcConnection = validPlcConnection
     window.plc = PlcCom if validPlcConnection else None
     window.update_connection_status_icon()
 
 
-# remember when last update was done
+# ============================================================================
+# MAIN LOOP
+# ============================================================================
+
 timeLastUpdate = 0
 connectionLostLogged = False
 
-
-# main loop only runs if this file is run directly
 if __name__ == "__main__":
     try:
+        logger.info("Starting main loop...")
+        
         while not mainConfig.doExit:
             app.processEvents()
-
-            """Check for connect command from GUI and tryConnect"""
+            
+            # Check for connect command from GUI
             if mainConfig.tryConnect:
                 validPlcConnection = False
-                connectionLostLogged = False  # Reset flag when attempting new connection
+                connectionLostLogged = False
                 mainConfig.tryConnect = False
                 print(f"\nAttempting connection to PLC...")
                 print(f"   IP: {mainConfig.plcIpAdress}")
                 print(f"   Protocol: {mainConfig.plcProtocol}")
                 tryConnectToPlc()
-
+                
                 # Update GUI connection status
                 window.validPlcConnection = validPlcConnection
                 window.plc = PlcCom if validPlcConnection else None
                 window.update_connection_status_icon()
-
-            """Process loop for simulation and data exchange"""
+            
+            # Process loop for simulation and data exchange
             # Throttle calculations and data exchange
-            if ((time.time() - timeLastUpdate) > currentProcessConfig.simulationInterval):
-
-                """Get process control from plc or gui"""
-                # only try to contact plc if there is a connection
+            if (time.time() - timeLastUpdate) > currentProcessConfig.simulationInterval:
+                
+                # Get process control from PLC or GUI
                 if validPlcConnection:
                     try:
                         # Check if connection is still alive
-                        if not PlcCom.isConnected():
+                        if not protocolManager.is_connected():
                             if not connectionLostLogged:
                                 print("\nConnection lost to the PLC!")
                                 connectionLostLogged = True
@@ -196,18 +238,19 @@ if __name__ == "__main__":
                         else:
                             # Connection OK - reset flag
                             connectionLostLogged = False
-
-                            # Haal geforceerde waardes op van GUI
+                            
+                            # Get forced values from GUI
                             forced_values = window.get_forced_io_values()
-
-                            # Update IO met force support
+                            
+                            # Update IO with force support
                             currentProcessIoHandler.updateIO(
                                 PlcCom, mainConfig, currentProcessConfig, currentProcessStatus,
                                 forced_values=forced_values)
-
+                    
                     except Exception as e:
                         if not connectionLostLogged:
                             print(f"\nPLC communication error: {e}")
+                            logger.error(f"PLC communication error: {e}")
                             connectionLostLogged = True
                         validPlcConnection = False
                         window.validPlcConnection = False
@@ -216,27 +259,27 @@ if __name__ == "__main__":
                         currentProcessIoHandler.resetOutputs(
                             mainConfig, currentProcessConfig, currentProcessStatus)
                 else:
-                    # if control is plc but no plc connection, pretend plc outputs are all 0
+                    # If control is PLC but no PLC connection, pretend PLC outputs are all 0
                     currentProcessIoHandler.resetOutputs(
                         mainConfig, currentProcessConfig, currentProcessStatus)
-
-                """Update process values (Run simulation)"""
-                currentProcessSim.doSimulation(
-                    currentProcessConfig, currentProcessStatus)
+                
+                # Update process values (Run simulation)
+                # Using the simulation manager's update method
+                dt = time.time() - timeLastUpdate
+                simulationManager.update_simulation(dt)
                 
                 # Update GUI display with new process values
                 window.update_tanksim_display()
-
+                
                 timeLastUpdate = time.time()
-
+        
         # ===== EXIT CLEANUP =====
-        # Final cleanup
-        if validPlcConnection and PlcCom:
-            try:
-                PlcCom.disconnect()
-                print("Disconnected from PLC")
-            except:
-                pass
+        logger.info("Exiting application...")
+        
+        # Disconnect from PLC
+        if validPlcConnection and protocolManager:
+            protocolManager.disconnect()
+            print("Disconnected from PLC")
         
         # Kill any remaining NetToPLCSim processes
         try:
@@ -253,17 +296,15 @@ if __name__ == "__main__":
             pass
         
         sys.exit(0)
-        
+    
     except KeyboardInterrupt:
+        logger.info("Keyboard interrupt received")
         mainConfig.doExit = True
-         
+        
         # Cleanup
-        if validPlcConnection and PlcCom:
-            try:
-                PlcCom.disconnect()
-                print("Disconnected from PLC")
-            except:
-                pass
+        if validPlcConnection and protocolManager:
+            protocolManager.disconnect()
+            print("Disconnected from PLC")
         
         # Kill any remaining NetToPLCSim processes
         try:
@@ -276,5 +317,10 @@ if __name__ == "__main__":
             )
         except:
             pass
+        
         sys.exit(0)
-
+    
+    except Exception as e:
+        logger.error(f"Unexpected error in main loop: {e}", exc_info=True)
+        print(f"ERROR: {e}")
+        sys.exit(1)
