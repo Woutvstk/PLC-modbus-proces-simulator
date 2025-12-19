@@ -40,11 +40,11 @@ class plcSimS7:
     
     # Configuration for port retry logic
     START_PORT = 1024 
-    PORT_TRY_LIMIT = 5 
+    PORT_TRY_LIMIT = 3 
     
     # Wait time for server startup verification
-    MAX_SERVER_START_WAIT = 2.5 
-    POLL_INTERVAL = 0.5 
+    MAX_SERVER_START_WAIT = 0.3
+    POLL_INTERVAL = 0.2 
 
     # --- Initialization ---
 
@@ -244,51 +244,22 @@ class plcSimS7:
         """
         # Start server first. The server finds the correct port and sets self.tcpport.
         if not self._start_server():
-            print("Cannot connect without successfully started server.")
             return False
         
-        # Try connecting multiple times to the actual port found (self.tcpport)
-        max_retries = 4
+        max_retries = 2
         for attempt in range(1, max_retries + 1):
             try:
-                print(f"Connection attempt {attempt}/{max_retries}: {self.ip}:{self.tcpport} (rack={self.rack}, slot={self.slot})...")
-                # Use the dynamically found port: self.tcpport
                 self.client.connect(self.ip, self.rack, self.slot, self.tcpport)
-                
                 if self.client.get_connected():
-                    print(f"Connected to S7 PLC on {self.ip}:{self.tcpport} (rack {self.rack}, slot {self.slot})")
                     return True
-                else:
-                    print(f"Attempt {attempt} failed - client reports not connected")
-                    
             except Exception as e:
-                print(f"Attempt {attempt} error: {e}")
-                
-                # Try alternative slots only on the last attempt
-                if attempt == max_retries:
-                    print("Trying alternative slots...")
-                    for alt_slot in [0, 1, 2]:
-                        if alt_slot != self.slot:
-                            try:
-                                print(f"    Trying slot {alt_slot}...")
-                                self.client.connect(self.ip, self.rack, alt_slot, self.tcpport)
-                                if self.client.get_connected():
-                                    print(f"Connected with alternative slot {alt_slot}")
-                                    self.slot = alt_slot
-                                    return True
-                            except Exception:
-                                    continue
+                pass
             
-            # Wait between attempts
             if attempt < max_retries:
-                print(f"Waiting 2 seconds before next attempt...")
-                time.sleep(2)
+                time.sleep(0.1)
         
-        print(f"Connection failed after {max_retries} attempts.")
-        print(f"Check:")
-        print(f" - Is PLCSim open and running a project?")
-        print(f" - NetToPLCSim INI: StartPort={self.START_PORT}, PortTryLimit={self.PORT_TRY_LIMIT}")
-        print(f" - Correct Rack={self.rack} and Slot={self.slot}?")
+        # VERWIJDER de hele "alternative slots" sectie
+        print("No PLCSim connection - check if PLCSim is running")
         return False
 
     def disconnect(self) -> bool:

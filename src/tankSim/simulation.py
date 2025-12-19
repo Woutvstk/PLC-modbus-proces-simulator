@@ -91,7 +91,6 @@ class simulation:
                 self._lastRun = time.time()
                 # remember sim was runnning during previous update
                 self._lastSimRunningState = status.simRunning
-                print("Simulation FIRST RUN - initializing timer")
                 return
 
             """
@@ -153,3 +152,4 @@ class simulation:
         else:
             # remember sim was NOT runnning during previous update
             self._lastSimRunningState = status.simRunning
+

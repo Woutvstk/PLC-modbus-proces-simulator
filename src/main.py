@@ -155,36 +155,59 @@ connectionLostLogged = False
 
 # main loop only runs if this file is run directly
 if __name__ == "__main__":
-    while True:
-        app.processEvents()
+    try:
+        while not mainConfig.doExit:
+            app.processEvents()
 
-        """Check for connect command from GUI and tryConnect"""
-        if mainConfig.tryConnect:
-            validPlcConnection = False
-            connectionLostLogged = False  # Reset flag when attempting new connection
-            mainConfig.tryConnect = False
-            print(f"\nAttempting connection to PLC...")
-            print(f"   IP: {mainConfig.plcIpAdress}")
-            print(f"   Protocol: {mainConfig.plcProtocol}")
-            tryConnectToPlc()
+            """Check for connect command from GUI and tryConnect"""
+            if mainConfig.tryConnect:
+                validPlcConnection = False
+                connectionLostLogged = False  # Reset flag when attempting new connection
+                mainConfig.tryConnect = False
+                print(f"\nAttempting connection to PLC...")
+                print(f"   IP: {mainConfig.plcIpAdress}")
+                print(f"   Protocol: {mainConfig.plcProtocol}")
+                tryConnectToPlc()
 
-            # Update GUI connection status
-            window.validPlcConnection = validPlcConnection
-            window.plc = PlcCom if validPlcConnection else None
-            window.update_connection_status_icon()
+                # Update GUI connection status
+                window.validPlcConnection = validPlcConnection
+                window.plc = PlcCom if validPlcConnection else None
+                window.update_connection_status_icon()
 
-        """Process loop for simulation and data exchange"""
-        # Throttle calculations and data exchange
-        if ((time.time() - timeLastUpdate) > currentProcessConfig.simulationInterval):
+            """Process loop for simulation and data exchange"""
+            # Throttle calculations and data exchange
+            if ((time.time() - timeLastUpdate) > currentProcessConfig.simulationInterval):
 
-            """Get process control from plc or gui"""
-            # only try to contact plc if there is a connection
-            if validPlcConnection:
-                try:
-                    # Check if connection is still alive
-                    if not PlcCom.isConnected():
+                """Get process control from plc or gui"""
+                # only try to contact plc if there is a connection
+                if validPlcConnection:
+                    try:
+                        # Check if connection is still alive
+                        if not PlcCom.isConnected():
+                            if not connectionLostLogged:
+                                print("\nConnection lost to the PLC!")
+                                connectionLostLogged = True
+                            validPlcConnection = False
+                            window.validPlcConnection = False
+                            window.plc = None
+                            window.update_connection_status_icon()
+                            currentProcessIoHandler.resetOutputs(
+                                mainConfig, currentProcessConfig, currentProcessStatus)
+                        else:
+                            # Connection OK - reset flag
+                            connectionLostLogged = False
+
+                            # Haal geforceerde waardes op van GUI
+                            forced_values = window.get_forced_io_values()
+
+                            # Update IO met force support
+                            currentProcessIoHandler.updateIO(
+                                PlcCom, mainConfig, currentProcessConfig, currentProcessStatus,
+                                forced_values=forced_values)
+
+                    except Exception as e:
                         if not connectionLostLogged:
-                            print("\nConnection lost to the PLC!")
+                            print(f"\nPLC communication error: {e}")
                             connectionLostLogged = True
                         validPlcConnection = False
                         window.validPlcConnection = False
@@ -192,106 +215,66 @@ if __name__ == "__main__":
                         window.update_connection_status_icon()
                         currentProcessIoHandler.resetOutputs(
                             mainConfig, currentProcessConfig, currentProcessStatus)
-                    else:
-                        # Connection OK - reset flag
-                        connectionLostLogged = False
-
-                        # Haal geforceerde waardes op van GUI
-                        forced_values = window.get_forced_io_values()
-
-                        # Update IO met force support
-                        currentProcessIoHandler.updateIO(
-                            PlcCom, mainConfig, currentProcessConfig, currentProcessStatus,
-                            forced_values=forced_values)
-
-                except Exception as e:
-                    if not connectionLostLogged:
-                        print(f"\nPLC communication error: {e}")
-                        connectionLostLogged = True
-                    validPlcConnection = False
-                    window.validPlcConnection = False
-                    window.plc = None
-                    window.update_connection_status_icon()
+                else:
+                    # if control is plc but no plc connection, pretend plc outputs are all 0
                     currentProcessIoHandler.resetOutputs(
                         mainConfig, currentProcessConfig, currentProcessStatus)
-            else:
-                # if control is plc but no plc connection, pretend plc outputs are all 0
-                currentProcessIoHandler.resetOutputs(
-                    mainConfig, currentProcessConfig, currentProcessStatus)
 
-            """Update process values (Run simulation)"""
-            currentProcessSim.doSimulation(
-                currentProcessConfig, currentProcessStatus)
+                """Update process values (Run simulation)"""
+                currentProcessSim.doSimulation(
+                    currentProcessConfig, currentProcessStatus)
+                
+                # Update GUI display with new process values
+                window.update_tanksim_display()
 
-            timeLastUpdate = time.time()
+                timeLastUpdate = time.time()
 
-        """Check for exit command from GUI"""
-        if mainConfig.doExit:
-            print("\nExiting TankSim...")
-            sys.exit(0)
-
-
-# =============================================================================
-# STAP 3: Voeg een isConnected() methode toe aan je PLC classes
-# =============================================================================
-
-# Voor plcS7.py, logoS7.py, PLCSimAPI.py, PLCSimS7.py:
-# Voeg deze methode toe indien niet aanwezig:
-
-def isConnected(self):
-    """Check if the PLC connection is still active"""
-    try:
-        if not hasattr(self, 'plc') or self.plc is None:
-            return False
-
-        # Try a simple operation to check connection
-        # For S7 connections:
-        if hasattr(self.plc, 'get_connected'):
-            return self.plc.get_connected()
-
-        # Alternative: try to read a byte to test connection
+        # ===== EXIT CLEANUP =====
+        # Final cleanup
+        if validPlcConnection and PlcCom:
+            try:
+                PlcCom.disconnect()
+                print("Disconnected from PLC")
+            except:
+                pass
+        
+        # Kill any remaining NetToPLCSim processes
         try:
-            self.plc.read_area(0x83, 0, 0, 1)  # Try to read 1 byte from inputs
-            return True
+            import subprocess
+            result = subprocess.run(
+                ['taskkill', '/F', '/IM', 'NetToPLCSim.exe'],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=2
+            )
+            if result.returncode == 0:
+                print("Terminated NetToPLCSim.exe processes")
         except:
-            return False
-    except:
-        return False
-
-
-"""
-=============================================================================
-ALTERNATIEVE OPLOSSING (als isConnected niet werkt):
-=============================================================================
-
-Als je PLC library geen goede isConnected() heeft, gebruik dan deze aanpak:
-"""
-
-# Voeg deze variabele toe bovenaan main.py
-lastConnectionCheck = time.time()
-connectionCheckInterval = 2.5
-
-if validPlcConnection:
-    # Only check connection periodically, not every cycle
-    if (time.time() - lastConnectionCheck) > connectionCheckInterval:
+            pass
+        
+        sys.exit(0)
+        
+    except KeyboardInterrupt:
+        mainConfig.doExit = True
+         
+        # Cleanup
+        if validPlcConnection and PlcCom:
+            try:
+                PlcCom.disconnect()
+                print("Disconnected from PLC")
+            except:
+                pass
+        
+        # Kill any remaining NetToPLCSim processes
         try:
-            # Try to perform a dummy read to check connection
-            PlcCom.GetDI(0, 0)  # Try to read input 0.0
-            lastConnectionCheck = time.time()
-            connectionLostLogged = False  # Connection OK, reset flag
-        except Exception as e:
-            if not connectionLostLogged:
-                print(
-                    f"\n Connection lost to the PLC during periodic check: {e}")
-                connectionLostLogged = True
-            validPlcConnection = False
-            window.validPlcConnection = False
-            window.plc = None
-            window.update_connection_status_icon()
+            import subprocess
+            subprocess.run(
+                ['taskkill', '/F', '/IM', 'NetToPLCSim.exe'],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=2
+            )
+        except:
+            pass
+        sys.exit(0)
 
-    # Normal IO update
-    if validPlcConnection:  # Check again after connection check
-        forced_values = window.get_forced_io_values()
-        currentProcessIoHandler.updateIO(
-            PlcCom, mainConfig, currentProcessConfig, currentProcessStatus,
-            forced_values=forced_values)

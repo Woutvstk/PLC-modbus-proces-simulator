@@ -70,9 +70,8 @@ class configuration:
         self.importExportVariableList = ["tankVolume", "valveInMaxFlow", "valveOutMaxFlow", "liquidVolumeTimeDelay", "ambientTemp", "digitalLevelSensorHighTriggerLevel", "digitalLevelSensorLowTriggerLevel", "heaterMaxPower", "tankHeatLoss", "liquidTempTimeDelay",
                                          "liquidSpecificHeatCapacity", "liquidBoilingTemp", "liquidSpecificWeight"]
 
-    # Save config to a CSV file
+    # Save configuration to CSV file
     def saveToFile(self, exportFileName, createFile: bool = False):
-        print(f"Exporting config to: {exportFileName}")
         openMode: str
         if (createFile):
             openMode = "w"  # if creating new file, open in Write mode
@@ -87,9 +86,8 @@ class configuration:
             # write all variables from list with value to csv
             for variable in self.importExportVariableList:
                 writer.writerow([variable, getattr(self, variable)])
-            file.close
 
-    # Read config back from the CSV file
+    # Read configuration from CSV file
     def loadFromFile(self, importFileName: str):
         with open(importFileName, "r") as file:
             reader = csv.DictReader(file)
@@ -115,7 +113,7 @@ class configuration:
                 # Voeg de byte-waarde toe aan de lijst met gebruikte bytes
                 bytes_used.append(value["byte"])
 
-        # Als er minstens één byte gevonden is → bepaal laagste en hoogste
+        # If at least one byte is found → determine lowest and highest byte
         if bytes_used:
             lowestByte = min(bytes_used)
             highestByte = max(bytes_used)

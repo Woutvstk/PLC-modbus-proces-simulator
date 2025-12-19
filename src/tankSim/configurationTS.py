@@ -12,18 +12,35 @@ class configuration:
         self.DQValveIn = {"byte": 0, "bit": 0}
         self.DQValveOut = {"byte": 0, "bit": 1}
         self.DQHeater = {"byte": 0, "bit": 2}
+        # General Controls - DIGITAL (PLC Inputs)
+        self.DIStart = {"byte": 0, "bit": 2}
+        self.DIStop = {"byte": 0, "bit": 3}
+        self.DIReset = {"byte": 0, "bit": 4}
         # ANALOG
         self.AQValveInFraction = {"byte": 2}
         self.AQValveOutFraction = {"byte": 4}
         self.AQHeaterFraction = {"byte": 6}
+        # General Controls - ANALOG (PLC Inputs)
+        self.AIControl1 = {"byte": 6}
+        self.AIControl2 = {"byte": 8}
+        self.AIControl3 = {"byte": 10}
 
         # PLC INPUTS (from PLC perspective = simulator outputs)
         # DIGITAL
         self.DILevelSensorHigh = {"byte": 0, "bit": 0}
         self.DILevelSensorLow = {"byte": 0, "bit": 1}
+        # General Controls - DIGITAL (PLC Outputs)
+        self.DQIndicator1 = {"byte": 0, "bit": 5}
+        self.DQIndicator2 = {"byte": 0, "bit": 6}
+        self.DQIndicator3 = {"byte": 0, "bit": 7}
+        self.DQIndicator4 = {"byte": 1, "bit": 0}
         # ANALOG
         self.AILevelSensor = {"byte": 2}
         self.AITemperatureSensor = {"byte": 4}
+        # General Controls - ANALOG (PLC Outputs)
+        self.AQAnalog1 = {"byte": 12}
+        self.AQAnalog2 = {"byte": 14}
+        self.AQAnalog3 = {"byte": 16}
 
         # Mapping of signal names from io_config.json to configuration attributes
         self.io_signal_mapping = {
@@ -40,6 +57,14 @@ class configuration:
             "HeaterFraction": "AQHeaterFraction",
             "HeaterPower": "AQHeaterFraction",
 
+            # General Controls - PLC Inputs => Simulator Outputs
+            "Start": "DIStart",
+            "Stop": "DIStop",
+            "Reset": "DIReset",
+            "Control1": "AIControl1",
+            "Control2": "AIControl2",
+            "Control3": "AIControl3",
+
             # OUTPUTS FROM SIMULATOR (= PLC INPUTS)
             "LevelSensorHigh": "DILevelSensorHigh",
             "TanklevelSensorHigh": "DILevelSensorHigh",
@@ -49,11 +74,24 @@ class configuration:
             "TankLevel": "AILevelSensor",
             "TemperatureSensor": "AITemperatureSensor",
             "TankTemperature": "AITemperatureSensor",
+
+            # General Controls - PLC Outputs => Simulator Inputs
+            "Indicator1": "DQIndicator1",
+            "Indicator2": "DQIndicator2",
+            "Indicator3": "DQIndicator3",
+            "Indicator4": "DQIndicator4",
+            "Analog1": "AQAnalog1",
+            "Analog2": "AQAnalog2",
+            "Analog3": "AQAnalog3",
         }
 
         # Reverse mapping: attribute name -> signal name (for status display)
         self.reverse_io_mapping = {v: k for k,
                                    v in self.io_signal_mapping.items()}
+
+        # Tracks which attributes are explicitly enabled by the current IO configuration file
+        # Signals not present in the JSON will remain disabled and should not be written/read
+        self.enabled_attrs: set[str] = set()
 
         self.lowestByte, self.highestByte = self.get_byte_range()
 
@@ -68,7 +106,7 @@ class configuration:
         self.ambientTemp: float = 21.0
         self.digitalLevelSensorHighTriggerLevel: float = 0.9 * self.tankVolume
         self.digitalLevelSensorLowTriggerLevel: float = 0.1 * self.tankVolume
-        self.heaterMaxPower: float = 10000.0
+        self.heaterMaxPower: float = 750.0
         self.tankHeatLoss: float = 150.0
         self.liquidTempTimeDelay: float = 0.0  # in seconds
         self.liquidSpecificHeatCapacity: float = 4186.0
@@ -118,6 +156,9 @@ class configuration:
                 print("Warning: No signals found in IO configuration")
                 return
 
+            # Reset enabled signals; will be repopulated based on file content
+            self.enabled_attrs.clear()
+
             for signal in config_data['signals']:
                 signal_name = signal.get('name', '')
                 signal_type = signal.get('type', '')
@@ -136,6 +177,7 @@ class configuration:
                             bit_val = int(bit_part)
                             setattr(self, attr_name, {
                                     "byte": byte_val, "bit": bit_val})
+                            self.enabled_attrs.add(attr_name)
                         except ValueError:
                             print(f"Cannot parse address: {address}")
 
@@ -144,12 +186,11 @@ class configuration:
                         try:
                             byte_val = int(byte_part)
                             setattr(self, attr_name, {"byte": byte_val})
+                            self.enabled_attrs.add(attr_name)
                         except ValueError:
-                            print(f"Cannot parse address: {address}")
+                            pass
 
             self.update_io_range()
-            print(
-                f"IO configuration loaded, byte range: {self.lowestByte} - {self.highestByte}")
 
         except FileNotFoundError:
             print(f"IO configuration file not found: {config_file_path}")
