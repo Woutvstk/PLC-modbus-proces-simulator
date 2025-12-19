@@ -5,10 +5,14 @@ This module provides:
 - Initial application state loading on startup
 - Save/Load complete simulation states via simulationManager
 - Centralized config access for all modules
+- JSON-based state persistence with validation
 """
 import csv
+import json
 import logging
-from typing import Optional, TYPE_CHECKING
+from pathlib import Path
+from typing import Optional, TYPE_CHECKING, Dict, Any
+from datetime import datetime
 
 if TYPE_CHECKING:
     from .simulationManager import SimulationManager
@@ -108,92 +112,241 @@ class configuration:
             logger.error(f"Failed to load config from {importFileName}: {e}")
             return False
     
-    def Save(self, simulation_manager: Optional['SimulationManager'], 
-             export_filename: str) -> bool:
+    def _serialize_object_to_dict(self, obj: Any) -> Dict[str, Any]:
         """
-        Save complete application state including simulation state.
+        Serialize an object to a dictionary for JSON export.
+        
+        Args:
+            obj: Object to serialize
+            
+        Returns:
+            Dictionary representation of the object
+        """
+        result = {}
+        
+        # Get export list if available
+        export_list = getattr(obj, 'importExportVariableList', None)
+        
+        if export_list:
+            # Use the object's export list
+            for var in export_list:
+                if hasattr(obj, var):
+                    result[var] = getattr(obj, var)
+        else:
+            # Fall back to all non-private attributes
+            for key, value in obj.__dict__.items():
+                if not key.startswith('_'):
+                    result[key] = value
+        
+        return result
+    
+    def _deserialize_dict_to_object(self, obj: Any, data: Dict[str, Any]) -> None:
+        """
+        Deserialize a dictionary to an object.
+        
+        Args:
+            obj: Object to update
+            data: Dictionary with values to set
+        """
+        for key, value in data.items():
+            if hasattr(obj, key):
+                # Convert to correct type based on current attribute type
+                try:
+                    current_type = type(getattr(obj, key))
+                    setattr(obj, key, current_type(value))
+                except (TypeError, ValueError) as e:
+                    logger.warning(f"Could not convert {key}={value} to type {current_type}: {e}")
+                    # Set as-is if conversion fails
+                    setattr(obj, key, value)
+    
+    def Save(self, simulation_manager: Optional['SimulationManager'], 
+             export_filename: str, io_config_path: Optional[str] = None) -> bool:
+        """
+        Save complete application state to JSON file.
+        
+        This saves:
+        - Main configuration (PLC settings, protocol, control mode)
+        - Active simulation name and state
+        - Simulation configuration (tank parameters, intervals, etc.)
+        - Simulation status (current values, running state, etc.)
+        - IO configuration path reference
         
         Args:
             simulation_manager: SimulationManager instance to save simulation state
-            export_filename: Path to save the complete state
+            export_filename: Path to save the complete state (JSON format)
+            io_config_path: Optional path to IO configuration file to reference
             
         Returns:
             True if saved successfully, False otherwise
         """
         try:
+            state_data = {
+                "version": "1.0",
+                "timestamp": datetime.now().isoformat(),
+                "main_config": {},
+                "active_simulation": None,
+                "simulation_config": {},
+                "simulation_status": {},
+                "io_config_path": io_config_path or "IO/IO_configuration.json"
+            }
+            
             # Save main configuration
-            if not self.saveToFile(export_filename, createFile=True):
-                return False
+            for var in self.importExportVariableList:
+                state_data["main_config"][var] = getattr(self, var)
             
             # Save simulation state if manager is provided and has active simulation
             if simulation_manager:
-                active_sim = simulation_manager.get_active_simulation()
                 sim_name = simulation_manager.get_active_simulation_name()
+                active_sim = simulation_manager.get_active_simulation()
                 
                 if active_sim and sim_name:
-                    # Get simulation status and save it
-                    status = simulation_manager.get_status()
-                    if status and hasattr(active_sim, 'get_status_object'):
-                        status_obj = active_sim.get_status_object()
-                        if hasattr(status_obj, 'saveToFile'):
-                            status_obj.saveToFile(export_filename, createFile=False)
+                    state_data["active_simulation"] = sim_name
                     
-                    # Get simulation config and save it
-                    config = simulation_manager.get_config()
-                    if config and hasattr(active_sim, 'get_config_object'):
+                    # Get simulation config and serialize it
+                    if hasattr(active_sim, 'get_config_object'):
                         config_obj = active_sim.get_config_object()
-                        if hasattr(config_obj, 'saveToFile'):
-                            config_obj.saveToFile(export_filename, createFile=False)
+                        state_data["simulation_config"] = self._serialize_object_to_dict(config_obj)
+                    elif hasattr(active_sim, 'config'):
+                        state_data["simulation_config"] = self._serialize_object_to_dict(active_sim.config)
                     
-                    logger.info(f"Saved simulation state for: {sim_name}")
+                    # Get simulation status and serialize it
+                    if hasattr(active_sim, 'get_status_object'):
+                        status_obj = active_sim.get_status_object()
+                        state_data["simulation_status"] = self._serialize_object_to_dict(status_obj)
+                    elif hasattr(active_sim, 'status'):
+                        state_data["simulation_status"] = self._serialize_object_to_dict(active_sim.status)
+                    
+                    logger.info(f"Prepared simulation state for: {sim_name}")
+            
+            # Write to JSON file
+            export_path = Path(export_filename)
+            export_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            with open(export_path, 'w') as f:
+                json.dump(state_data, f, indent=2)
             
             logger.info(f"Complete state saved to: {export_filename}")
+            print(f"✓ Configuration saved to: {export_filename}")
             return True
             
         except Exception as e:
             logger.error(f"Failed to save complete state: {e}")
+            print(f"✗ Failed to save configuration: {e}")
             return False
     
     def Load(self, simulation_manager: Optional['SimulationManager'], 
              import_filename: str) -> bool:
         """
-        Load complete application state including simulation state.
+        Load complete application state from JSON file with validation.
+        
+        This restores:
+        - Main configuration (PLC settings, protocol, control mode)
+        - Active simulation (auto-loads the simulation)
+        - Simulation configuration
+        - Simulation status (process values)
+        - IO configuration path
         
         Args:
-            simulation_manager: SimulationManager instance to load simulation state
-            import_filename: Path to load the complete state from
+            simulation_manager: SimulationManager instance to load simulation into
+            import_filename: Path to load the complete state from (JSON format)
             
         Returns:
             True if loaded successfully, False otherwise
         """
         try:
-            # Load main configuration
-            if not self.loadFromFile(import_filename):
+            import_path = Path(import_filename)
+            
+            if not import_path.exists():
+                logger.error(f"Import file not found: {import_filename}")
+                print(f"✗ Configuration file not found: {import_filename}")
                 return False
             
-            # Load simulation state if manager is provided and has active simulation
-            if simulation_manager:
-                active_sim = simulation_manager.get_active_simulation()
-                sim_name = simulation_manager.get_active_simulation_name()
+            # Load JSON data
+            with open(import_path, 'r') as f:
+                state_data = json.load(f)
+            
+            # Validate JSON structure
+            required_keys = ["version", "main_config", "active_simulation"]
+            for key in required_keys:
+                if key not in state_data:
+                    logger.error(f"Invalid state file: missing '{key}'")
+                    print(f"✗ Invalid configuration file: missing '{key}'")
+                    return False
+            
+            # Check version compatibility
+            if state_data["version"] != "1.0":
+                logger.warning(f"State file version {state_data['version']} may not be compatible")
+            
+            # Load main configuration
+            main_config = state_data["main_config"]
+            for var in self.importExportVariableList:
+                if var in main_config:
+                    try:
+                        current_type = type(getattr(self, var))
+                        setattr(self, var, current_type(main_config[var]))
+                    except Exception as e:
+                        logger.warning(f"Could not set {var}: {e}")
+            
+            logger.info("Main configuration loaded")
+            
+            # Load simulation state if manager is provided
+            if simulation_manager and state_data["active_simulation"]:
+                sim_name = state_data["active_simulation"]
                 
-                if active_sim and sim_name:
-                    # Load simulation status
-                    if hasattr(active_sim, 'get_status_object'):
-                        status_obj = active_sim.get_status_object()
-                        if hasattr(status_obj, 'loadFromFile'):
-                            status_obj.loadFromFile(import_filename)
+                # Check if simulation is registered
+                if sim_name not in simulation_manager.get_registered_simulations():
+                    logger.error(f"Simulation '{sim_name}' not registered")
+                    print(f"✗ Simulation '{sim_name}' not available")
+                    return False
+                
+                # Load the simulation (this will create a new instance)
+                logger.info(f"Loading simulation: {sim_name}")
+                if not simulation_manager.load_simulation(sim_name, sim_name + "_loaded"):
+                    logger.error(f"Failed to load simulation: {sim_name}")
+                    print(f"✗ Failed to load simulation: {sim_name}")
+                    return False
+                
+                active_sim = simulation_manager.get_active_simulation()
+                
+                if active_sim:
+                    # Restore simulation configuration
+                    if "simulation_config" in state_data and state_data["simulation_config"]:
+                        if hasattr(active_sim, 'get_config_object'):
+                            config_obj = active_sim.get_config_object()
+                            self._deserialize_dict_to_object(config_obj, state_data["simulation_config"])
+                            logger.info("Simulation configuration restored")
+                        elif hasattr(active_sim, 'config'):
+                            self._deserialize_dict_to_object(active_sim.config, state_data["simulation_config"])
+                            logger.info("Simulation configuration restored")
                     
-                    # Load simulation config
-                    if hasattr(active_sim, 'get_config_object'):
-                        config_obj = active_sim.get_config_object()
-                        if hasattr(config_obj, 'loadFromFile'):
-                            config_obj.loadFromFile(import_filename)
+                    # Restore simulation status (process values)
+                    if "simulation_status" in state_data and state_data["simulation_status"]:
+                        if hasattr(active_sim, 'get_status_object'):
+                            status_obj = active_sim.get_status_object()
+                            self._deserialize_dict_to_object(status_obj, state_data["simulation_status"])
+                            logger.info("Simulation status restored")
+                        elif hasattr(active_sim, 'status'):
+                            self._deserialize_dict_to_object(active_sim.status, state_data["simulation_status"])
+                            logger.info("Simulation status restored")
                     
-                    logger.info(f"Loaded simulation state for: {sim_name}")
+                    logger.info(f"Simulation '{sim_name}' loaded and configured")
+                    print(f"✓ Simulation '{sim_name}' loaded successfully")
+                
+                # Note: IO configuration should be loaded separately by the IO handler
+                if "io_config_path" in state_data:
+                    io_path = state_data["io_config_path"]
+                    logger.info(f"IO configuration path: {io_path}")
+                    print(f"  IO configuration: {io_path}")
             
             logger.info(f"Complete state loaded from: {import_filename}")
+            print(f"✓ Configuration loaded from: {import_filename}")
             return True
             
+        except json.JSONDecodeError as e:
+            logger.error(f"Invalid JSON in state file: {e}")
+            print(f"✗ Invalid JSON in configuration file: {e}")
+            return False
         except Exception as e:
             logger.error(f"Failed to load complete state: {e}")
+            print(f"✗ Failed to load configuration: {e}")
             return False
