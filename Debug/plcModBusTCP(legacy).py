@@ -15,6 +15,8 @@ class plcModBusTCP:
         except Exception as e:
             print("Error in __init__:", e)
 
+        self.analogMax = 32767  # TODO correct to 27xxx
+
     def connect(self,instance_name: str | None = None) -> bool:
         try:
             self.client = ModbusTcpClient(self.ip, port=self.port)

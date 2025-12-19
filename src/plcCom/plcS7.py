@@ -3,8 +3,8 @@ import snap7.util as s7util
 
 
 class plcS7:
-
     """Class for communication with a Siemens S7 PLC using Snap7."""
+    analogMax = 32767  # Max value for signed 16-bit integer
 
     def __init__(self, ip: str, rack: int, slot: int, tcpport: int = 102):
         """
@@ -21,9 +21,8 @@ class plcS7:
         self.slot = slot
         self.tcpport = tcpport
         self.client = snap7.client.Client()
-        self.analogMax = 32767  # TODO correct to 27xxx
 
-    def connect(self,instance_name: str | None = None) -> bool:
+    def connect(self, instance_name: str | None = None) -> bool:
         """
         Connect to the PLC.
 
@@ -90,8 +89,8 @@ class plcS7:
         if self.isConnected():
             if byte >= 0 and 0 <= bit <= 7:
                 try:
-                    current_data = self.client.eb_read(start=byte, size=1)  
-                    buffer_DI = bytearray(current_data)  
+                    current_data = self.client.eb_read(start=byte, size=1)
+                    buffer_DI = bytearray(current_data)
                     if value:
                         buffer_DI[0] |= (1 << bit)
                     else:
@@ -177,6 +176,70 @@ class plcS7:
             return -1
         return -1
 
+    def SetDO(self, byte: int, bit: int, value: int) -> int:
+        """
+        Set a digital output (DO) bit in the PLC output process image.
+
+        Parameters:
+        byte (int): Byte index in the PLC output area (A/Q)
+        bit (int): Bit position (0–7) within the byte
+        value (int): 1/0 or True/False to set or clear the bit
+
+        Returns:
+        int: The value set (1/0), -1 on error
+        """
+        if self.isConnected():
+            if byte >= 0 and 0 <= bit <= 7:
+                try:
+                    current_data = self.client.ab_read(start=byte, size=1)
+                    buffer_DO = bytearray(current_data)
+                    if value:
+                        buffer_DO[0] |= (1 << bit)
+                    else:
+                        buffer_DO[0] &= ~(1 << bit)
+                    self.client.ab_write(start=byte, data=buffer_DO)
+                    return int(bool(value))
+                except Exception as e:
+                    print(f"SetDO error: {e}")
+                    return -1
+            return -1
+        return -1
+
+    def SetAO(self, startByte: int, value: int) -> int:
+        """
+        Set an analog output (AO) value as a 16-bit SIGNED INTEGER in the PLC output process image.
+
+        Parameters:
+        startByte (int): Byte index in the PLC output area (A/Q)
+        value (int | float): Analog value (-32768–32767)
+
+        Returns:
+        int: Value set, -1 on error
+        """
+        if self.isConnected():
+            if startByte >= 0 and -32768 <= value <= 32767:
+                try:
+                    buffer_AO = bytearray(2)
+                    val_int = int(round(value)) if isinstance(
+                        value, float) else int(value)
+
+                    # Convert to signed 16-bit and then to bytes (Big Endian)
+                    if val_int < 0:
+                        val_int = val_int & 0xFFFF  # Two's complement
+
+                    lowByte = val_int & 0xFF
+                    highByte = (val_int >> 8) & 0xFF
+                    buffer_AO[0] = highByte
+                    buffer_AO[1] = lowByte
+
+                    self.client.ab_write(start=startByte, data=buffer_AO)
+                    return val_int
+                except Exception as e:
+                    print(f"SetAO error: {e}")
+                    return -1
+            return -1
+        return -1
+
     def resetSendInputs(self, startByte: int, endByte: int) -> bool:
         """
         Reset all input data sent to the PLC (DI, AI).
@@ -197,6 +260,31 @@ class plcS7:
                     return True
                 except Exception as e:
                     print("Error:", e)
+                    return False
+            return False
+        return False
+
+    def resetSendOutputs(self, startByte: int, endByte: int) -> bool:
+        """
+        Reset all output data sent to the PLC (DO, AO) by writing zeros.
+
+        Parameters:
+        startByte (int): Start byte index to reset
+        endByte (int): End byte index to reset
+
+        Returns:
+        bool: True if successful, False otherwise
+        """
+        if self.isConnected():
+            if startByte >= 0 and endByte >= startByte:
+                try:
+                    size = endByte - startByte + 1
+                    bufferEmpty = bytearray(size)
+                    self.client.ab_write(start=startByte, data=bufferEmpty)
+                    print(f"Output area reset: bytes {startByte}-{endByte}")
+                    return True
+                except Exception as e:
+                    print(f"resetSendOutputs error: {e}")
                     return False
             return False
         return False

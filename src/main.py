@@ -1,131 +1,280 @@
-
 # general imports
+import sys
+import os
+from pathlib import Path
 import time
-from plcCom.plcModBusTCP import plcModBusTCP
+
 from plcCom.plcS7 import plcS7
 from plcCom.logoS7 import logoS7
 from plcCom.PLCSimAPI import plcSimAPI
-from mainGui.mainGui import mainGui as mainGuiClass
+from plcCom.PLCSimS7 import plcSimS7
 from configuration import configuration as mainConfigClass
 
+from PyQt5.QtWidgets import (
+    QMainWindow, QApplication, QPushButton, QMenu, QAction,
+    QWidget, QVBoxLayout)
+
+from PyQt5.QtCore import QTimer, QSize
+from PyQt5.QtSvg import QSvgRenderer
+from PyQt5.QtGui import QPainter
 
 # tankSim specific imports
-from tankSim.simulation import simulation as tankSimCLass
-# from tankSim.tankSimGui import gui as tankSimGui TODO move tanksimGui here
+from tankSim.simulation import simulation as tankSimClass
 from tankSim.status import status as tankSimStatusClass
-from tankSim.configuration import configuration as tankSimConfigurationClass
+from tankSim.configurationTS import configuration as tankSimConfigurationClass
 from tankSim.ioHandler import ioHandler as tankSimIoHandlerClass
+from mainGui.mainGui import MainWindow
 
-"""Initialize objects for main"""
-Gui0 = None
+"""Initialize objects for main GUI setup (Part 1 of original structure)"""
 mainConfig = mainConfigClass()
 validPlcConnection: bool = False
-print("Creating main gui...")
-Gui0 = mainGuiClass()
 
 
-"""Initialize objects for tankSim"""
-# Initialize configuration instance with default parameters
+PlcCom = None  # Initialize PlcCom here to ensure it's defined for the global scope usage later
+
+
+"""Initialize objects for tankSim (Part 2 of original structure)"""
+# Initialize configuration instance
 tankSimConfig = tankSimConfigurationClass()
-# Initialize status instance with default parameters
+# Initialize status instance
 tankSimStatus = tankSimStatusClass()
 # Initialize ioHandler instance
 tankSimIO = tankSimIoHandlerClass()
 # Initialize simulation object
-tankSim = tankSimCLass("tankSimSimulation0")
+tankSim = tankSimClass("tankSimSimulation0")
 
-# set chosen process to tankSIm
-# types now of tankSim process, should change to base class
+# set chosen process to tankSim
 currentProcessConfig: tankSimConfigurationClass = tankSimConfig
 currentProcessStatus: tankSimStatusClass = tankSimStatus
 currentProcessIoHandler: tankSimIoHandlerClass = tankSimIO
-currentProcessSim: tankSimCLass = tankSim
+currentProcessSim: tankSimClass = tankSim
+
+# Load IO configuration from JSON file
+project_root = Path(__file__).resolve().parent
+io_config_path = project_root / "tankSim" / "io_configuration.json"
+if io_config_path.exists():
+    tankSimConfig.load_io_config_from_file(io_config_path)
+else:
+    pass  # Removed unnecessary print
+
+app = QApplication(sys.argv)
+
+# Determine the project root path (already defined above, remove duplicate)
+style_path = project_root / "guiCommon" / "style.qss"
+
+# Load QSS style sheet
+if os.path.exists(style_path):
+    with open(style_path, "r") as f:
+        app.setStyleSheet(f.read())
+else:
+    pass  # Removed unnecessary print
+
+window = MainWindow()
+
+# Give MainWindow access to configurations
+window.mainConfig = mainConfig
+window.tanksim_config = tankSimConfig
+window.tanksim_status = tankSimStatus
+
+window.show()
 
 # remember at what time we started
 startTime = time.time()
 
 
 def tryConnectToPlc():
-    # creates a global var inside a function (normally local)
+    """Initializes or attempts to connect/reconnect to the configured PLC"""
+    # Use global variables
     global mainConfig, validPlcConnection, PlcCom
-    """"Initialize plc communication object"""
-    if mainConfig.plcProtocol == "ModBusTCP":
-        PlcCom = plcModBusTCP(mainConfig.plcIpAdress, mainConfig.plcPort)
-    elif mainConfig.plcProtocol == "PLC S7-1500/1200/400/300":
+    window.clear_all_forces()
+
+    # Don't connect in GUI mode
+    if mainConfig.plcGuiControl == "gui":
+        validPlcConnection = False
+        window.validPlcConnection = False
+        window.plc = None
+        window.update_connection_status_icon()
+        # Untoggle connect button
+        try:
+            window.pushButton_connect.blockSignals(True)
+            window.pushButton_connect.setChecked(False)
+            window.pushButton_connect.blockSignals(False)
+        except:
+            pass
+        return
+
+    """Initialize plc communication object based on protocol"""
+    if mainConfig.plcProtocol == "PLC S7-1500/1200/400/300/ET 200SP":
         PlcCom = plcS7(mainConfig.plcIpAdress,
                        mainConfig.plcRack, mainConfig.plcSlot)
     elif mainConfig.plcProtocol == "logo!":
         PlcCom = logoS7(mainConfig.plcIpAdress,
                         mainConfig.tsapLogo, mainConfig.tsapServer)
-    elif mainConfig.plcProtocol == "PLCSim":
+    elif mainConfig.plcProtocol == "PLCSim S7-1500 advanced":
         PlcCom = plcSimAPI()
+    elif mainConfig.plcProtocol == "PLCSim S7-1500/1200/400/300/ET 200SP":
+        PlcCom = plcSimS7(mainConfig.plcIpAdress,
+                          mainConfig.plcRack, mainConfig.plcSlot)
     else:
-        print("Error: no valid plcProtocol")
+        validPlcConnection = False
+        window.validPlcConnection = False
+        window.plc = None
+        window.update_connection_status_icon()
+        return
 
-    '''connect/reconnect'''
-    if PlcCom.isConnected():
+    '''connect/reconnect logic'''
+    if PlcCom.connect():  # run connect, returns True/False
         validPlcConnection = True
+        # Use byte ranges from current process config
+
+        # Reset INPUTS (sensors from simulator to PLC)
+        PlcCom.resetSendInputs(
+            currentProcessConfig.lowestByte,
+            currentProcessConfig.highestByte
+        )
+
+        # Reset OUTPUTS (actuators from PLC to simulator) - important for force!
+        PlcCom.resetSendOutputs(
+            currentProcessConfig.lowestByte,
+            currentProcessConfig.highestByte
+        )
+
     else:
-        if PlcCom.connect():  # run connect, returns True/False
-            validPlcConnection = True
-            PlcCom.resetSendInputs(mainConfig.lowestByte,
-                                   mainConfig.highestByte)
-        else:
-            validPlcConnection = False
+        validPlcConnection = False
+
+    # Update GUI
+    window.validPlcConnection = validPlcConnection
+    window.plc = PlcCom if validPlcConnection else None
+    window.update_connection_status_icon()
 
 
 # remember when last update was done
 timeLastUpdate = 0
-
-tryConnectToPlc()  # create initial PlcCom instance
+connectionLostLogged = False
 
 
 # main loop only runs if this file is run directly
 if __name__ == "__main__":
-    while True:
+    try:
+        while not mainConfig.doExit:
+            app.processEvents()
 
-        """Check for connect command from gui and tryConnect"""
-        if (mainConfig.tryConnect == True):  # check connection status
-            Gui0.updateDataMain(mainConfig)
-            validPlcConnection = False
-            mainConfig.tryConnect = False
-            print(
-                f"Try connection to PLC at IP: {mainConfig.plcIpAdress} using protocol: {mainConfig.plcProtocol}")
-            tryConnectToPlc()  # updates validPlcConnection
+            """Check for connect command from GUI and tryConnect"""
+            if mainConfig.tryConnect:
+                validPlcConnection = False
+                connectionLostLogged = False  # Reset flag when attempting new connection
+                mainConfig.tryConnect = False
+                print(f"\nAttempting connection to PLC...")
+                print(f"   IP: {mainConfig.plcIpAdress}")
+                print(f"   Protocol: {mainConfig.plcProtocol}")
+                tryConnectToPlc()
 
-        """Get process control from plc or gui (mainConfig.plcGuiControl)"""
-        # throttle calculations and data exchange between plc, process and gui
-        if ((time.time() - timeLastUpdate) > currentProcessConfig.simulationInterval):
+                # Update GUI connection status
+                window.validPlcConnection = validPlcConnection
+                window.plc = PlcCom if validPlcConnection else None
+                window.update_connection_status_icon()
 
-            """
-            Get process control from plc or gui
-            PlcCom.updateData() and Gui0.updateData() check whether to change the status using mainConfig.plcGuiControl
-            """
-            # only try to contact plc if there is a connection
-            if (validPlcConnection):
-                currentProcessIoHandler.updateIO(
-                    PlcCom, currentProcessConfig, currentProcessStatus)
-            else:
-                # if control is plc but no plc connection, pretend plc outputs are all 0
-                currentProcessIoHandler.resetOutputs(
-                    mainConfig, currentProcessConfig, currentProcessStatus)
+            """Process loop for simulation and data exchange"""
+            # Throttle calculations and data exchange
+            if ((time.time() - timeLastUpdate) > currentProcessConfig.simulationInterval):
 
-            """Update process values"""
-            currentProcessSim.doSimulation(
-                currentProcessConfig, currentProcessStatus)
-            """send new process status to gui"""
-            Gui0.updateDataMain(mainConfig)
-            Gui0.updateData(
-                mainConfig, currentProcessConfig, currentProcessStatus)
+                """Get process control from plc or gui"""
+                # only try to contact plc if there is a connection
+                if validPlcConnection:
+                    try:
+                        # Check if connection is still alive
+                        if not PlcCom.isConnected():
+                            if not connectionLostLogged:
+                                print("\nConnection lost to the PLC!")
+                                connectionLostLogged = True
+                            validPlcConnection = False
+                            window.validPlcConnection = False
+                            window.plc = None
+                            window.update_connection_status_icon()
+                            currentProcessIoHandler.resetOutputs(
+                                mainConfig, currentProcessConfig, currentProcessStatus)
+                        else:
+                            # Connection OK - reset flag
+                            connectionLostLogged = False
 
-            # print out the current time since start and status
-            # print(f"Time: {int(time.time() - startTime)}, simRunning: {currentProcessStatus.simRunning}, Liquid level: {int(currentProcessStatus.liquidVolume)}, Liquid temp: {int(currentProcessStatus.liquidTemperature)}")
-            timeLastUpdate = time.time()
+                            # Haal geforceerde waardes op van GUI
+                            forced_values = window.get_forced_io_values()
 
-        # stop program if gui is closed
-        if (mainConfig.doExit):
-            quit()
+                            # Update IO met force support
+                            currentProcessIoHandler.updateIO(
+                                PlcCom, mainConfig, currentProcessConfig, currentProcessStatus,
+                                forced_values=forced_values)
 
-        # always update gui for responsive buttons/input
-        if Gui0 is not None:
-            Gui0.updateGui()
+                    except Exception as e:
+                        if not connectionLostLogged:
+                            print(f"\nPLC communication error: {e}")
+                            connectionLostLogged = True
+                        validPlcConnection = False
+                        window.validPlcConnection = False
+                        window.plc = None
+                        window.update_connection_status_icon()
+                        currentProcessIoHandler.resetOutputs(
+                            mainConfig, currentProcessConfig, currentProcessStatus)
+                else:
+                    # if control is plc but no plc connection, pretend plc outputs are all 0
+                    currentProcessIoHandler.resetOutputs(
+                        mainConfig, currentProcessConfig, currentProcessStatus)
+
+                """Update process values (Run simulation)"""
+                currentProcessSim.doSimulation(
+                    currentProcessConfig, currentProcessStatus)
+                
+                # Update GUI display with new process values
+                window.update_tanksim_display()
+
+                timeLastUpdate = time.time()
+
+        # ===== EXIT CLEANUP =====
+        # Final cleanup
+        if validPlcConnection and PlcCom:
+            try:
+                PlcCom.disconnect()
+                print("Disconnected from PLC")
+            except:
+                pass
+        
+        # Kill any remaining NetToPLCSim processes
+        try:
+            import subprocess
+            result = subprocess.run(
+                ['taskkill', '/F', '/IM', 'NetToPLCSim.exe'],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=2
+            )
+            if result.returncode == 0:
+                print("Terminated NetToPLCSim.exe processes")
+        except:
+            pass
+        
+        sys.exit(0)
+        
+    except KeyboardInterrupt:
+        mainConfig.doExit = True
+         
+        # Cleanup
+        if validPlcConnection and PlcCom:
+            try:
+                PlcCom.disconnect()
+                print("Disconnected from PLC")
+            except:
+                pass
+        
+        # Kill any remaining NetToPLCSim processes
+        try:
+            import subprocess
+            subprocess.run(
+                ['taskkill', '/F', '/IM', 'NetToPLCSim.exe'],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=2
+            )
+        except:
+            pass
+        sys.exit(0)
+

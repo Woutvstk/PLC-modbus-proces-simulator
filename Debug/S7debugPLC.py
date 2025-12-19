@@ -29,10 +29,10 @@ class PlcClient:
         """
         # --- ATTENTION: HARDCODED IP AND PORT FOR PLCSIM ---
         # The variables passed to __init__ are overridden below for a fixed setup.
-        self.ip = "127.0.0.1" # HARDCODED IP. CHANGE THIS for real PLC (e.g., "192.168.0.1") or use "127.0.0.1" for NetToPLCSim.
+        self.ip = "192.168.0.1" # HARDCODED IP. CHANGE THIS for real PLC (e.g., "192.168.0.1") or use "127.0.0.1" for NetToPLCSim.
         self.rack = rack
         self.slot = slot
-        self.tcpport = 1024 # HARDCODED PORT. Change to 102 for a real PLC, or keep 1024/1025/... for PLCSimS7.
+        self.tcpport = 102 # HARDCODED PORT. Change to 102 for a real PLC, or keep 1024/1025/... for PLCSimS7.
         self.client = snap7.client.Client()
 
     def connect(self) -> bool:

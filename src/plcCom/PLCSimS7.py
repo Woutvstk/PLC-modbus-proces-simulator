@@ -10,6 +10,7 @@ import sys # Required for PyInstaller compatibility
 #Code succesfully tested with S7-1500/1200(G1-G2)/400/300/ET200 CPU in standard and advanced license(for the S7-1500)
 
 class plcSimS7:
+    analogMax = 32767  # Max value for signed 16-bit integer
     """
     Class for communication with a Siemens S7 PLC using Snap7,
     integrated with NetToPLCSim server management for simulation environments.
@@ -39,11 +40,11 @@ class plcSimS7:
     
     # Configuration for port retry logic
     START_PORT = 1024 
-    PORT_TRY_LIMIT = 5 
+    PORT_TRY_LIMIT = 3 
     
     # Wait time for server startup verification
-    MAX_SERVER_START_WAIT = 2.5 
-    POLL_INTERVAL = 0.5 
+    MAX_SERVER_START_WAIT = 0.3
+    POLL_INTERVAL = 0.2 
 
     # --- Initialization ---
 
@@ -243,51 +244,22 @@ class plcSimS7:
         """
         # Start server first. The server finds the correct port and sets self.tcpport.
         if not self._start_server():
-            print("Cannot connect without successfully started server.")
             return False
         
-        # Try connecting multiple times to the actual port found (self.tcpport)
-        max_retries = 4
+        max_retries = 2
         for attempt in range(1, max_retries + 1):
             try:
-                print(f"Connection attempt {attempt}/{max_retries}: {self.ip}:{self.tcpport} (rack={self.rack}, slot={self.slot})...")
-                # Use the dynamically found port: self.tcpport
                 self.client.connect(self.ip, self.rack, self.slot, self.tcpport)
-                
                 if self.client.get_connected():
-                    print(f"Connected to S7 PLC on {self.ip}:{self.tcpport} (rack {self.rack}, slot {self.slot})")
                     return True
-                else:
-                    print(f"Attempt {attempt} failed - client reports not connected")
-                    
             except Exception as e:
-                print(f"Attempt {attempt} error: {e}")
-                
-                # Try alternative slots only on the last attempt
-                if attempt == max_retries:
-                    print("Trying alternative slots...")
-                    for alt_slot in [0, 1, 2]:
-                        if alt_slot != self.slot:
-                            try:
-                                print(f"    Trying slot {alt_slot}...")
-                                self.client.connect(self.ip, self.rack, alt_slot, self.tcpport)
-                                if self.client.get_connected():
-                                    print(f"Connected with alternative slot {alt_slot}")
-                                    self.slot = alt_slot
-                                    return True
-                            except Exception:
-                                    continue
+                pass
             
-            # Wait between attempts
             if attempt < max_retries:
-                print(f"Waiting 2 seconds before next attempt...")
-                time.sleep(2)
+                time.sleep(0.1)
         
-        print(f"Connection failed after {max_retries} attempts.")
-        print(f"Check:")
-        print(f" - Is PLCSim open and running a project?")
-        print(f" - NetToPLCSim INI: StartPort={self.START_PORT}, PortTryLimit={self.PORT_TRY_LIMIT}")
-        print(f" - Correct Rack={self.rack} and Slot={self.slot}?")
+        # VERWIJDER de hele "alternative slots" sectie
+        print("No PLCSim connection - check if PLCSim is running")
         return False
 
     def disconnect(self) -> bool:
@@ -299,12 +271,33 @@ class plcSimS7:
                 self.client.disconnect()
                 print("Disconnected from PLC")
             
+            # Always try to stop server
             self._stop_server()
+            
+            # Extra cleanup: kill any remaining NetToPLCSim processes
+            try:
+                import subprocess
+                subprocess.run(['taskkill', '/F', '/IM', 'NetToPLCSim.exe'], 
+                             stdout=subprocess.DEVNULL, 
+                             stderr=subprocess.DEVNULL,
+                             timeout=2)
+            except:
+                pass
+            
             return True
         except Exception as e:
             print(f"Error disconnecting: {e}")
+            # Still try cleanup
+            try:
+                import subprocess
+                subprocess.run(['taskkill', '/F', '/IM', 'NetToPLCSim.exe'], 
+                             stdout=subprocess.DEVNULL, 
+                             stderr=subprocess.DEVNULL,
+                             timeout=2)
+            except:
+                pass
             return False
-
+        
     def isConnected(self) -> bool:
         """
         Check if the connection to the PLC is alive.
@@ -426,6 +419,72 @@ class plcSimS7:
                     return -1
             return -1
         return -1
+    
+    def SetDO(self, byte: int, bit: int, value: int) -> int:
+        """
+        Set a digital output (DO) bit in the PLC output process image.
+
+        Parameters:
+        byte (int): Byte index in the PLC output area (A/Q)
+        bit (int): Bit position (0–7) within the byte
+        value (int): 1/0 or True/False to set or clear the bit
+
+        Returns:
+        int: The value set (1/0), -1 on error
+        """
+        if self.isConnected():
+            if byte >= 0 and 0 <= bit <= 7:
+                try:
+                    # Read current byte data to preserve other bits
+                    current_data = self.client.ab_read(start=byte, size=1)
+                    buffer_DO = bytearray(current_data)
+                    if value:
+                        # Set bit
+                        buffer_DO[0] |= (1 << bit)
+                    else:
+                        # Clear bit
+                        buffer_DO[0] &= ~(1 << bit)
+                    self.client.ab_write(start=byte, data=buffer_DO)
+                    return int(bool(value))
+                except Exception as e:
+                    print(f"SetDO error: {e}")
+                    return -1
+            return -1
+        return -1
+
+    def SetAO(self, startByte: int, value: int) -> int:
+        """
+        Set an analog output (AO) value as a 16-bit SIGNED INTEGER in the PLC output process image.
+
+        Parameters:
+        startByte (int): Byte index in the PLC output area (A/Q)
+        value (int | float): Analog value (-32768–32767)
+
+        Returns:
+        int: Value set, -1 on error
+        """
+        if self.isConnected():
+            if startByte >= 0 and -32768 <= value <= 32767:
+                try:
+                    buffer_AO = bytearray(2)
+                    val_int = int(round(value)) if isinstance(value, float) else int(value)
+                    
+                    # Convert to signed 16-bit and then to bytes (Big Endian)
+                    if val_int < 0:
+                        val_int = val_int & 0xFFFF  # Two's complement
+                    
+                    lowByte = val_int & 0xFF
+                    highByte = (val_int >> 8) & 0xFF
+                    buffer_AO[0] = highByte
+                    buffer_AO[1] = lowByte
+                    
+                    self.client.ab_write(start=startByte, data=buffer_AO)
+                    return val_int
+                except Exception as e:
+                    print(f"SetAO error: {e}")
+                    return -1
+            return -1
+        return -1
 
     def resetSendInputs(self, startByte: int, endByte: int) -> bool:
         """
@@ -450,6 +509,31 @@ class plcSimS7:
                     return False
             return False
         return False
+    
+    def resetSendOutputs(self, startByte: int, endByte: int) -> bool:
+        """
+        Reset all output data sent to the PLC (DO, AO) by writing zeros.
+
+        Parameters:
+        startByte (int): Start byte index to reset
+        endByte (int): End byte index to reset
+
+        Returns:
+        bool: True if successful, False otherwise
+        """
+        if self.isConnected():
+            if startByte >= 0 and endByte >= startByte:
+                try:
+                    size = endByte - startByte + 1
+                    bufferEmpty = bytearray(size)
+                    self.client.ab_write(start=startByte, data=bufferEmpty)
+                    print(f"Output area reset: bytes {startByte}-{endByte}")
+                    return True
+                except Exception as e:
+                    print(f"resetSendOutputs error: {e}")
+                    return False
+            return False
+        return False
 
     def __del__(self):
         """Cleanup upon object deletion."""
@@ -457,3 +541,4 @@ class plcSimS7:
             self.disconnect()
         except:
             pass
+        
