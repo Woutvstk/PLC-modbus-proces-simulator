@@ -104,6 +104,7 @@ class DroppableTableWidget(QTableWidget):
         self.horizontalHeader().sectionClicked.connect(self.handle_sort_click)
         self.verticalHeader().sectionClicked.connect(self.handle_row_click)
         self.itemChanged.connect(self.on_item_changed)
+        self.itemDoubleClicked.connect(self.on_item_double_clicked)
         
         # Column widths
         self.setColumnWidth(0, 180)
@@ -114,6 +115,17 @@ class DroppableTableWidget(QTableWidget):
         self.setColumnWidth(5, 80)
         self.setColumnWidth(6, 250)
         self.setColumnWidth(7, 100)
+    
+    def on_item_double_clicked(self, item):
+        """Handle double-click on item for inline editing"""
+        # Allow editing for NAME (column 0) and DESCRIPTION (column 6)
+        if item.column() in [0, 6]:
+            # Make item editable temporarily
+            original_flags = item.flags()
+            item.setFlags(item.flags() | Qt.ItemIsEditable)
+            # Start editing
+            self.editItem(item)
+            # Note: Flags will be restored when editing finishes
     
     def on_item_changed(self, item):
         """Callback when a cell changes - update address"""
@@ -948,9 +960,38 @@ class IOConfigMixin:
         self._connect_offset_buttons()
         self._connect_io_buttons()
         self._connect_force_button()
+        self._setup_search_filter()
         
         # Don't load tree at startup - only load when simulation is started
         # Tree will be loaded when start_simulation() is called
+    
+    def _setup_search_filter(self):
+        """Add search/filter functionality to I/O table"""
+        try:
+            # Try to find or create a search box
+            if hasattr(self, 'lineEdit_IOSearch'):
+                self.lineEdit_IOSearch.textChanged.connect(self._filter_io_table)
+                self.lineEdit_IOSearch.setPlaceholderText("Search I/O names...")
+        except AttributeError:
+            pass  # Search box not available in UI
+    
+    def _filter_io_table(self, search_text):
+        """Filter I/O table based on search text"""
+        if not hasattr(self, 'tableWidget_IO'):
+            return
+        
+        search_text = search_text.lower()
+        table = self.tableWidget_IO
+        
+        for row in range(table.rowCount()):
+            name_item = table.item(row, 0)
+            if name_item:
+                name = name_item.text().lower()
+                # Show row if search text is in name, or if search is empty
+                should_show = search_text == "" or search_text in name
+                table.setRowHidden(row, not should_show)
+            else:
+                table.setRowHidden(row, True)
     
     def _replace_table_widget(self):
         """Replace standard table widget with custom DroppableTableWidget"""
@@ -1002,6 +1043,12 @@ class IOConfigMixin:
             self.pushButton_SaveIO.clicked.connect(self.save_io_configuration)
             self.pushButton_LoadIO.clicked.connect(self.load_io_configuration)
             self.pushButton_ReloadConfig.clicked.connect(self.reload_io_config)
+            
+            # Try to connect export/import buttons if they exist in UI
+            if hasattr(self, 'pushButton_ExportIO'):
+                self.pushButton_ExportIO.clicked.connect(self.export_io_configuration)
+            if hasattr(self, 'pushButton_ImportIO'):
+                self.pushButton_ImportIO.clicked.connect(self.import_io_configuration)
         except AttributeError:
             pass # Removed print
     
@@ -1383,6 +1430,141 @@ class IOConfigMixin:
             
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to reload: {str(e)}")
+    
+    def export_io_configuration(self):
+        """Export I/O configuration to CSV or JSON"""
+        try:
+            file_path, filter_type = QFileDialog.getSaveFileName(
+                self, "Export IO Configuration", "",
+                "CSV Files (*.csv);;JSON Files (*.json);;All Files (*)")
+            
+            if not file_path:
+                return
+            
+            table = self.tableWidget_IO
+            data = []
+            
+            # Collect all non-empty rows
+            for row in range(table.rowCount()):
+                name_item = table.item(row, 0)
+                if name_item and name_item.text():
+                    row_data = {
+                        'name': name_item.text(),
+                        'type': table.item(row, 1).text() if table.item(row, 1) else '',
+                        'byte': table.item(row, 2).text() if table.item(row, 2) else '',
+                        'bit': table.item(row, 3).text() if table.item(row, 3) else '',
+                        'address': table.item(row, 4).text() if table.item(row, 4) else '',
+                        'status': table.item(row, 5).text() if table.item(row, 5) else '',
+                        'description': table.item(row, 6).text() if table.item(row, 6) else '',
+                        'range': table.item(row, 7).text() if table.item(row, 7) else ''
+                    }
+                    data.append(row_data)
+            
+            # Export based on file type
+            if file_path.endswith('.csv') or 'CSV' in filter_type:
+                import csv
+                with open(file_path, 'w', newline='', encoding='utf-8') as f:
+                    if data:
+                        writer = csv.DictWriter(f, fieldnames=data[0].keys())
+                        writer.writeheader()
+                        writer.writerows(data)
+                QMessageBox.information(self, "Success", f"Exported {len(data)} I/O points to CSV")
+            else:
+                # Export as JSON
+                export_data = {
+                    'version': '1.0',
+                    'signals': data,
+                    'offsets': self.io_screen.byte_offsets.copy()
+                }
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    json.dump(export_data, f, indent=2)
+                QMessageBox.information(self, "Success", f"Exported {len(data)} I/O points to JSON")
+                
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to export: {str(e)}")
+    
+    def import_io_configuration(self):
+        """Import I/O configuration from CSV or JSON"""
+        try:
+            file_path, _ = QFileDialog.getOpenFileName(
+                self, "Import IO Configuration", "",
+                "CSV Files (*.csv);;JSON Files (*.json);;All Files (*)")
+            
+            if not file_path:
+                return
+            
+            data = []
+            
+            # Import based on file type
+            if file_path.endswith('.csv'):
+                import csv
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    reader = csv.DictReader(f)
+                    data = list(reader)
+            else:
+                # Import from JSON
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    import_data = json.load(f)
+                    if 'signals' in import_data:
+                        data = import_data['signals']
+                        # Also import offsets if available
+                        if 'offsets' in import_data:
+                            self.io_screen.byte_offsets = import_data['offsets'].copy()
+                    else:
+                        # Old format or direct array
+                        data = import_data if isinstance(import_data, list) else []
+            
+            if not data:
+                QMessageBox.warning(self, "No Data", "No I/O points found in file")
+                return
+            
+            reply = QMessageBox.question(
+                self, "Confirm Import",
+                f"Import {len(data)} I/O points? This will add to existing configuration.",
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            
+            if reply == QMessageBox.No:
+                return
+            
+            table = self.tableWidget_IO
+            table.blockSignals(True)
+            
+            # Find first empty row or append
+            start_row = 0
+            for row in range(table.rowCount()):
+                name_item = table.item(row, 0)
+                if not name_item or not name_item.text():
+                    start_row = row
+                    break
+            
+            imported_count = 0
+            for idx, signal in enumerate(data):
+                row = start_row + idx
+                if row >= table.rowCount():
+                    break
+                
+                table.setItem(row, 0, ReadOnlyTableWidgetItem(signal.get('name', '')))
+                table.setItem(row, 1, ReadOnlyTableWidgetItem(signal.get('type', '')))
+                table.setItem(row, 2, EditableTableWidgetItem(signal.get('byte', '')))
+                table.setItem(row, 3, EditableTableWidgetItem(signal.get('bit', '')))
+                table.setItem(row, 4, ReadOnlyTableWidgetItem(signal.get('address', '')))
+                table.setItem(row, 5, ReadOnlyTableWidgetItem(signal.get('status', '')))
+                table.setItem(row, 6, ReadOnlyTableWidgetItem(signal.get('description', '')))
+                table.setItem(row, 7, ReadOnlyTableWidgetItem(signal.get('range', '')))
+                table._save_row_data(row)
+                imported_count += 1
+            
+            table.blockSignals(False)
+            QMessageBox.information(self, "Success", f"Imported {imported_count} I/O points")
+            
+            # Mark as dirty
+            try:
+                self._mark_io_dirty()
+            except Exception:
+                pass
+                
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to import: {str(e)}")
         
     def _update_table_from_config(self):
         """Update the GUI table with addresses from the config"""
