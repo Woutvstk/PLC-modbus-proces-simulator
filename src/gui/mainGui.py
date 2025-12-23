@@ -80,9 +80,14 @@ class MainWindow(QMainWindow, Ui_MainWindow, ProcessSettingsMixin, IOConfigMixin
     Uses mixins for process settings and I/O config functionality
     """
 
-    def __init__(self):
+    def __init__(self, mainConfig=None):
         super(MainWindow, self).__init__()
         self.setupUi(self)
+        
+        # Store reference to main configuration BEFORE initializing mixins
+        self.mainConfig = mainConfig
+        self.tanksim_config = None
+        self.tanksim_status = None
 
         # Sidebar: start collapsed (animate width), keep both widgets available
         try:
@@ -103,11 +108,6 @@ class MainWindow(QMainWindow, Ui_MainWindow, ProcessSettingsMixin, IOConfigMixin
 
         # Connect exit buttons
         self.pushButton_Exit.clicked.connect(self.close)
-
-        # Store reference to main configuration
-        self.mainConfig = None
-        self.tanksim_config = None
-        self.tanksim_status = None
 
         # Initialize connection variables
         self.validPlcConnection = False

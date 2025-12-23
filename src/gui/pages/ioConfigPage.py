@@ -1016,6 +1016,7 @@ class IOConfigMixin:
     def load_io_tree(self):
         """Load IO signals from XML file based on active simulation"""
         if not hasattr(self, 'treeWidget_IO') or self.treeWidget_IO is None:
+            logger.warning("treeWidget_IO not initialized")
             return
         
         # Clear existing tree
@@ -1026,12 +1027,16 @@ class IOConfigMixin:
         try:
             if hasattr(self, 'mainConfig') and self.mainConfig and hasattr(self.mainConfig, 'simulationManager'):
                 active_sim = self.mainConfig.simulationManager.get_active_simulation_name()
+            else:
+                logger.warning("mainConfig or simulationManager not available")
+                return
         except Exception as e:
-            pass
+            logger.error(f"Error getting active simulation: {e}")
+            return
         
         # Determine which XML file to load
         current_dir = Path(__file__).parent
-        io_dir = current_dir.parent / "IO"
+        io_dir = current_dir.parent.parent / "IO"  # Go from pages -> gui -> src -> IO
         
         xml_file = None
         if active_sim == "PIDtankValve":
@@ -1040,10 +1045,16 @@ class IOConfigMixin:
             xml_file = io_dir / "IO_treeList_conveyor.xml"
         
         # If no active simulation or file doesn't exist, don't load anything
-        if xml_file is None or not xml_file.exists():
+        if xml_file is None:
+            logger.warning(f"No XML file mapping for simulation: {active_sim}")
+            return
+        
+        if not xml_file.exists():
+            logger.warning(f"IO tree XML file not found: {xml_file}")
             return
         
         try:
+            logger.info(f"Loading IO tree from: {xml_file}")
             tree = ET.parse(str(xml_file))
             root = tree.getroot()
             
@@ -1067,9 +1078,10 @@ class IOConfigMixin:
                 self._load_tanksim_signals(tanksim)
             
             self.treeWidget_IO.expandAll()
+            logger.info(f"IO tree loaded successfully from {active_sim}")
             
         except Exception as e:
-            logger.error(f"Error loading IO tree: {e}")
+            logger.error(f"Error loading IO tree: {e}", exc_info=True)
     
     def _load_tanksim_signals(self, tanksim):
         """Load TankSim signals"""
