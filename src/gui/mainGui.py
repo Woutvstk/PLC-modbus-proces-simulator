@@ -42,23 +42,22 @@ rc_py_file = gui_media_dir / "Resource_rc.py"
 
 if qrc_file.exists():
     try:
-        subprocess.run(
+        # Try to compile resources using pyside6-rcc
+        result = subprocess.run(
             ["pyside6-rcc", str(qrc_file), "-o", str(rc_py_file)],
-            check=True
+            check=True,
+            capture_output=True,
+            text=True
         )
-
-        if str(gui_media_dir) not in sys.path:
-            sys.path.insert(0, str(gui_media_dir))
-
-        try:
-            import Resource_rc  # type: ignore[import-not-found]
-        except ImportError as e:
-            pass
-
+        print(f"Resources compiled successfully with pyside6-rcc")
+    except FileNotFoundError:
+        print("Warning: pyside6-rcc not found. Resource compilation skipped.")
+        print("Install PySide6 tools if resource compilation is needed.")
     except subprocess.CalledProcessError as e:
-        pass
+        print(f"Warning: Resource compilation failed: {e}")
+        print(f"stderr: {e.stderr}")
     except Exception as e:
-        pass
+        print(f"Warning: Unexpected error during resource compilation: {e}")
 
 # Ensure gui_media_dir is in path so Resource_rc can be found
 if str(gui_media_dir) not in sys.path:

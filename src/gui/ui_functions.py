@@ -76,8 +76,8 @@ class UIFunctions:
             # Start animation
             animation_group.start()
             
-            # Store reference to prevent garbage collection
-            window._menu_animation_group = animation_group
+            # Store reference to prevent garbage collection with unique name
+            window._ui_menu_animation_group = animation_group
             
         except Exception as e:
             print(f"Error in toggle_menu: {e}")
@@ -137,8 +137,8 @@ class UIFunctions:
         animation.setEasingCurve(QEasingCurve.Type.InOutQuad)
         animation.start()
         
-        # Store reference to prevent garbage collection
-        widget._opacity_animation = animation
+        # Store reference to prevent garbage collection with unique name
+        widget._ui_opacity_animation = animation
     
     @staticmethod
     def animate_widget_geometry(widget, start_rect, end_rect, duration: int = 300):
@@ -158,8 +158,8 @@ class UIFunctions:
         animation.setEasingCurve(QEasingCurve.Type.InOutQuad)
         animation.start()
         
-        # Store reference to prevent garbage collection
-        widget._geometry_animation = animation
+        # Store reference to prevent garbage collection with unique name
+        widget._ui_geometry_animation = animation
     
     @staticmethod
     def setup_button_hover_effects(button, normal_color: str, hover_color: str, 
