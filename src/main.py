@@ -89,11 +89,10 @@ if style_path.exists():
         app.setStyleSheet(f.read())
     logger.info("Style sheet loaded")
 
-# Initialize main window
-window = MainWindow()
+# Initialize main window with mainConfig
+window = MainWindow(mainConfig)
 
-# Provide MainWindow access to core objects
-window.mainConfig = mainConfig
+# Provide MainWindow access to tank simulation objects
 window.tanksim_config = active_config
 window.tanksim_status = active_status
 

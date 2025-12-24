@@ -1,5 +1,8 @@
+import logging
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QWidget, QPushButton, QDialog, QVBoxLayout
+
+logger = logging.getLogger(__name__)
 
 
 class SimPageMixin:
@@ -161,15 +164,11 @@ class SimPageMixin:
                     sm.load_simulation(sim_name)
                 else:
                     sm._active_simulation_name = sim_name
+            # Load IO tree after simulation name is set
             if hasattr(self, 'load_io_tree'):
                 self.load_io_tree()
-        except Exception:
-            pass
-        try:
-            if hasattr(self, 'load_io_tree'):
-                self.load_io_tree()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error(f"Error starting simulation: {e}", exc_info=True)
         try:
             for btn in self.findChildren(QPushButton, "pushButton_PIDtankValve"):
                 btn.blockSignals(True)
