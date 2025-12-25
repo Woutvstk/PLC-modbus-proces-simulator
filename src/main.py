@@ -188,6 +188,9 @@ if __name__ == "__main__":
                     if not ok:
                         logger.warning("Connection failed")
 
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
                 # Update GUI connection status
                 window.validPlcConnection = validPlcConnection
