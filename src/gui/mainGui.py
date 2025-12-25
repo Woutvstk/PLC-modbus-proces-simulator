@@ -96,22 +96,14 @@ class MainWindow(QMainWindow, Ui_MainWindow, ProcessSettingsMixin, IOConfigMixin
         self.tanksim_config = None
         self.tanksim_status = None
 
-        # Sidebar: start collapsed, smooth animation between icon-only and full menu
+        # Sidebar: start collapsed (animate width), keep both widgets available
         try:
             self.fullMenuWidget.setVisible(True)
             self.fullMenuWidget.setMaximumWidth(0)
+            # Restore dual-sidebar behavior
             self.iconOnlyWidget.setVisible(True)
             self.pushButton_menu.setChecked(False)
             self.pushButton_menu.toggled.connect(self.toggle_menu)
-            
-            # Setup animation for smooth transition
-            self._setup_menu_animation()
-        except Exception:
-            pass
-
-        # Normalize sidebar button heights
-        try:
-            self._normalize_sidebar_button_heights()
         except Exception:
             pass
 
@@ -187,97 +179,6 @@ class MainWindow(QMainWindow, Ui_MainWindow, ProcessSettingsMixin, IOConfigMixin
         except Exception:
             pass
         self.timer.start()
-
-    def _setup_menu_animation(self):
-        """Setup animations for smooth sidebar transitions."""
-        try:
-            # Animation for full menu expanding
-            self._menu_anim = QPropertyAnimation(self.fullMenuWidget, b"maximumWidth", self)
-            self._menu_anim.setDuration(500)
-            self._menu_anim.setEasingCurve(QEasingCurve.InOutCubic)
-            
-            # Animation for icon-only shrinking
-            self._icon_anim = QPropertyAnimation(self.iconOnlyWidget, b"maximumWidth", self)
-            self._icon_anim.setDuration(500)
-            self._icon_anim.setEasingCurve(QEasingCurve.InOutCubic)
-            
-            self._menu_anim.finished.connect(self._on_menu_anim_finished)
-        except Exception:
-            self._menu_anim = None
-            self._icon_anim = None
-
-    def toggle_menu(self, checked):
-        """Toggle menu with smooth animation between icon-only and full menu."""
-        try:
-            if not hasattr(self, "_menu_anim") or self._menu_anim is None:
-                self._setup_menu_animation()
-            
-            # Both widgets visible during animation
-            self.fullMenuWidget.setVisible(True)
-            self.iconOnlyWidget.setVisible(True)
-            
-            # Stop any running animations
-            if self._menu_anim:
-                self._menu_anim.stop()
-            if hasattr(self, '_icon_anim') and self._icon_anim:
-                self._icon_anim.stop()
-            
-            if checked:
-                # Expanding: icon-only shrinks to 0, full menu expands to 240
-                self._icon_anim.setStartValue(self.iconOnlyWidget.maximumWidth())
-                self._icon_anim.setEndValue(0)
-                
-                self._menu_anim.setStartValue(self.fullMenuWidget.maximumWidth())
-                self._menu_anim.setEndValue(240)
-                
-                self._icon_anim.start()
-                self._menu_anim.start()
-            else:
-                # Collapsing: full menu shrinks to 0, icon-only expands to 60
-                self._menu_anim.setStartValue(self.fullMenuWidget.maximumWidth())
-                self._menu_anim.setEndValue(0)
-                
-                self._icon_anim.setStartValue(self.iconOnlyWidget.maximumWidth())
-                self._icon_anim.setEndValue(60)
-                
-                self._icon_anim.start()
-                self._menu_anim.start()
-        except Exception:
-            pass
-
-    def _on_menu_anim_finished(self):
-        """Handle animation completion."""
-        try:
-            expanded = self.fullMenuWidget.maximumWidth() > 0
-            # Keep both visible for seamless transitions
-            self.iconOnlyWidget.setVisible(not expanded)
-            self.fullMenuWidget.setVisible(True)
-        except Exception:
-            pass
-
-
-    def _normalize_sidebar_button_heights(self):
-        """Ensure all sidebar buttons have consistent heights."""
-        try:
-            # Set consistent height for all sidebar buttons
-            button_height = 50  # Standard height in pixels
-            
-            # Find all buttons in both sidebars
-            sidebar_widgets = []
-            if hasattr(self, 'iconOnlyWidget'):
-                sidebar_widgets.append(self.iconOnlyWidget)
-            if hasattr(self, 'fullMenuWidget'):
-                sidebar_widgets.append(self.fullMenuWidget)
-            
-            for sidebar in sidebar_widgets:
-                if sidebar:
-                    buttons = sidebar.findChildren(QPushButton)
-                    for button in buttons:
-                        button.setMinimumHeight(button_height)
-                        button.setMaximumHeight(button_height)
-        except Exception:
-            pass
-
     def _initialize_gui_mode(self):
         """Initialize GUI mode after mainConfig is available"""
         if hasattr(self, 'mainConfig') and self.mainConfig:

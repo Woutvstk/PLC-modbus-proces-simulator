@@ -95,9 +95,6 @@ class TankSimSettingsMixin:
         try:
             self.adjustableValveCheckBox.toggled.connect(
                 self.on_tank_config_changed)
-            self.adjustableValveCheckBox.toggled.connect(
-                self._update_gui_panel_visibility)  # Add this line
-            
             self.adjustableHeatingCoilCheckBox.toggled.connect(
                 self.on_tank_config_changed)
             self.levelSwitchesCheckBox.toggled.connect(
@@ -255,16 +252,11 @@ class TankSimSettingsMixin:
                 print(f"Warning: Could not initialize vat_widget: {e}")
                 return
 
-        # Update PID control widget index based on current protocol
-        self._update_pid_control_widget_index()
-
         gui_mode = False
         try:
             gui_mode = (self.mainConfig.plcGuiControl == "gui") if hasattr(self, 'mainConfig') else False
         except Exception:
             gui_mode = False
-
-
 
         # Step 1: Read simulation values from status object
         from simulations.PIDtankValve import gui as gui_module
@@ -351,59 +343,18 @@ class TankSimSettingsMixin:
         self.vat_widget.rebuild()
 
     def _update_gui_panel_visibility(self):
-        """Show GUI control panels based on controller mode and valve type."""
+        """Show GUI control panels based on controller mode, but never hide them."""
         try:
             is_gui_mode = (hasattr(self, 'mainConfig') and
-                        self.mainConfig and
-                        self.mainConfig.plcProtocol == "GUI")
-            
-            # Handle the regelingSimGui stacked widget (GUiSim and adjustableVavleGUISim)
-            if hasattr(self, 'regelingSimGui'):
-                if is_gui_mode:
-                    if self.adjustableValveCheckBox.isChecked():
-                        # Adjustable valve mode - show analog controls (index 0)
-                        self.regelingSimGui.setCurrentIndex(0)
-                    else:
-                        # Digital valve mode - show on/off controls (index 1)
-                        self.regelingSimGui.setCurrentIndex(1)
-                # In PLC mode, keep current index but don't force visibility
-            
-            # Legacy handling for separate widgets if regelingSimGui doesn't exist
-            elif hasattr(self, 'GUiSim') and hasattr(self, 'adjustableVavleGUISim'):
-                if is_gui_mode and self.adjustableValveCheckBox.isChecked():
-                    if not self.adjustableVavleGUISim.isVisible():
-                        self.GUiSim.hide()
-                        self.adjustableVavleGUISim.show()
-                elif is_gui_mode and not self.adjustableValveCheckBox.isChecked():
-                    if not self.GUiSim.isVisible():
-                        self.adjustableVavleGUISim.hide()
-                        self.GUiSim.show()
-                else:
-                    if self.GUiSim.isVisible() or self.adjustableVavleGUISim.isVisible():
-                        self.GUiSim.hide()
-                        self.adjustableVavleGUISim.hide()
-        except AttributeError:
-            pass
+                           self.mainConfig and
+                           self.mainConfig.plcGuiControl == "gui")
 
-    def _update_pid_control_widget_index(self):
-        """Update PLCControl_PIDControl widget index based on control mode."""
-        try:
-            # Find the PLCControl_PIDControl widget
-            pid_control_widget = getattr(self, 'PLCControl_PIDControl', None)
-            if pid_control_widget is None:
-                return
-            
-            # Determine mode from mainConfig
-            gui_mode = False
-            if hasattr(self, 'mainConfig') and self.mainConfig:
-                gui_mode = (self.mainConfig.plcProtocol == "GUI")
-            
-            # Set index: 0 for PLC, 1 for GUI
-            if gui_mode:
-                pid_control_widget.setCurrentIndex(1)
-            else:
-                pid_control_widget.setCurrentIndex(0)
-        except Exception:
+            if is_gui_mode and self.vat_widget.adjustableValve:
+                self.adjustableVavleGUISim.show()
+            elif is_gui_mode and not self.vat_widget.adjustableValve:
+                self.GUiSim.show()
+            # Do not hide any panels in any case
+        except AttributeError:
             pass
 
     def _read_valve_positions(self):
@@ -442,12 +393,6 @@ class TankSimSettingsMixin:
 
         if not hasattr(self, 'mainConfig') or self.mainConfig is None:
             return
-
-        # Always read the latest valve/slider states from the GUI controls
-        self._read_valve_positions()
-
-        # Update PID control widget index
-        self._update_pid_control_widget_index()
 
         # If PLC is in control, do not overwrite runtime status, but still propagate UI config changes (max flows, power, etc.)
         gui_mode = (self.mainConfig.plcGuiControl == "gui")

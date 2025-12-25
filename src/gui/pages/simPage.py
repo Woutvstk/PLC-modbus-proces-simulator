@@ -9,38 +9,17 @@ class SimPageMixin:
     def connect_navigation_buttons(self):
         """Connect all navigation buttons to page handlers."""
         try:
-            # Connect both icon-only and full menu buttons using findChildren
-            settings_buttons = self.findChildren(QPushButton, "pushButton_settingsPage") + \
-                            self.findChildren(QPushButton, "pushButton_settingsPage2")
-            for btn in settings_buttons:
-                btn.setCheckable(True)
-                btn.toggled.connect(lambda checked: self._nav_settings(checked, "settings"))
-            
-            io_buttons = self.findChildren(QPushButton, "pushButton_IOPage") + \
-                        self.findChildren(QPushButton, "pushButton_IOPage2")
-            for btn in io_buttons:
-                btn.setCheckable(True)
-                btn.toggled.connect(lambda checked: self._nav_io(checked, "io"))
-            
-            sim_buttons = self.findChildren(QPushButton, "pushButton_simPage") + \
-                        self.findChildren(QPushButton, "pushButton_simPage2")
-            for btn in sim_buttons:
-                btn.setCheckable(True)
-                btn.toggled.connect(lambda checked: self._nav_sim(checked, "sim"))
-            
-            # General Controls buttons
-            gc_buttons = self.findChildren(QPushButton, "pushButton_generalControls") + \
-                        self.findChildren(QPushButton, "pushButton_generalControls2")
-            for btn in gc_buttons:
-                btn.setCheckable(True)
-                btn.toggled.connect(self.go_to_general_controls)
-            
-            # Sim Settings buttons
-            ss_buttons = self.findChildren(QPushButton, "pushButton_simSettings") + \
-                        self.findChildren(QPushButton, "pushButton_simSettings2")
-            for btn in ss_buttons:
-                btn.setCheckable(True)
-                btn.toggled.connect(self.go_to_sim_settings)
+            self.pushButton_settingsPage.toggled.connect(lambda checked: self._nav_settings(checked, "settings"))
+            self.pushButton_IOPage.toggled.connect(lambda checked: self._nav_io(checked, "io"))
+            self.pushButton_simPage.toggled.connect(lambda checked: self._nav_sim(checked, "sim"))
+            try:
+                self.pushButton_simSettings.toggled.connect(self.go_to_sim_settings)
+            except AttributeError:
+                pass
+            try:
+                self.pushButton_generalControls.toggled.connect(self.go_to_general_controls)
+            except AttributeError:
+                pass
         except AttributeError:
             pass
 
@@ -79,49 +58,18 @@ class SimPageMixin:
     def connect_simulation_buttons(self):
         """Connect all simulation related buttons across sidebar and pages."""
         try:
-                # Connect both icon-only and full menu buttons using findChildren
-                settings_buttons = self.findChildren(QPushButton, "pushButton_settingsPage") + \
-                                self.findChildren(QPushButton, "pushButton_settingsPage2")
-                for btn in settings_buttons:
-                    btn.setCheckable(True)
-                    btn.toggled.connect(lambda checked: self._nav_settings(checked, "settings"))
-            
-                io_buttons = self.findChildren(QPushButton, "pushButton_IOPage") + \
-                            self.findChildren(QPushButton, "pushButton_IOPage2")
-                for btn in io_buttons:
-                    btn.setCheckable(True)
-                    btn.toggled.connect(lambda checked: self._nav_io(checked, "io"))
-            
-                sim_buttons = self.findChildren(QPushButton, "pushButton_simPage") + \
-                            self.findChildren(QPushButton, "pushButton_simPage2")
-                for btn in sim_buttons:
-                    btn.setCheckable(True)
-                    btn.toggled.connect(lambda checked: self._nav_sim(checked, "sim"))
-            
-                # General Controls buttons
-                gc_buttons = self.findChildren(QPushButton, "pushButton_generalControls") + \
-                            self.findChildren(QPushButton, "pushButton_generalControls2")
-                for btn in gc_buttons:
-                    btn.setCheckable(True)
-                    btn.toggled.connect(self.go_to_general_controls)
-            
-                # Sim Settings buttons
-                ss_buttons = self.findChildren(QPushButton, "pushButton_simSettings") + \
-                            self.findChildren(QPushButton, "pushButton_simSettings2")
-                for btn in ss_buttons:
-                    btn.setCheckable(True)
-                    btn.toggled.connect(self.go_to_sim_settings)
+            buttons_PIDtankValve = self.findChildren(QPushButton, "pushButton_PIDtankValve")
+            for btn in buttons_PIDtankValve:
+                btn.setCheckable(True)
+                btn.clicked.connect(lambda checked, b=btn: self.start_simulation(0))
+        except AttributeError:
+            pass
 
-                # Simulation selection buttons
-                pidtank_btns = self.findChildren(QPushButton, "pushButton_PIDtankValve")
-                for btn in pidtank_btns:
-                    btn.setCheckable(True)
-                    btn.clicked.connect(lambda checked, b=btn: self.start_simulation(0))
-
-                dualtank_btns = self.findChildren(QPushButton, "pushButton_dualTank")
-                for btn in dualtank_btns:
-                    btn.setCheckable(True)
-                    btn.clicked.connect(lambda checked, b=btn: self.start_simulation(1))
+        try:
+            buttons_dualTank = self.findChildren(QPushButton, "pushButton_dualTank")
+            for btn in buttons_dualTank:
+                btn.setCheckable(True)
+                btn.clicked.connect(lambda checked, b=btn: self.start_simulation(1))
         except AttributeError:
             pass
 

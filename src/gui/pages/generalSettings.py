@@ -160,9 +160,6 @@ class ProcessSettingsMixin:
                 except:
                     pass
 
-            # Update PID control widget index (NEW)
-            self._update_pid_control_widget_index()
-
             # Update addresses if switching to/from LOGO!
             if (old_protocol == "logo!" or new_controller == "logo!") and old_protocol != new_controller:
                 self._update_addresses_for_controller_change(
@@ -172,27 +169,6 @@ class ProcessSettingsMixin:
         if hasattr(self, 'vat_widget'):
             self.vat_widget.controler = new_controller
             self.vat_widget.rebuild()
-
-    def _update_pid_control_widget_index(self):
-        """Update PLCControl_PIDControl widget index based on control mode."""
-        try:
-            # Find the PLCControl_PIDControl widget
-            pid_control_widget = getattr(self, 'PLCControl_PIDControl', None)
-            if pid_control_widget is None:
-                return
-            
-            # Determine mode from mainConfig
-            gui_mode = False
-            if hasattr(self, 'mainConfig') and self.mainConfig:
-                gui_mode = (self.mainConfig.plcProtocol == "GUI")
-            
-            # Set index: 0 for PLC, 1 for GUI
-            if gui_mode:
-                pid_control_widget.setCurrentIndex(1)
-            else:
-                pid_control_widget.setCurrentIndex(0)
-        except Exception:
-            pass
 
     def _update_addresses_for_controller_change(self, old_protocol, new_protocol):
         """Update all addresses when switching to/from LOGO!"""
