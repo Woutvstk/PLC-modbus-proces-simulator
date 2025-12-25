@@ -36,9 +36,6 @@
 =======
     <PIDtankValve>
         <!-- Sensors Inputs -->
-<<<<<<< Updated upstream:src/guiCommon/io_treeList.xml
->>>>>>> Stashed changes:src/IO/IO_treeList_PIDtankValve.xml
-=======
 >>>>>>> Stashed changes:src/IO/IO_treeList_PIDtankValve.xml
         <Inputs>
             <Digital>

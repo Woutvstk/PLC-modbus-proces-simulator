@@ -200,7 +200,6 @@ QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
   <widget class="QWidget" name="centralwidget">
    <layout class="QGridLayout" name="gridLayout_6">
 <<<<<<< Updated upstream:src/guiCommon/mainWindowPIDRegelaarSim.ui
-<<<<<<< Updated upstream:src/guiCommon/mainWindowPIDRegelaarSim.ui
     <item row="0" column="0">
      <widget class="QWidget" name="iconOnlyWidget" native="true">
       <property name="styleSheet">
@@ -748,8 +747,6 @@ QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
     </item>
 =======
 >>>>>>> Stashed changes:src/gui/media/mainWindowPIDRegelaarSim.ui
-=======
->>>>>>> Stashed changes:src/gui/media/mainWindowPIDRegelaarSim.ui
     <item row="0" column="2">
      <widget class="QWidget" name="MainContent" native="true">
       <layout class="QVBoxLayout" name="verticalLayout_5">
@@ -1128,11 +1125,7 @@ QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
                <property name="sizeHint" stdset="0">
                 <size>
 <<<<<<< Updated upstream:src/guiCommon/mainWindowPIDRegelaarSim.ui
-<<<<<<< Updated upstream:src/guiCommon/mainWindowPIDRegelaarSim.ui
                  <width>280</width>
-=======
-                 <width>170</width>
->>>>>>> Stashed changes:src/gui/media/mainWindowPIDRegelaarSim.ui
 =======
                  <width>170</width>
 >>>>>>> Stashed changes:src/gui/media/mainWindowPIDRegelaarSim.ui
@@ -1143,11 +1136,8 @@ QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
              </item>
              <item>
 <<<<<<< Updated upstream:src/guiCommon/mainWindowPIDRegelaarSim.ui
-<<<<<<< Updated upstream:src/guiCommon/mainWindowPIDRegelaarSim.ui
               <widget class="QPushButton" name="pushButton_closePIDValves">
 =======
-=======
->>>>>>> Stashed changes:src/gui/media/mainWindowPIDRegelaarSim.ui
               <widget class="QPushButton" name="pushButton_PIDtankValve_2">
 >>>>>>> Stashed changes:src/gui/media/mainWindowPIDRegelaarSim.ui
                <property name="minimumSize">
@@ -1171,29 +1161,22 @@ QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
                </property>
                <property name="styleSheet">
 <<<<<<< Updated upstream:src/guiCommon/mainWindowPIDRegelaarSim.ui
-<<<<<<< Updated upstream:src/guiCommon/mainWindowPIDRegelaarSim.ui
                 <string notr="true">
 #pushButton_closePIDValves {
     background-color: #ef4444;
     color: #ffffff;
 =======
-=======
->>>>>>> Stashed changes:src/gui/media/mainWindowPIDRegelaarSim.ui
                 <string notr="true">QPushButton {
     background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, 
         stop:0 rgba(220, 38, 38, 255), 
         stop:1 rgba(239, 68, 68, 255));
     color: white;
-<<<<<<< Updated upstream:src/guiCommon/mainWindowPIDRegelaarSim.ui
->>>>>>> Stashed changes:src/gui/media/mainWindowPIDRegelaarSim.ui
-=======
 >>>>>>> Stashed changes:src/gui/media/mainWindowPIDRegelaarSim.ui
     border: none;
     border-radius: 8px;
     padding: 12px;
 }
 
-<<<<<<< Updated upstream:src/guiCommon/mainWindowPIDRegelaarSim.ui
 <<<<<<< Updated upstream:src/guiCommon/mainWindowPIDRegelaarSim.ui
 #pushButton_closePIDValves:hover {
     background-color: #dc2626;
@@ -1211,24 +1194,12 @@ QPushButton:hover {
         stop:1 rgba(220, 38, 38, 255));
 }
 
-=======
-QPushButton:hover {
-    background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:0, y2:1, 
-        stop:0 rgba(248, 113, 113, 255), 
-        stop:0.5 rgba(239, 68, 68, 255), 
-        stop:1 rgba(220, 38, 38, 255));
-}
-
->>>>>>> Stashed changes:src/gui/media/mainWindowPIDRegelaarSim.ui
 QPushButton:pressed {
     background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:0, y2:1, 
         stop:0 rgba(185, 28, 28, 255), 
         stop:0.5 rgba(153, 27, 27, 255), 
         stop:1 rgba(127, 29, 29, 255));
 }</string>
-<<<<<<< Updated upstream:src/guiCommon/mainWindowPIDRegelaarSim.ui
->>>>>>> Stashed changes:src/gui/media/mainWindowPIDRegelaarSim.ui
-=======
 >>>>>>> Stashed changes:src/gui/media/mainWindowPIDRegelaarSim.ui
                </property>
                <property name="text">
@@ -1249,12 +1220,9 @@ QPushButton:pressed {
             </layout>
            </item>
 <<<<<<< Updated upstream:src/guiCommon/mainWindowPIDRegelaarSim.ui
-<<<<<<< Updated upstream:src/guiCommon/mainWindowPIDRegelaarSim.ui
            <item row="1" column="0">
             <widget class="QWidget" name="vatWidgetContainer" native="true">
 =======
-=======
->>>>>>> Stashed changes:src/gui/media/mainWindowPIDRegelaarSim.ui
            <item row="2" column="1">
             <spacer name="verticalSpacer_9">
              <property name="orientation">
@@ -1368,9 +1336,6 @@ QPushButton:pressed {
            </item>
            <item row="5" column="1">
             <widget class="QGroupBox" name="groupBox_plcPidTankValveControls_2">
-<<<<<<< Updated upstream:src/guiCommon/mainWindowPIDRegelaarSim.ui
->>>>>>> Stashed changes:src/gui/media/mainWindowPIDRegelaarSim.ui
-=======
 >>>>>>> Stashed changes:src/gui/media/mainWindowPIDRegelaarSim.ui
              <property name="sizePolicy">
               <sizepolicy hsizetype="Fixed" vsizetype="MinimumExpanding">
@@ -1381,13 +1346,8 @@ QPushButton:pressed {
              <property name="minimumSize">
               <size>
 <<<<<<< Updated upstream:src/guiCommon/mainWindowPIDRegelaarSim.ui
-<<<<<<< Updated upstream:src/guiCommon/mainWindowPIDRegelaarSim.ui
                <width>400</width>
                <height>400</height>
-=======
-               <width>325</width>
-               <height>100</height>
->>>>>>> Stashed changes:src/gui/media/mainWindowPIDRegelaarSim.ui
 =======
                <width>325</width>
                <height>100</height>
@@ -1397,13 +1357,8 @@ QPushButton:pressed {
              <property name="maximumSize">
               <size>
 <<<<<<< Updated upstream:src/guiCommon/mainWindowPIDRegelaarSim.ui
-<<<<<<< Updated upstream:src/guiCommon/mainWindowPIDRegelaarSim.ui
                <width>1000</width>
                <height>16777215</height>
-=======
-               <width>300</width>
-               <height>150</height>
->>>>>>> Stashed changes:src/gui/media/mainWindowPIDRegelaarSim.ui
 =======
                <width>300</width>
                <height>150</height>
@@ -1583,10 +1538,7 @@ QPushButton:pressed {
               </palette>
              </property>
 <<<<<<< Updated upstream:src/guiCommon/mainWindowPIDRegelaarSim.ui
-<<<<<<< Updated upstream:src/guiCommon/mainWindowPIDRegelaarSim.ui
 =======
-=======
->>>>>>> Stashed changes:src/gui/media/mainWindowPIDRegelaarSim.ui
              <property name="font">
               <font>
                <family>Segoe UI,Arial,sans-serif</family>
@@ -1845,9 +1797,6 @@ QPushButton:pressed {
                </layout>
               </item>
              </layout>
-<<<<<<< Updated upstream:src/guiCommon/mainWindowPIDRegelaarSim.ui
->>>>>>> Stashed changes:src/gui/media/mainWindowPIDRegelaarSim.ui
-=======
 >>>>>>> Stashed changes:src/gui/media/mainWindowPIDRegelaarSim.ui
             </widget>
            </item>
@@ -1886,13 +1835,8 @@ QPushButton:pressed {
                 <property name="minimumSize">
                  <size>
 <<<<<<< Updated upstream:src/guiCommon/mainWindowPIDRegelaarSim.ui
-<<<<<<< Updated upstream:src/guiCommon/mainWindowPIDRegelaarSim.ui
                   <width>340</width>
                   <height>700</height>
-=======
-                  <width>0</width>
-                  <height>300</height>
->>>>>>> Stashed changes:src/gui/media/mainWindowPIDRegelaarSim.ui
 =======
                   <width>0</width>
                   <height>300</height>
@@ -1929,11 +1873,7 @@ QPushButton:pressed {
                    <widget class="QGroupBox" name="groupBox_simControls">
                     <property name="sizePolicy">
 <<<<<<< Updated upstream:src/guiCommon/mainWindowPIDRegelaarSim.ui
-<<<<<<< Updated upstream:src/guiCommon/mainWindowPIDRegelaarSim.ui
                      <sizepolicy hsizetype="Preferred" vsizetype="Minimum">
-=======
-                     <sizepolicy hsizetype="Fixed" vsizetype="Expanding">
->>>>>>> Stashed changes:src/gui/media/mainWindowPIDRegelaarSim.ui
 =======
                      <sizepolicy hsizetype="Fixed" vsizetype="Expanding">
 >>>>>>> Stashed changes:src/gui/media/mainWindowPIDRegelaarSim.ui
@@ -2796,7 +2736,6 @@ QPushButton:pressed {
             </widget>
            </item>
 <<<<<<< Updated upstream:src/guiCommon/mainWindowPIDRegelaarSim.ui
-<<<<<<< Updated upstream:src/guiCommon/mainWindowPIDRegelaarSim.ui
            <item row="2" column="1">
             <widget class="QPushButton" name="pushButton_startSimulatie">
              <property name="minimumSize">
@@ -2804,8 +2743,6 @@ QPushButton:pressed {
                <width>300</width>
                <height>44</height>
 =======
-=======
->>>>>>> Stashed changes:src/gui/media/mainWindowPIDRegelaarSim.ui
            <item row="0" column="0" rowspan="8">
             <widget class="QWidget" name="vatWidgetContainer" native="true">
              <property name="sizePolicy">
@@ -2818,15 +2755,11 @@ QPushButton:pressed {
               <size>
                <width>500</width>
                <height>700</height>
-<<<<<<< Updated upstream:src/guiCommon/mainWindowPIDRegelaarSim.ui
->>>>>>> Stashed changes:src/gui/media/mainWindowPIDRegelaarSim.ui
-=======
 >>>>>>> Stashed changes:src/gui/media/mainWindowPIDRegelaarSim.ui
               </size>
              </property>
              <property name="maximumSize">
               <size>
-<<<<<<< Updated upstream:src/guiCommon/mainWindowPIDRegelaarSim.ui
 <<<<<<< Updated upstream:src/guiCommon/mainWindowPIDRegelaarSim.ui
                <width>200</width>
                <height>50</height>
@@ -2878,8 +2811,6 @@ QPushButton:pressed {
             </widget>
            </item>
 =======
-=======
->>>>>>> Stashed changes:src/gui/media/mainWindowPIDRegelaarSim.ui
                <width>20000</width>
                <height>20000</height>
               </size>
@@ -4487,9 +4418,6 @@ QRadioButton:disabled {
              </property>
             </spacer>
            </item>
-<<<<<<< Updated upstream:src/guiCommon/mainWindowPIDRegelaarSim.ui
->>>>>>> Stashed changes:src/gui/media/mainWindowPIDRegelaarSim.ui
-=======
 >>>>>>> Stashed changes:src/gui/media/mainWindowPIDRegelaarSim.ui
           </layout>
          </widget>
@@ -6843,12 +6771,9 @@ QPushButton:pressed {
                     <x>0</x>
                     <y>0</y>
 <<<<<<< Updated upstream:src/guiCommon/mainWindowPIDRegelaarSim.ui
-<<<<<<< Updated upstream:src/guiCommon/mainWindowPIDRegelaarSim.ui
                     <width>1279</width>
                     <height>1059</height>
 =======
-=======
->>>>>>> Stashed changes:src/gui/media/mainWindowPIDRegelaarSim.ui
                     <width>366</width>
                     <height>1119</height>
 >>>>>>> Stashed changes:src/gui/media/mainWindowPIDRegelaarSim.ui
