@@ -7,7 +7,7 @@
 
 import sys
 from pathlib import Path
-from PyQt5.QtWidgets import QWidget, QVBoxLayout
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QStackedWidget
 
 # Add src to path for imports
 src_dir = Path(__file__).resolve().parent.parent
@@ -30,6 +30,19 @@ class TankSimSettingsMixin:
         self._init_checkboxes()
         self._init_entry_fields()
         self._init_simulation_button()
+
+        # Ensure correct tab index for analog/digital valve control on startup
+        # If adjustableValveCheckBox is not checked, set index to 1 (digital)
+        try:
+            # Find the QStackedWidget for valve control
+            stacked_widget = self.findChild(QStackedWidget, "regelingSimGui")
+            if stacked_widget is not None and hasattr(self, 'adjustableValveCheckBox'):
+                if not self.adjustableValveCheckBox.isChecked():
+                    stacked_widget.setCurrentIndex(1)  # Digital
+                else:
+                    stacked_widget.setCurrentIndex(0)  # Analog
+        except Exception as e:
+            print(f"Error setting regelingSimGui index: {e}")
 
     def _init_vat_widget(self):
         """Initialize VatWidget (tank visualization)"""
@@ -556,7 +569,21 @@ class TankSimSettingsMixin:
 
     def on_tank_config_changed(self):
         """Callback when tank configuration changes"""
-        pass  # Handled by update loop
+        # Update the regelingSimGui stacked widget index based on adjustableValveCheckBox
+        try:
+            stacked_widget = self.findChild(QStackedWidget, "regelingSimGui")
+            if stacked_widget is not None and hasattr(self, 'adjustableValveCheckBox'):
+                if not self.adjustableValveCheckBox.isChecked():
+                    stacked_widget.setCurrentIndex(1)  # Digital
+                else:
+                    stacked_widget.setCurrentIndex(0)  # Analog
+        except Exception as e:
+            print(f"Error setting regelingSimGui index: {e}")
+        
+        # Update vat_widget adjustableValve setting
+        if hasattr(self, 'vat_widget'):
+            self.vat_widget.adjustableValve = self.adjustableValveCheckBox.isChecked()
+            self.vat_widget.updateControlsVisibility()
 
     def syncFields(self, text, group):
         """Synchronize linked entry fields"""
