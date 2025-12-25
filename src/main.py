@@ -169,26 +169,6 @@ if __name__ == "__main__":
                 print(f"   Protocol: {mainConfig.plcProtocol}")
                 tryConnectToPlc()
 
-<<<<<<< Updated upstream
-=======
-                # In GUI mode, skip PLC connection entirely
-                if mainConfig.plcGuiControl == "gui":
-                    validPlcConnection = False
-                    window.validPlcConnection = False
-                    window.plc = None
-                    window.update_connection_status_icon()
-                    protocolManager.deactivate()
-                else:
-                    ok = protocolManager.initialize_and_connect(
-                        mainConfig,
-                        active_config.lowestByte,
-                        active_config.highestByte,
-                    )
-                    validPlcConnection = bool(ok)
-                    if not ok:
-                        logger.warning("Connection failed")
-
->>>>>>> Stashed changes
                 # Update GUI connection status
                 window.validPlcConnection = validPlcConnection
                 window.plc = PlcCom if validPlcConnection else None

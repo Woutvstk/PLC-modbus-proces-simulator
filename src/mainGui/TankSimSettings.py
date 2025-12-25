@@ -309,17 +309,24 @@ class TankSimSettingsMixin:
         self.vat_widget.rebuild()
 
     def _update_gui_panel_visibility(self):
-        """Show GUI control panels based on controller mode, but never hide them."""
+        """Show/hide GUI control panels based on controller mode"""
         try:
             is_gui_mode = (hasattr(self, 'mainConfig') and
                            self.mainConfig and
                            self.mainConfig.plcGuiControl == "gui")
 
             if is_gui_mode and self.vat_widget.adjustableValve:
-                self.adjustableVavleGUISim.show()
+                if not self.adjustableVavleGUISim.isVisible():
+                    self.GUiSim.hide()
+                    self.adjustableVavleGUISim.show()
             elif is_gui_mode and not self.vat_widget.adjustableValve:
-                self.GUiSim.show()
-            # Do not hide any panels in any case
+                if not self.GUiSim.isVisible():
+                    self.adjustableVavleGUISim.hide()
+                    self.GUiSim.show()
+            else:
+                if self.GUiSim.isVisible() or self.adjustableVavleGUISim.isVisible():
+                    self.GUiSim.hide()
+                    self.adjustableVavleGUISim.hide()
         except AttributeError:
             pass
 
