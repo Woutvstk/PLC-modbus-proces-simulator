@@ -414,6 +414,11 @@ class ProcessSettingsMixin:
                     old_protocol, new_controller)
 
         self.vat_widget.rebuild()
+        
+        # Update PLC control widget index based on new mode
+        gui_mode = (new_controller == "GUI")
+        if hasattr(self.vat_widget, 'set_plc_pidcontrol_index'):
+            self.vat_widget.set_plc_pidcontrol_index(gui_mode)
 
     def _update_addresses_for_controller_change(self, old_protocol, new_protocol):
         """Update all addresses when switching to/from LOGO!"""

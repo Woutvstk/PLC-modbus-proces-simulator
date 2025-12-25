@@ -335,7 +335,7 @@ class VatWidget(QWidget):
             slider_level.valueChanged.connect(lambda val: label_level.setText(str(val)))
 
     def set_plc_pidcontrol_index(self, gui_mode: bool):
-        """Set PLCControl_PIDControl index: 0 for PLC, 1 for GUI."""
+        """Set PLCControl_PIDControl index: 0 for PLC mode, 1 for GUI mode."""
         # This assumes the parent or main window exposes these widgets
         parent = self.parent()
         # Try to find the PLCControl_PIDControl widget in the parent hierarchy
@@ -348,6 +348,6 @@ class VatWidget(QWidget):
             w = getattr(w, 'parent', lambda: None)()
         if plc_control is not None:
             if gui_mode:
-                plc_control.setCurrentIndex(1)
+                plc_control.setCurrentIndex(1)  # GUI mode shows PID controls
             else:
-                plc_control.setCurrentIndex(0)
+                plc_control.setCurrentIndex(0)  # PLC mode shows PLC controls

@@ -397,6 +397,10 @@ class TankSimSettingsMixin:
         # If PLC is in control, do not overwrite runtime status, but still propagate UI config changes (max flows, power, etc.)
         gui_mode = (self.mainConfig.plcGuiControl == "gui")
 
+        # Update PLCControl_PIDControl widget based on GUI mode
+        if hasattr(self, 'vat_widget') and self.vat_widget:
+            self.vat_widget.set_plc_pidcontrol_index(gui_mode)
+
         if gui_mode:
             # Write valve positions
             self.tanksim_status.valveInOpenFraction = self.vat_widget.adjustableValveInValue / 100.0

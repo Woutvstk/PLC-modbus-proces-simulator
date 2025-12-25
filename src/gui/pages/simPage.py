@@ -20,6 +20,27 @@ class SimPageMixin:
                 self.pushButton_generalControls.toggled.connect(self.go_to_general_controls)
             except AttributeError:
                 pass
+            # Connect the big sidebar buttons (*2 versions)
+            try:
+                self.pushButton_settingsPage2.toggled.connect(lambda checked: self._nav_settings(checked, "settings"))
+            except AttributeError:
+                pass
+            try:
+                self.pushButton_IOPage2.toggled.connect(lambda checked: self._nav_io(checked, "io"))
+            except AttributeError:
+                pass
+            try:
+                self.pushButton_simPage2.toggled.connect(lambda checked: self._nav_sim(checked, "sim"))
+            except AttributeError:
+                pass
+            try:
+                self.pushButton_simSettings2.toggled.connect(self.go_to_sim_settings)
+            except AttributeError:
+                pass
+            try:
+                self.pushButton_generalControls2.toggled.connect(self.go_to_general_controls)
+            except AttributeError:
+                pass
         except AttributeError:
             pass
 
@@ -143,11 +164,12 @@ class SimPageMixin:
                 self.MainScreen.setCurrentIndex(self.current_sim_page)
             else:
                 self.MainScreen.setCurrentIndex(5)
-            try:
-                if self.fullMenuWidget.maximumWidth() == 0:
-                    self.pushButton_menu.setChecked(True)
-            except Exception:
-                pass
+            # Prevent sidebar from opening when sim page is clicked
+            # try:
+            #     if self.fullMenuWidget.maximumWidth() == 0:
+            #         self.pushButton_menu.setChecked(True)
+            # except Exception:
+            #     pass
 
     def start_simulation(self, sim_index):
         """Start a specific simulation and refresh IO tree."""
