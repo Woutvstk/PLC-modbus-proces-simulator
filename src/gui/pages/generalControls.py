@@ -231,11 +231,19 @@ class GeneralControlsMixin:
                     values.append(int(s.value()) if s is not None else 0)
                 except Exception:
                     values.append(0)
-            try:
-                self.tanksim_status.generalControl1Value = values[0]
-                self.tanksim_status.generalControl2Value = values[1]
-                self.tanksim_status.generalControl3Value = values[2]
-            except Exception:
-                pass
+            if gui_mode:
+                # Map sliders to valve and heater controls in GUI mode
+                # Assume slider1 = valveIn, slider2 = valveOut, slider3 = heater
+                self.tanksim_status.valveInOpenFraction = values[0] / 32747.0
+                self.tanksim_status.valveOutOpenFraction = values[1] / 32747.0
+                self.tanksim_status.heaterPowerFraction = values[2] / 32747.0
+            else:
+                # PLC mode: keep original mapping
+                try:
+                    self.tanksim_status.generalControl1Value = values[0]
+                    self.tanksim_status.generalControl2Value = values[1]
+                    self.tanksim_status.generalControl3Value = values[2]
+                except Exception:
+                    pass
         except Exception:
             pass
