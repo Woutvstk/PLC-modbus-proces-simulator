@@ -1,0 +1,12 @@
+#open a cmd terminal in the current folder
+
+# Create and activate python virtual environment .venv:
+python -m venv .venv && .venv\Scripts\activate
+
+# With activated virtual environment (.venv) C:\.... , install requirements:
+pip install -r requirements.txt
+
+#build the executable:
+pyinstaller app.spec
+
+#main.exe can be found in the dist directory
