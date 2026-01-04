@@ -5,17 +5,39 @@ from PyQt5.QtWidgets import QWidget, QDockWidget, QPushButton
 class GeneralControlsMixin:
     def init_general_controls_page(self):
         """Initialize General Controls dock and sidebar buttons, sliders, and handlers."""
-        # Ensure General Controls dock is not visible at startup and floats
+        # Configure General Controls dock for right-side docking
         try:
             if hasattr(self, 'dockWidget_GeneralControls') and self.dockWidget_GeneralControls:
+                # Hide at startup
                 self.dockWidget_GeneralControls.hide()
+                
                 try:
-                    self.dockWidget_GeneralControls.setAllowedAreas(Qt.NoDockWidgetArea)
+                    # Allow docking only on the right side
+                    self.dockWidget_GeneralControls.setAllowedAreas(Qt.RightDockWidgetArea)
+                    
+                    # Allow moving, closing, and floating
                     self.dockWidget_GeneralControls.setFeatures(
-                        QDockWidget.DockWidgetFloatable | QDockWidget.DockWidgetClosable
+                        QDockWidget.DockWidgetMovable | 
+                        QDockWidget.DockWidgetFloatable | 
+                        QDockWidget.DockWidgetClosable
                     )
-                    self.dockWidget_GeneralControls.setFloating(True)
-                except Exception:
+                    
+                    # Initially dock it (not floating)
+                    self.dockWidget_GeneralControls.setFloating(False)
+                    
+                    # Add it to the right dock area
+                    self.addDockWidget(Qt.RightDockWidgetArea, self.dockWidget_GeneralControls)
+                    
+                    # Set a reasonable minimum and maximum width
+                    self.dockWidget_GeneralControls.setMinimumWidth(250)
+                    self.dockWidget_GeneralControls.setMaximumWidth(500)
+                    
+                    # Connect close event to update sidebar button state
+                    self.dockWidget_GeneralControls.visibilityChanged.connect(
+                        self._on_general_controls_visibility_changed
+                    )
+                    
+                except Exception as e:
                     pass
         except Exception:
             pass
@@ -42,6 +64,9 @@ class GeneralControlsMixin:
             self._init_general_controls_buttons()
         except Exception:
             pass
+        
+        # Load saved dock state if available
+        self._load_general_controls_dock_state()
 
     def _init_general_controls_sliders(self):
         """Set slider ranges to 0..32747 and bind labels to show live value."""
@@ -131,10 +156,6 @@ class GeneralControlsMixin:
             # Show/hide dock accordingly
             if hasattr(self, 'dockWidget_GeneralControls') and self.dockWidget_GeneralControls:
                 if checked:
-                    try:
-                        self.dockWidget_GeneralControls.setFloating(True)
-                    except Exception:
-                        pass
                     self.dockWidget_GeneralControls.show()
                     try:
                         self.dockWidget_GeneralControls.raise_()
@@ -237,5 +258,72 @@ class GeneralControlsMixin:
                 self.tanksim_status.generalControl3Value = values[2]
             except Exception:
                 pass
+        except Exception:
+            pass
+
+    def _on_general_controls_visibility_changed(self, visible):
+        """Handle General Controls dock visibility changes"""
+        try:
+            # Update sidebar button states when dock is shown/hidden
+            if hasattr(self, 'pushButton_generalControls'):
+                self.pushButton_generalControls.blockSignals(True)
+                self.pushButton_generalControls.setChecked(visible)
+                self.pushButton_generalControls.blockSignals(False)
+            
+            if hasattr(self, 'pushButton_generalControls2'):
+                self.pushButton_generalControls2.blockSignals(True)
+                self.pushButton_generalControls2.setChecked(visible)
+                self.pushButton_generalControls2.blockSignals(False)
+            
+            # Save state when visibility changes
+            if not visible:
+                self._save_general_controls_dock_state()
+        except Exception:
+            pass
+
+    def _save_general_controls_dock_state(self):
+        """Save General Controls dock state to QSettings"""
+        try:
+            from PyQt5.QtCore import QSettings
+            
+            if not hasattr(self, 'dockWidget_GeneralControls') or not self.dockWidget_GeneralControls:
+                return
+            
+            settings = QSettings('PLC-Simulator', 'GeneralControls')
+            settings.setValue('visible', self.dockWidget_GeneralControls.isVisible())
+            settings.setValue('floating', self.dockWidget_GeneralControls.isFloating())
+            settings.setValue('width', self.dockWidget_GeneralControls.width())
+            
+            # Save geometry if floating
+            if self.dockWidget_GeneralControls.isFloating():
+                settings.setValue('geometry', self.dockWidget_GeneralControls.saveGeometry())
+        except Exception:
+            pass
+
+    def _load_general_controls_dock_state(self):
+        """Load General Controls dock state from QSettings"""
+        try:
+            from PyQt5.QtCore import QSettings
+            
+            if not hasattr(self, 'dockWidget_GeneralControls') or not self.dockWidget_GeneralControls:
+                return
+            
+            settings = QSettings('PLC-Simulator', 'GeneralControls')
+            
+            # Restore width if saved
+            width = settings.value('width', type=int)
+            if width:
+                self.dockWidget_GeneralControls.setMinimumWidth(min(250, width))
+                self.dockWidget_GeneralControls.resize(width, self.dockWidget_GeneralControls.height())
+            
+            # Restore floating state
+            was_floating = settings.value('floating', False, type=bool)
+            if was_floating:
+                geometry = settings.value('geometry')
+                if geometry:
+                    self.dockWidget_GeneralControls.restoreGeometry(geometry)
+                self.dockWidget_GeneralControls.setFloating(True)
+            
+            # Note: Don't restore visibility state - always start hidden per requirements
         except Exception:
             pass
