@@ -432,6 +432,7 @@ class TankSimSettingsMixin:
                 is_auto_mode = auto_btn.isChecked()
             
             # List of control widgets that should be disabled in Manual (PLC) mode
+            # Note: Temperature and level trend radio buttons are excluded - they're for viewing, not control
             control_widget_names = [
                 'slider_PidTankTempSP',
                 'slider_PidTankLevelSP',
@@ -451,6 +452,13 @@ class TankSimSettingsMixin:
                 widget = getattr(self, widget_name, None)
                 if widget:
                     widget.setEnabled(is_auto_mode)
+                    # Force visual update with stylesheet to ensure graying out is visible
+                    if not is_auto_mode:
+                        # Apply disabled style
+                        widget.setStyleSheet("QWidget:disabled { color: #9CA3AF; background-color: #F3F4F6; }")
+                    else:
+                        # Clear custom style to use default enabled appearance
+                        widget.setStyleSheet("")
             
             # Update visual styling for mode indication
             self._update_mode_button_styling(is_auto_mode)

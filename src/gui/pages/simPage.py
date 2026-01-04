@@ -63,6 +63,8 @@ class SimPageMixin:
     def _nav_settings(self, checked, source):
         if checked:
             self.go_to_settings(True)
+            # Auto-close sidebar when navigating
+            self._auto_close_sidebar()
 
     def go_to_io(self, checked):
         """Navigate to I/O page."""
@@ -72,10 +74,23 @@ class SimPageMixin:
     def _nav_io(self, checked, source):
         if checked:
             self.go_to_io(True)
+            # Auto-close sidebar when navigating
+            self._auto_close_sidebar()
 
     def _nav_sim(self, checked, source):
         if checked:
             self.go_to_sim_or_selection(True)
+            # Auto-close sidebar when navigating
+            self._auto_close_sidebar()
+    
+    def _auto_close_sidebar(self):
+        """Auto-close the sidebar after navigation"""
+        try:
+            if hasattr(self, 'pushButton_menu') and self.pushButton_menu:
+                if self.pushButton_menu.isChecked():
+                    self.pushButton_menu.setChecked(False)
+        except Exception:
+            pass
     def connect_simulation_buttons(self):
         """Connect all simulation related buttons across sidebar and pages."""
         try:
@@ -322,3 +337,5 @@ class SimPageMixin:
                     self.stackedWidget_SimSettings.setCurrentIndex(2)
                 else:
                     self.stackedWidget_SimSettings.setCurrentIndex(0)
+            # Auto-close sidebar when navigating
+            self._auto_close_sidebar()

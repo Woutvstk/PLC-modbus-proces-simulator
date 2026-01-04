@@ -163,6 +163,10 @@ class GeneralControlsMixin:
                         pass
                 else:
                     self.dockWidget_GeneralControls.hide()
+            
+            # Auto-close sidebar when navigating
+            if hasattr(self, '_auto_close_sidebar'):
+                self._auto_close_sidebar()
         except Exception:
             pass
 
