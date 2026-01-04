@@ -320,13 +320,8 @@ class GeneralControlsMixin:
                 self.dockWidget_GeneralControls.setMinimumWidth(min(250, width))
                 self.dockWidget_GeneralControls.resize(width, self.dockWidget_GeneralControls.height())
             
-            # Restore floating state
-            was_floating = settings.value('floating', False, type=bool)
-            if was_floating:
-                geometry = settings.value('geometry')
-                if geometry:
-                    self.dockWidget_GeneralControls.restoreGeometry(geometry)
-                self.dockWidget_GeneralControls.setFloating(True)
+            # Don't restore floating state - always start docked per requirements
+            # Users can float it manually if they want during the session
             
             # Note: Don't restore visibility state - always start hidden per requirements
         except Exception:

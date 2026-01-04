@@ -425,13 +425,14 @@ class TankSimSettingsMixin:
     def _update_pidvalve_control_states(self):
         """Enable/disable PID control widgets based on Auto/Manual mode"""
         try:
-            # Determine current mode: Auto = True means GUI controls enabled
+            # Determine current mode: Auto = True means PID is active, Manual = False means manual control
             is_auto_mode = False
             auto_btn = getattr(self, 'pushButton_PidValveAuto', None)
             if auto_btn:
                 is_auto_mode = auto_btn.isChecked()
             
-            # List of control widgets that should be disabled in Manual (PLC) mode
+            # List of control widgets that should be disabled in Auto (PID) mode
+            # In Auto mode, PID controller takes over, so manual controls should be disabled
             # Note: Temperature and level trend radio buttons are excluded - they're for viewing, not control
             control_widget_names = [
                 'slider_PidTankTempSP',
@@ -447,18 +448,28 @@ class TankSimSettingsMixin:
                 'pushButton_PidValveReset',
             ]
             
-            # Enable controls in Auto mode, disable in Manual mode
+            # Enable controls in Manual mode, disable in Auto mode
+            # In Auto mode, PID controls the process
             for widget_name in control_widget_names:
                 widget = getattr(self, widget_name, None)
                 if widget:
-                    widget.setEnabled(is_auto_mode)
+                    widget.setEnabled(not is_auto_mode)  # Inverted logic
                     # Force visual update with stylesheet to ensure graying out is visible
-                    if not is_auto_mode:
-                        # Apply disabled style
+                    if is_auto_mode:
+                        # Apply disabled style in Auto mode
                         widget.setStyleSheet("QWidget:disabled { color: #9CA3AF; background-color: #F3F4F6; }")
                     else:
-                        # Clear custom style to use default enabled appearance
+                        # Clear custom style to use default enabled appearance in Manual mode
                         widget.setStyleSheet("")
+            
+            # Also disable/enable regelingSimGui stacked widget in Auto mode
+            regeling_widget = getattr(self, 'regelingSimGui', None)
+            if regeling_widget:
+                regeling_widget.setEnabled(not is_auto_mode)
+                if is_auto_mode:
+                    regeling_widget.setStyleSheet("QWidget:disabled { color: #9CA3AF; background-color: #F3F4F6; }")
+                else:
+                    regeling_widget.setStyleSheet("")
             
             # Update visual styling for mode indication
             self._update_mode_button_styling(is_auto_mode)

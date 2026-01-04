@@ -116,9 +116,28 @@ class DroppableTableWidget(QTableWidget):
         self.setColumnWidth(7, 100)
     
     def on_item_changed(self, item):
-        """Callback when a cell changes - update address"""
+        """Callback when a cell changes - update address or name"""
         row = item.row()
         col = item.column()
+        
+        # Handle name changes (column 0)
+        if col == 0:
+            # Validate name: no empty, trim whitespace
+            name = item.text().strip()
+            if not name:
+                # Restore previous name if empty
+                if row in self.row_data and 'name' in self.row_data[row]:
+                    self.blockSignals(True)
+                    item.setText(self.row_data[row]['name'])
+                    self.blockSignals(False)
+                return
+            
+            # Save the name change
+            self._save_row_data(row)
+            # Mark IO configuration as dirty
+            if hasattr(self, 'parent') and hasattr(self.parent(), '_io_config_dirty'):
+                self.parent()._io_config_dirty = True
+            return
         
         if col not in [2, 3]:
             return
@@ -553,7 +572,7 @@ class DroppableTableWidget(QTableWidget):
                         except Exception:                            pass
                     
                     self.blockSignals(True)
-                    self.setItem(row, 0, ReadOnlyTableWidgetItem(dropped_text))
+                    self.setItem(row, 0, EditableTableWidgetItem(dropped_text))
                     
                     if signal_data:
                         data_type = signal_data.get('type', 'bool')
