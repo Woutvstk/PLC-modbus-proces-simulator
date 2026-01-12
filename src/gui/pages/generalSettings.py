@@ -17,6 +17,31 @@ class ProcessSettingsMixin:
         """Initialize general process settings (controller selection only)"""
         self._init_controller_dropdown()
         self._init_network_port_combobox()
+        # Initialize label after controller dropdown so it shows correct initial value
+        self._init_active_method_label()
+
+    def _init_active_method_label(self):
+        """Initialize the active method label to show current protocol"""
+        try:
+            if hasattr(self, 'ActiveMethodLabel'):
+                # Set initial text based on current protocol
+                if hasattr(self, 'mainConfig') and self.mainConfig:
+                    protocol = self.mainConfig.plcProtocol
+                    self._update_active_method_label(protocol)
+        except AttributeError:
+            pass
+
+    def _update_active_method_label(self, protocol):
+        """Update the active method label text
+        
+        Args:
+            protocol: The protocol name to display
+        """
+        try:
+            if hasattr(self, 'ActiveMethodLabel'):
+                self.ActiveMethodLabel.setText(f"Active: {protocol}")
+        except AttributeError:
+            pass
 
     def _init_controller_dropdown(self):
         """Initialize controller dropdown"""
@@ -34,6 +59,12 @@ class ProcessSettingsMixin:
                 self.controlerDropDown.addItem(controller)
 
             self.controlerDropDown.setCurrentText("GUI")
+            
+            # Update mainConfig to match initial GUI selection
+            if hasattr(self, 'mainConfig') and self.mainConfig:
+                self.mainConfig.plcProtocol = "GUI"
+                self.mainConfig.plcGuiControl = "gui"
+            
             self.controlerDropDown.currentIndexChanged.connect(
                 self.on_controller_changed)
 
@@ -129,6 +160,9 @@ class ProcessSettingsMixin:
         if hasattr(self, 'mainConfig') and self.mainConfig:
             old_protocol = self.mainConfig.plcProtocol
             self.mainConfig.plcProtocol = new_controller
+            
+            # Update the active method label
+            self._update_active_method_label(new_controller)
 
             if new_controller == "GUI":
                 self.mainConfig.plcGuiControl = "gui"

@@ -6,6 +6,7 @@ import subprocess
 from pathlib import Path
 
 from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QVBoxLayout, QPushButton, QDockWidget, QGraphicsOpacityEffect
+from PyQt5 import QtCore
 from PyQt5.QtCore import QTimer, Qt, QPropertyAnimation, QEasingCurve
 from PyQt5 import uic
 
@@ -81,6 +82,8 @@ class MainWindow(QMainWindow, Ui_MainWindow, ProcessSettingsMixin, IOConfigMixin
         self.setupUi(self)
         # Set a smaller default window height
         self.resize(self.width(), 800)
+        # Remove maximum size constraint to enable maximize button
+        self.setMaximumSize(16777215, 16777215)  # Qt's QWIDGETSIZE_MAX
         # Ensure fullscreen action is enabled if present
         if hasattr(self, 'actionFullscreen'):
             self.actionFullscreen.setEnabled(True)
@@ -131,7 +134,14 @@ class MainWindow(QMainWindow, Ui_MainWindow, ProcessSettingsMixin, IOConfigMixin
             pass
 
         # Connect exit buttons
-        self.pushButton_Exit.clicked.connect(self.close)
+        try:
+            self.pushButton_Exit.clicked.connect(self.close)
+        except AttributeError:
+            pass
+        try:
+            self.pushButton_exit2.clicked.connect(self.close)
+        except AttributeError:
+            pass
 
         # Initialize connection variables
         self.validPlcConnection = False

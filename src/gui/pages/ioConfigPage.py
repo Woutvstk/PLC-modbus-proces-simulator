@@ -1000,7 +1000,7 @@ class IOConfigMixin:
             
             self.treeWidget_IO = DraggableTreeWidget(parent)
             self.treeWidget_IO.setHeaderLabel("IN/OUTPUTS")
-            self.treeWidget_IO.setMinimumSize(250, 250)
+            self.treeWidget_IO.setMinimumSize(0, 0)
             self.treeWidget_IO.setMaximumWidth(300)
             
             if layout:

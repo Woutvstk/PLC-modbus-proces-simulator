@@ -55,17 +55,20 @@ class GeneralControlsMixin:
                     pass
         except Exception:
             pass
-        try:
-            if hasattr(self, 'pushButton_generalControls2') and self.pushButton_generalControls2:
-                self.pushButton_generalControls2.blockSignals(True)
-                self.pushButton_generalControls2.setChecked(False)
-                self.pushButton_generalControls2.blockSignals(False)
-                try:
-                    self.pushButton_generalControls2.clicked.connect(self._on_general_controls_clicked)
-                except Exception:
-                    pass
-        except Exception:
-            pass
+        # Connect pushButton_generalControls_2 and pushButton_generalControls_3
+        for button_name in ['pushButton_generalControls_2', 'pushButton_generalControls_3']:
+            try:
+                button = getattr(self, button_name, None)
+                if button:
+                    button.blockSignals(True)
+                    button.setChecked(False)
+                    button.blockSignals(False)
+                    try:
+                        button.clicked.connect(self._on_general_controls_clicked)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
 
         # Initialize sliders and buttons
         try:
@@ -75,7 +78,7 @@ class GeneralControlsMixin:
             pass
         
         # Load saved dock state if available
-        self._load_general_controls_dock_state()
+        # Removed: Always start docked and hidden, don't restore state
 
     def _init_general_controls_sliders(self):
         """Set slider ranges to 0..32747 and bind labels to show live value."""
@@ -155,59 +158,18 @@ class GeneralControlsMixin:
     def _on_general_controls_clicked(self):
         """Clicked handler to toggle/hide the General Controls dock robustly"""
         try:
-            if hasattr(self, 'dockWidget_GeneralControls') and self.dockWidget_GeneralControls:
-                if self.dockWidget_GeneralControls.isVisible():
-                    self.dockWidget_GeneralControls.hide()
-                    # Ensure sidebar buttons updated
-                    try:
-                        if hasattr(self, 'pushButton_generalControls') and self.pushButton_generalControls:
-                            self.pushButton_generalControls.blockSignals(True)
-                            self.pushButton_generalControls.setChecked(False)
-                            self.pushButton_generalControls.blockSignals(False)
-                        if hasattr(self, 'pushButton_generalControls2') and self.pushButton_generalControls2:
-                            self.pushButton_generalControls2.blockSignals(True)
-                            self.pushButton_generalControls2.setChecked(False)
-                            self.pushButton_generalControls2.blockSignals(False)
-                    except Exception:
-                        pass
-                    # Also close the full menu if open
-                    try:
-                        if hasattr(self, '_auto_close_sidebar'):
-                            self._auto_close_sidebar()
-                    except Exception:
-                        pass
-                    # Hard-close full menu widgets to be sure the sidebar is collapsed
-                    try:
-                        if hasattr(self, 'fullMenuWidget'):
-                            self.fullMenuWidget.setMaximumWidth(0)
-                        if hasattr(self, 'iconOnlyWidget'):
-                            self.iconOnlyWidget.setVisible(True)
-                        if hasattr(self, '_fullMenuOpacity') and self._fullMenuOpacity:
-                            self._fullMenuOpacity.setOpacity(0.0)
-                    except Exception:
-                        pass
-                    # For robustness, also directly uncheck the menu button and call toggle_menu if available
-                    try:
-                        if hasattr(self, 'pushButton_menu') and self.pushButton_menu:
-                            self.pushButton_menu.setChecked(False)
-                    except Exception:
-                        pass
-                    try:
-                        if hasattr(self, 'toggle_menu'):
-                            # Call with False to close
-                            self.toggle_menu(False)
-                    except Exception:
-                        pass
-                else:
-                    # Show it (use existing behavior)
-                    try:
-                        if hasattr(self, 'pushButton_generalControls') and self.pushButton_generalControls:
-                            self.pushButton_generalControls.blockSignals(True)
-                            self.pushButton_generalControls.setChecked(True)
-                            self.pushButton_generalControls.blockSignals(False)
-                    except Exception:
-                        pass
-                    self.go_to_general_controls(True)
+            # Get the sender button to check its state
+            sender = self.sender()
+            if sender and hasattr(sender, 'isChecked'):
+                checked = sender.isChecked()
+            else:
+                # Fallback: toggle based on dock visibility
+                checked = not (hasattr(self, 'dockWidget_GeneralControls') and 
+                              self.dockWidget_GeneralControls and 
+                              self.dockWidget_GeneralControls.isVisible())
+            
+            # Call the main handler with the checked state
+            self.go_to_general_controls(checked)
         except Exception:
             pass
 
@@ -215,15 +177,16 @@ class GeneralControlsMixin:
         """Navigate to General Controls page and toggle dock visibility."""
         try:
             if checked and not self._maybe_confirm_leave_io():
-                try:
-                    self.pushButton_generalControls.blockSignals(True)
-                    self.pushButton_generalControls.setChecked(False)
-                    self.pushButton_generalControls.blockSignals(False)
-                    self.pushButton_generalControls2.blockSignals(True)
-                    self.pushButton_generalControls2.setChecked(False)
-                    self.pushButton_generalControls2.blockSignals(False)
-                except Exception:
-                    pass
+                # Uncheck all general controls buttons
+                for button_name in ['pushButton_generalControls', 'pushButton_generalControls_2', 'pushButton_generalControls_3']:
+                    try:
+                        button = getattr(self, button_name, None)
+                        if button:
+                            button.blockSignals(True)
+                            button.setChecked(False)
+                            button.blockSignals(False)
+                    except Exception:
+                        pass
                 return
             page = self.findChild(QWidget, "page_generalControls")
             if checked and page is not None:
@@ -233,6 +196,8 @@ class GeneralControlsMixin:
             # Show/hide dock accordingly
             if hasattr(self, 'dockWidget_GeneralControls') and self.dockWidget_GeneralControls:
                 if checked:
+                    # Force dock to be docked (not floating) before showing
+                    self.dockWidget_GeneralControls.setFloating(False)
                     self.dockWidget_GeneralControls.show()
                     try:
                         self.dockWidget_GeneralControls.raise_()
@@ -241,8 +206,9 @@ class GeneralControlsMixin:
                 else:
                     self.dockWidget_GeneralControls.hide()
             
-            # Auto-close sidebar when navigating
-            if hasattr(self, '_auto_close_sidebar'):
+            # Don't auto-close sidebar when showing general controls
+            # Only close it when hiding
+            if not checked and hasattr(self, '_auto_close_sidebar'):
                 self._auto_close_sidebar()
         except Exception:
             pass
@@ -345,61 +311,20 @@ class GeneralControlsMixin:
     def _on_general_controls_visibility_changed(self, visible):
         """Handle General Controls dock visibility changes"""
         try:
-            # Update sidebar button states when dock is shown/hidden
-            if hasattr(self, 'pushButton_generalControls'):
-                self.pushButton_generalControls.blockSignals(True)
-                self.pushButton_generalControls.setChecked(visible)
-                self.pushButton_generalControls.blockSignals(False)
+            # Update all 3 sidebar button states when dock is shown/hidden
+            for button_name in ['pushButton_generalControls', 'pushButton_generalControls_2', 'pushButton_generalControls_3']:
+                try:
+                    button = getattr(self, button_name, None)
+                    if button:
+                        button.blockSignals(True)
+                        button.setChecked(visible)
+                        button.blockSignals(False)
+                except Exception:
+                    pass
             
-            if hasattr(self, 'pushButton_generalControls2'):
-                self.pushButton_generalControls2.blockSignals(True)
-                self.pushButton_generalControls2.setChecked(visible)
-                self.pushButton_generalControls2.blockSignals(False)
-            
-            # Save state when visibility changes
-            if not visible:
-                self._save_general_controls_dock_state()
+            # Save state when visibility changes (removed - don't save state)
         except Exception:
             pass
 
-    def _save_general_controls_dock_state(self):
-        """Save General Controls dock state to QSettings"""
-        try:
-            from PyQt5.QtCore import QSettings
-            
-            if not hasattr(self, 'dockWidget_GeneralControls') or not self.dockWidget_GeneralControls:
-                return
-            
-            settings = QSettings('PLC-Simulator', 'GeneralControls')
-            settings.setValue('visible', self.dockWidget_GeneralControls.isVisible())
-            settings.setValue('floating', self.dockWidget_GeneralControls.isFloating())
-            settings.setValue('width', self.dockWidget_GeneralControls.width())
-            
-            # Save geometry if floating
-            if self.dockWidget_GeneralControls.isFloating():
-                settings.setValue('geometry', self.dockWidget_GeneralControls.saveGeometry())
-        except Exception:
-            pass
-
-    def _load_general_controls_dock_state(self):
-        """Load General Controls dock state from QSettings"""
-        try:
-            from PyQt5.QtCore import QSettings
-            
-            if not hasattr(self, 'dockWidget_GeneralControls') or not self.dockWidget_GeneralControls:
-                return
-            
-            settings = QSettings('PLC-Simulator', 'GeneralControls')
-            
-            # Restore width if saved
-            width = settings.value('width', type=int)
-            if width:
-                self.dockWidget_GeneralControls.setMinimumWidth(min(250, width))
-                self.dockWidget_GeneralControls.resize(width, self.dockWidget_GeneralControls.height())
-            
-            # Don't restore floating state - always start docked per requirements
-            # Users can float it manually if they want during the session
-            
-            # Note: Don't restore visibility state - always start hidden per requirements
-        except Exception:
-            pass
+    # Removed _save_general_controls_dock_state and _load_general_controls_dock_state
+    # Dock always starts docked and hidden
