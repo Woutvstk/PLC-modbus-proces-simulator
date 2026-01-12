@@ -48,6 +48,11 @@ class GeneralControlsMixin:
                 self.pushButton_generalControls.blockSignals(True)
                 self.pushButton_generalControls.setChecked(False)
                 self.pushButton_generalControls.blockSignals(False)
+                # Ensure click toggles/hides the dock even if toggled doesn't fire in some layouts
+                try:
+                    self.pushButton_generalControls.clicked.connect(self._on_general_controls_clicked)
+                except Exception:
+                    pass
         except Exception:
             pass
         try:
@@ -55,6 +60,10 @@ class GeneralControlsMixin:
                 self.pushButton_generalControls2.blockSignals(True)
                 self.pushButton_generalControls2.setChecked(False)
                 self.pushButton_generalControls2.blockSignals(False)
+                try:
+                    self.pushButton_generalControls2.clicked.connect(self._on_general_controls_clicked)
+                except Exception:
+                    pass
         except Exception:
             pass
 
@@ -133,6 +142,74 @@ class GeneralControlsMixin:
     def _on_reset_released(self):
         if hasattr(self, 'tanksim_status') and self.tanksim_status:
             self.tanksim_status.generalResetCmd = False
+    
+    def _auto_close_sidebar(self):
+        """Auto-close the sidebar after navigation (same as SimPageMixin)"""
+        try:
+            if hasattr(self, 'pushButton_menu') and self.pushButton_menu:
+                if self.pushButton_menu.isChecked():
+                    self.pushButton_menu.setChecked(False)
+        except Exception:
+            pass
+
+    def _on_general_controls_clicked(self):
+        """Clicked handler to toggle/hide the General Controls dock robustly"""
+        try:
+            if hasattr(self, 'dockWidget_GeneralControls') and self.dockWidget_GeneralControls:
+                if self.dockWidget_GeneralControls.isVisible():
+                    self.dockWidget_GeneralControls.hide()
+                    # Ensure sidebar buttons updated
+                    try:
+                        if hasattr(self, 'pushButton_generalControls') and self.pushButton_generalControls:
+                            self.pushButton_generalControls.blockSignals(True)
+                            self.pushButton_generalControls.setChecked(False)
+                            self.pushButton_generalControls.blockSignals(False)
+                        if hasattr(self, 'pushButton_generalControls2') and self.pushButton_generalControls2:
+                            self.pushButton_generalControls2.blockSignals(True)
+                            self.pushButton_generalControls2.setChecked(False)
+                            self.pushButton_generalControls2.blockSignals(False)
+                    except Exception:
+                        pass
+                    # Also close the full menu if open
+                    try:
+                        if hasattr(self, '_auto_close_sidebar'):
+                            self._auto_close_sidebar()
+                    except Exception:
+                        pass
+                    # Hard-close full menu widgets to be sure the sidebar is collapsed
+                    try:
+                        if hasattr(self, 'fullMenuWidget'):
+                            self.fullMenuWidget.setMaximumWidth(0)
+                        if hasattr(self, 'iconOnlyWidget'):
+                            self.iconOnlyWidget.setVisible(True)
+                        if hasattr(self, '_fullMenuOpacity') and self._fullMenuOpacity:
+                            self._fullMenuOpacity.setOpacity(0.0)
+                    except Exception:
+                        pass
+                    # For robustness, also directly uncheck the menu button and call toggle_menu if available
+                    try:
+                        if hasattr(self, 'pushButton_menu') and self.pushButton_menu:
+                            self.pushButton_menu.setChecked(False)
+                    except Exception:
+                        pass
+                    try:
+                        if hasattr(self, 'toggle_menu'):
+                            # Call with False to close
+                            self.toggle_menu(False)
+                    except Exception:
+                        pass
+                else:
+                    # Show it (use existing behavior)
+                    try:
+                        if hasattr(self, 'pushButton_generalControls') and self.pushButton_generalControls:
+                            self.pushButton_generalControls.blockSignals(True)
+                            self.pushButton_generalControls.setChecked(True)
+                            self.pushButton_generalControls.blockSignals(False)
+                    except Exception:
+                        pass
+                    self.go_to_general_controls(True)
+        except Exception:
+            pass
 
     def go_to_general_controls(self, checked):
         """Navigate to General Controls page and toggle dock visibility."""

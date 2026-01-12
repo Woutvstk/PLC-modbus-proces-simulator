@@ -1,5 +1,4 @@
 # mainGui.py - Main GUI entry point and navigation
-# Alternative version with absolute imports
 
 import sys
 import os
@@ -25,8 +24,7 @@ from simulations.PIDtankValve.settingsGui import TankSimSettingsMixin
 
 # Import from new structure
 from simulations.PIDtankValve.gui import VatWidget
-# TODO: conveyor simulation not yet migrated
-# from simulations.conveyorSim.SimGui import TransportbandWidget
+
 from core.configuration import configuration
 
 # =============================================================================
@@ -69,8 +67,6 @@ if ui_file.exists():
 else:
     raise FileNotFoundError(f"Cannot find {ui_file}! Searched in: {ui_file}")
 
-
-
 # =============================================================================
 # MainWindow class - Same as before
 # =============================================================================
@@ -96,16 +92,37 @@ class MainWindow(QMainWindow, Ui_MainWindow, ProcessSettingsMixin, IOConfigMixin
         self.tanksim_config = None
         self.tanksim_status = None
 
-        # Sidebar: start collapsed (animate width), keep both widgets available
+        # Sidebar: simple single-widget animation approach
         try:
+            # Initialize menu state variables
+            self._menu_is_expanded = False
+            self._menu_anim = None
+            
+            # Hide icon-only widget completely - we'll only use fullMenuWidget
+            self.iconOnlyWidget.setVisible(False)
+            self.iconOnlyWidget.setMaximumWidth(0)
+            
+            # fullMenuWidget starts at icon-only width (70px for wider icons)
             self.fullMenuWidget.setVisible(True)
-            self.fullMenuWidget.setMaximumWidth(0)
-            # Restore dual-sidebar behavior
-            self.iconOnlyWidget.setVisible(True)
-            self.pushButton_menu.setChecked(False)
-            self.pushButton_menu.toggled.connect(self.toggle_menu)
-        except Exception:
-            pass
+            self.fullMenuWidget.setMinimumWidth(70)
+            self.fullMenuWidget.setMaximumWidth(70)
+            
+            # Hide logoText initially (collapsed state)
+            if hasattr(self, 'logoText'):
+                self.logoText.setVisible(False)
+            
+            # Setup menu button - ensure it's in iconOnlyWidget or fullMenuWidget
+            if hasattr(self, 'pushButton_menu'):
+                self.pushButton_menu.setCheckable(True)
+                self.pushButton_menu.setChecked(False)
+                # Use clicked instead of toggled to avoid issues
+                try:
+                    self.pushButton_menu.clicked.disconnect()
+                except:
+                    pass
+                self.pushButton_menu.clicked.connect(self.toggle_menu)
+        except Exception as e:
+            print(f"Sidebar setup error: {e}")
 
         # Initialize GENERAL CONTROLS page and dock default state
         try:
@@ -210,86 +227,47 @@ class MainWindow(QMainWindow, Ui_MainWindow, ProcessSettingsMixin, IOConfigMixin
         except Exception:
             return True
 
-    # Sidebar animation helpers
-    def _setup_menu_animation(self):
+    # =========================================================================
+    # Sidebar toggle menu animation - Simple single widget approach
+    # =========================================================================
+    def toggle_menu(self):
+        """Toggle sidebar menu with smooth animation - single widget approach"""
         try:
-            # Width animation for the full menu widget
-            self._menu_anim = QPropertyAnimation(self.fullMenuWidget, b"maximumWidth", self)
-            self._menu_anim.setDuration(400)  # Slightly faster for better feel
-            self._menu_anim.setEasingCurve(QEasingCurve.InOutCubic)  # Smoother easing
-            self._menu_anim.finished.connect(self._on_menu_anim_finished)
+            # Initialize animation if not exists
+            if self._menu_anim is None:
+                self._menu_anim = QPropertyAnimation(self.fullMenuWidget, b"maximumWidth", self)
+                self._menu_anim.setDuration(300)
+                self._menu_anim.setEasingCurve(QEasingCurve.InOutCubic)
             
-            # Create opacity effect for fullMenuWidget if not exists
-            if not hasattr(self, '_fullMenuOpacity'):
-                self._fullMenuOpacity = QGraphicsOpacityEffect(self.fullMenuWidget)
-                self.fullMenuWidget.setGraphicsEffect(self._fullMenuOpacity)
-            
-            # Create opacity animation
-            self._menu_opacity_anim = QPropertyAnimation(self._fullMenuOpacity, b"opacity", self)
-            self._menu_opacity_anim.setDuration(400)
-            self._menu_opacity_anim.setEasingCurve(QEasingCurve.InOutCubic)
-            
-        except Exception as e:
-            self._menu_anim = None
-            self._menu_opacity_anim = None
-
-    def toggle_menu(self, checked):
-        try:
-            if not hasattr(self, "_menu_anim") or self._menu_anim is None:
-                self._setup_menu_animation()
-            
-            target_width = 240 if checked else 0
-            
-            # Ensure full menu is visible during animation
-            self.fullMenuWidget.setVisible(True)
-            
-            if checked:
-                # Opening: hide icon-only immediately, fade in full menu
-                self.iconOnlyWidget.setVisible(False)
-                
-                # Start with opacity 0, animate to 1
-                if hasattr(self, '_menu_opacity_anim') and self._menu_opacity_anim:
-                    self._menu_opacity_anim.stop()
-                    self._menu_opacity_anim.setStartValue(0.0)
-                    self._menu_opacity_anim.setEndValue(1.0)
-                    self._menu_opacity_anim.start()
-            else:
-                # Closing: fade out full menu
-                if hasattr(self, '_menu_opacity_anim') and self._menu_opacity_anim:
-                    self._menu_opacity_anim.stop()
-                    self._menu_opacity_anim.setStartValue(1.0)
-                    self._menu_opacity_anim.setEndValue(0.0)
-                    self._menu_opacity_anim.start()
-            
-            # Width animation
-            if hasattr(self, "_menu_anim") and self._menu_anim:
+            # Stop any running animation
+            if self._menu_anim.state() == QPropertyAnimation.Running:
                 self._menu_anim.stop()
-                self._menu_anim.setStartValue(self.fullMenuWidget.maximumWidth())
-                self._menu_anim.setEndValue(target_width)
-                self._menu_anim.start()
-        except Exception as e:
-            pass
-
-    def _on_menu_anim_finished(self):
-        try:
-            expanded = self.fullMenuWidget.maximumWidth() > 0
             
-            if not expanded:
-                # Animation finished closing - now show icon-only sidebar
-                self.iconOnlyWidget.setVisible(True)
-                # Keep full menu widget in DOM but ensure opacity stays at 0
-                if hasattr(self, '_fullMenuOpacity') and self._fullMenuOpacity:
-                    self._fullMenuOpacity.setOpacity(0.0)
-            else:
-                # Animation finished opening - ensure full opacity
-                self.iconOnlyWidget.setVisible(False)
-                if hasattr(self, '_fullMenuOpacity') and self._fullMenuOpacity:
-                    self._fullMenuOpacity.setOpacity(1.0)
-                    
-            # Always keep fullMenuWidget visible (just opacity 0 when closed)
-            self.fullMenuWidget.setVisible(True)
+            # Toggle state
+            self._menu_is_expanded = not self._menu_is_expanded
+            
+            # Animate between 70px (icon-only) and 240px (full menu)
+            target_width = 240 if self._menu_is_expanded else 70
+            
+            # Hide/show logoText based on expanded state
+            if hasattr(self, 'logoText'):
+                self.logoText.setVisible(self._menu_is_expanded)
+            
+            # Also update minimum width during animation
+            self.fullMenuWidget.setMinimumWidth(target_width if self._menu_is_expanded else 70)
+            
+            # Start width animation
+            self._menu_anim.setStartValue(self.fullMenuWidget.maximumWidth())
+            self._menu_anim.setEndValue(target_width)
+            self._menu_anim.start()
+            
+            # Update button checked state
+            self.pushButton_menu.setChecked(self._menu_is_expanded)
+            
+            print(f"Toggle menu: expanding={self._menu_is_expanded}, target_width={target_width}")
+            
         except Exception as e:
-            pass
+            print(f"Toggle menu error: {e}")
 
 
     def update_all_values(self):

@@ -44,6 +44,9 @@ class TankSimSettingsMixin:
                     stacked_widget.setCurrentIndex(0)  # Analog
         except Exception as e:
             print(f"Error setting regelingSimGui index: {e}")
+        
+        # Defer control state update until mainConfig is available
+        # This will be called in update_tanksim_display which runs in the main loop
 
     def _init_vat_widget(self):
         """Initialize VatWidget (tank visualization)"""
@@ -275,7 +278,10 @@ class TankSimSettingsMixin:
                 btn.toggled.connect(lambda checked, b=btn: self._on_manual_mode_toggled(checked))
             
             # Initialize control widget states based on current mode
-            self._update_pidvalve_control_states()
+            # Note: This may be called before mainConfig is set, so _update_pidvalve_control_states
+            # will be called again in update_tanksim_display once mainConfig is available
+            if hasattr(self, 'mainConfig') and self.mainConfig:
+                self._update_pidvalve_control_states()
             
         except Exception as e:
             print(f"Error initializing PID valve mode toggle: {e}")
@@ -423,17 +429,28 @@ class TankSimSettingsMixin:
             print(f"Error in manual mode toggle: {e}")
 
     def _update_pidvalve_control_states(self):
-        """Enable/disable PID control widgets based on Auto/Manual mode"""
+        """Enable/disable PID control widgets based on Auto/Manual mode AND GUI/PLC control mode
+        
+        Logic:
+        - In GUI mode: controls are never grayed out (always enabled)
+        - In PLC mode with Auto: controls are grayed out (PID controller takes over)
+        - In PLC mode with Manual: controls are grayed out (PLC has manual control)
+        """
         try:
+            # Determine GUI vs PLC control mode
+            is_gui_mode = False
+            if hasattr(self, 'mainConfig') and self.mainConfig:
+                is_gui_mode = (self.mainConfig.plcGuiControl == "gui")
+            
             # Determine current mode: Auto = True means PID is active, Manual = False means manual control
             is_auto_mode = False
             auto_btn = getattr(self, 'pushButton_PidValveAuto', None)
             if auto_btn:
                 is_auto_mode = auto_btn.isChecked()
             
-            # List of control widgets that should be disabled in Auto (PID) mode
-            # In Auto mode, PID controller takes over, so manual controls should be disabled
-            # Note: Temperature and level trend radio buttons are excluded - they're for viewing, not control
+            # List of control widgets that should be disabled based on mode
+            # In Auto mode with PLC control, PID controller takes over
+            # In GUI mode, controls should NEVER be disabled
             control_widget_names = [
                 'slider_PidTankTempSP',
                 'slider_PidTankLevelSP',
@@ -448,25 +465,29 @@ class TankSimSettingsMixin:
                 'pushButton_PidValveReset',
             ]
             
-            # Enable controls in Manual mode, disable in Auto mode
-            # In Auto mode, PID controls the process
+            # Determine if controls should be disabled
+            # GUI mode: NEVER disable controls
+            # PLC mode with Auto: disable controls (PID takes over)
+            should_disable = (not is_gui_mode) and is_auto_mode
+            
+            # Apply enabled/disabled state to all control widgets
             for widget_name in control_widget_names:
                 widget = getattr(self, widget_name, None)
                 if widget:
-                    widget.setEnabled(not is_auto_mode)  # Inverted logic
+                    widget.setEnabled(not should_disable)
                     # Force visual update with stylesheet to ensure graying out is visible
-                    if is_auto_mode:
-                        # Apply disabled style in Auto mode
+                    if should_disable:
+                        # Apply disabled style
                         widget.setStyleSheet("QWidget:disabled { color: #9CA3AF; background-color: #F3F4F6; }")
                     else:
-                        # Clear custom style to use default enabled appearance in Manual mode
+                        # Clear custom style to use default enabled appearance
                         widget.setStyleSheet("")
             
-            # Also disable/enable regelingSimGui stacked widget in Auto mode
+            # Also disable/enable regelingSimGui stacked widget based on mode
             regeling_widget = getattr(self, 'regelingSimGui', None)
             if regeling_widget:
-                regeling_widget.setEnabled(not is_auto_mode)
-                if is_auto_mode:
+                regeling_widget.setEnabled(not should_disable)
+                if should_disable:
                     regeling_widget.setStyleSheet("QWidget:disabled { color: #9CA3AF; background-color: #F3F4F6; }")
                 else:
                     regeling_widget.setStyleSheet("")
@@ -537,6 +558,12 @@ class TankSimSettingsMixin:
             except Exception as e:
                 print(f"Warning: Could not initialize vat_widget: {e}")
                 return
+
+        # Ensure control states are updated when mainConfig becomes available
+        # This handles the case where init was called before mainConfig was set
+        if hasattr(self, 'mainConfig') and self.mainConfig and not hasattr(self, '_control_states_initialized'):
+            self._update_pidvalve_control_states()
+            self._control_states_initialized = True
 
         gui_mode = False
         try:
@@ -696,9 +723,9 @@ class TankSimSettingsMixin:
         if hasattr(self, 'vat_widget') and self.vat_widget:
             self.vat_widget.set_plc_pidcontrol_index(gui_mode)
 
-        if gui_mode and is_auto_mode:
-            # Only write GUI values when in GUI mode AND Auto mode (controls enabled)
-            
+        # In GUI mode, ALWAYS write values from GUI to status (regardless of Auto/Manual)
+        # This ensures the simulation sees the values the user is inputting
+        if gui_mode:
             # Write PID temperature setpoint
             try:
                 slider_temp = getattr(self, 'slider_PidTankTempSP', None)
@@ -719,7 +746,7 @@ class TankSimSettingsMixin:
             except Exception:
                 pass
             
-            # Write valve positions
+            # Write valve positions - CRITICAL: Always write these in GUI mode
             self.tanksim_status.valveInOpenFraction = self.vat_widget.adjustableValveInValue / 100.0
             self.tanksim_status.valveOutOpenFraction = self.vat_widget.adjustableValveOutValue / 100.0
 

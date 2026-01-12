@@ -409,7 +409,8 @@ class DroppableTableWidget(QTableWidget):
         for display_row, row_content in enumerate(rows_data):
             for col in range(self.columnCount()):
                 text = row_content.get(col, "")
-                if col in [2, 3]:
+                # Column 0 (name) and columns 2,3 (byte/bit) are editable
+                if col in [0, 2, 3]:
                     self.setItem(display_row, col, EditableTableWidgetItem(text))
                 else:
                     self.setItem(display_row, col, ReadOnlyTableWidgetItem(text))
@@ -999,7 +1000,8 @@ class IOConfigMixin:
             
             self.treeWidget_IO = DraggableTreeWidget(parent)
             self.treeWidget_IO.setHeaderLabel("IN/OUTPUTS")
-            self.treeWidget_IO.setMinimumSize(250, 300)
+            self.treeWidget_IO.setMinimumSize(250, 250)
+            self.treeWidget_IO.setMaximumWidth(300)
             
             if layout:
                 layout.replaceWidget(old_tree, self.treeWidget_IO)
@@ -1325,7 +1327,8 @@ class IOConfigMixin:
                 if idx >= table.rowCount():
                     break
                 
-                table.setItem(idx, 0, ReadOnlyTableWidgetItem(signal.get('name', '')))
+                # Column 0 (name) should be editable, all others read-only except byte/bit
+                table.setItem(idx, 0, EditableTableWidgetItem(signal.get('name', '')))
                 table.setItem(idx, 1, ReadOnlyTableWidgetItem(signal.get('type', '')))
                 table.setItem(idx, 2, EditableTableWidgetItem(signal.get('byte', '')))
                 table.setItem(idx, 3, EditableTableWidgetItem(signal.get('bit', '')))
@@ -1587,7 +1590,7 @@ class IOConfigMixin:
                         value = (status.heaterPowerFraction > 0)
                     elif attr_name == "AQHeaterFraction":
                         value = int(status.heaterPowerFraction * plc_analog_max)
-                    # General Controls - PLC Inputs fallback (Start/Stop/Reset, Control1-3)
+                    # General Controls - PLC Inputs (commands from GUI to PLC)
                     elif attr_name == "DIStart":
                         value = bool(getattr(status, 'generalStartCmd', False))
                     elif attr_name == "DIStop":
@@ -1600,6 +1603,7 @@ class IOConfigMixin:
                         value = int(getattr(status, 'generalControl2Value', 0))
                     elif attr_name == "AIControl3":
                         value = int(getattr(status, 'generalControl3Value', 0))
+                    # Sensor Inputs (from simulation to PLC)
                     elif attr_name == "DILevelSensorHigh":
                         value = status.digitalLevelSensorHighTriggered
                     elif attr_name == "DILevelSensorLow":
@@ -1608,7 +1612,7 @@ class IOConfigMixin:
                         value = int((status.liquidVolume / config.tankVolume) * plc_analog_max)
                     elif attr_name == "AITemperatureSensor":
                         value = int(((status.liquidTemperature + 50) / 300) * plc_analog_max)
-                    # General Controls - PLC Outputs fallback (Indicators, Analog1-3)
+                    # General Controls - PLC Outputs (from PLC to GUI indicators)
                     elif attr_name == "DQIndicator1":
                         value = bool(getattr(status, 'indicator1', False))
                     elif attr_name == "DQIndicator2":
@@ -1623,6 +1627,32 @@ class IOConfigMixin:
                         value = int(getattr(status, 'analog2', 0))
                     elif attr_name == "AQAnalog3":
                         value = int(getattr(status, 'analog3', 0))
+                    # PID Controls and other dynamic signals - Try to get value from dynamic attributes created by handler
+                    # Handler creates attributes like pidPidValveStartCmd for digital, pidPidTankTempSPValue for analog
+                    elif attr_name.startswith("DI") or attr_name.startswith("AI"):
+                        # Try to get the attribute dynamically - handler may have created it
+                        # Handler creates: attr = f"pid{name}Cmd" where name is like "PidValveStart"
+                        # So for DIPidValveStart, it would create pidPidValveStartCmd
+                        type_item = table.item(row, 1)
+                        data_type = type_item.text() if type_item else 'bool'
+                        
+                        attr_to_check = f"pid{attr_name[2:]}Cmd" if attr_name.startswith("DI") else f"pid{attr_name[2:]}Value"
+                        value = getattr(status, attr_to_check, None)
+                        
+                        if value is None:
+                            # Try specific hardcoded fallbacks for known attributes
+                            if attr_name == "DIPidValveStart":
+                                value = bool(getattr(status, 'pidStartCmd', False))
+                            elif attr_name == "DIPidValveStop":
+                                value = bool(getattr(status, 'pidStopCmd', False))
+                            elif attr_name == "DIPidValveAuto":
+                                value = bool(getattr(status, 'pidPidValveAutoCmd', False))
+                            elif attr_name == "DIPidValveMan":
+                                value = bool(getattr(status, 'pidPidValveManCmd', False))
+                            else:
+                                # Default value: False for bool, 0 for int
+                                # This ensures the status column gets updated with green background
+                                value = False if data_type == 'bool' else 0
                     else:
                         continue
                 

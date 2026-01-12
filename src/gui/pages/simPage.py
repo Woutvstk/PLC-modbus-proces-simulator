@@ -91,13 +91,24 @@ class SimPageMixin:
                     self.pushButton_menu.setChecked(False)
         except Exception:
             pass
+    
+    def _start_sim_and_close_sidebar(self, sim_index):
+        """Start simulation and auto-close sidebar"""
+        self.start_simulation(sim_index)
+        self._auto_close_sidebar()
+    
+    def _close_sim_and_close_sidebar(self):
+        """Close simulation and auto-close sidebar"""
+        self.close_simulation()
+        self._auto_close_sidebar()
+    
     def connect_simulation_buttons(self):
         """Connect all simulation related buttons across sidebar and pages."""
         try:
             buttons_PIDtankValve = self.findChildren(QPushButton, "pushButton_PIDtankValve")
             for btn in buttons_PIDtankValve:
                 btn.setCheckable(True)
-                btn.clicked.connect(lambda checked, b=btn: self.start_simulation(0))
+                btn.clicked.connect(lambda checked, b=btn: self._start_sim_and_close_sidebar(0))
         except AttributeError:
             pass
 
@@ -105,7 +116,7 @@ class SimPageMixin:
             buttons_dualTank = self.findChildren(QPushButton, "pushButton_dualTank")
             for btn in buttons_dualTank:
                 btn.setCheckable(True)
-                btn.clicked.connect(lambda checked, b=btn: self.start_simulation(1))
+                btn.clicked.connect(lambda checked, b=btn: self._start_sim_and_close_sidebar(1))
         except AttributeError:
             pass
 
@@ -113,7 +124,7 @@ class SimPageMixin:
             buttons_conveyor = self.findChildren(QPushButton, "pushButton_conveyor")
             for btn in buttons_conveyor:
                 btn.setCheckable(True)
-                btn.clicked.connect(lambda checked, b=btn: self.start_simulation(2))
+                btn.clicked.connect(lambda checked, b=btn: self._start_sim_and_close_sidebar(2))
         except AttributeError:
             pass
 
@@ -121,21 +132,21 @@ class SimPageMixin:
         try:
             close_btn = self.findChild(QPushButton, "pushButton_PIDtankValve_2")
             if close_btn:
-                close_btn.clicked.connect(self.close_simulation)
+                close_btn.clicked.connect(self._close_sim_and_close_sidebar)
         except AttributeError:
             pass
 
         try:
             close_btn = self.findChild(QPushButton, "pushButton_closeDualTank")
             if close_btn:
-                close_btn.clicked.connect(self.close_simulation)
+                close_btn.clicked.connect(self._close_sim_and_close_sidebar)
         except AttributeError:
             pass
 
         try:
             close_btn = self.findChild(QPushButton, "pushButton_closeConveyor")
             if close_btn:
-                close_btn.clicked.connect(self.close_simulation)
+                close_btn.clicked.connect(self._close_sim_and_close_sidebar)
         except AttributeError:
             pass
 
@@ -143,6 +154,7 @@ class SimPageMixin:
         try:
             float_btn = self.singleTankPage.findChild(QPushButton, "pushButton_FloatPIDTankValve")
             if float_btn:
+                float_btn.setEnabled(True)
                 float_btn.clicked.connect(lambda: self.toggle_float(0))
         except AttributeError:
             pass
@@ -150,6 +162,7 @@ class SimPageMixin:
         try:
             float_btn = self.dualTankPage.findChild(QPushButton, "pushButton_FloatDualTank")
             if float_btn:
+                float_btn.setEnabled(True)
                 float_btn.clicked.connect(lambda: self.toggle_float(1))
         except AttributeError:
             pass
@@ -157,8 +170,23 @@ class SimPageMixin:
         try:
             float_btn = self.conveyorPage.findChild(QPushButton, "pushButton_FloatConveyor")
             if float_btn:
+                float_btn.setEnabled(True)
                 float_btn.clicked.connect(lambda: self.toggle_float(2))
         except AttributeError:
+            pass
+
+        # Ensure any float buttons (in full menu or page) are enabled and wired
+        try:
+            for btn in self.findChildren(QPushButton, "pushButton_FloatPIDTankValve"):
+                btn.setEnabled(True)
+                btn.clicked.connect(lambda: self.toggle_float(0))
+            for btn in self.findChildren(QPushButton, "pushButton_FloatDualTank"):
+                btn.setEnabled(True)
+                btn.clicked.connect(lambda: self.toggle_float(1))
+            for btn in self.findChildren(QPushButton, "pushButton_FloatConveyor"):
+                btn.setEnabled(True)
+                btn.clicked.connect(lambda: self.toggle_float(2))
+        except Exception:
             pass
 
     def go_to_sim_or_selection(self, checked):
