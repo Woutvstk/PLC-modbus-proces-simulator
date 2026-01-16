@@ -1,9 +1,29 @@
+"""
+PID Tank Valve Simulation - Core simulation logic for tank with PID control.
+
+Implements SimulationInterface with:
+- Liquid level physics (inflow, outflow, conservation)
+- Temperature dynamics (heating, cooling, thermal mass)
+- Valve control (analog positioning)
+- Level sensors (digital high/low switches)
+- Time delay simulation for realistic sensor lag
+- PID controller integration
+
+External Libraries Used:
+- time (Python Standard Library) - Timestamp tracking
+- copy (Python Standard Library) - Deep copy for delay queue
+- typing (Python Standard Library) - Type hints for clarity
+"""
+
 import time
 import copy
+import logging
 from typing import Dict, Any
 from simulations.PIDtankValve.config import configuration as configurationClass
 from simulations.PIDtankValve.status import status as statusClass
 from core.interface import SimulationInterface
+
+logger = logging.getLogger(__name__)
 
 
 class delayHandlerClass:
@@ -15,6 +35,7 @@ class delayHandlerClass:
     def queueAdd(self, newStatus: statusClass, config: configurationClass):
         status = copy.deepcopy(newStatus)
         status.timeStamp = time.time()
+        # Calculate history size based on MAX delay to accommodate all delays
         self.historySize = max(config.liquidVolumeTimeDelay,
                                config.liquidTempTimeDelay)/config.simulationInterval
         # only write to list if at least one delay > 0
@@ -32,6 +53,8 @@ class delayHandlerClass:
         """
         Returns the most recent (newest) stored value of the requested attribute
         that is still older than the configured delay time.
+        
+        Each attribute uses its own delay time, independent of other attributes.
         """
         # Map attribute to config delay
         delayMap = {
@@ -44,16 +67,29 @@ class delayHandlerClass:
         if attrName not in delayMap:
             raise ValueError(f"Unknown delayed attribute: {attrName}")
 
-        if self.historySize > 0:
-            delayInSeconds = delayMap[attrName]
-            delayInIndex = delayInSeconds/config.simulationInterval
-            delayedStatusIndex = int((self.lastWriteIndex -
-                                      delayInIndex+1) % self.historySize)
+        # If NO delays at all, return current value
+        if config.liquidVolumeTimeDelay <= 0 and config.liquidTempTimeDelay <= 0:
+            return getattr(status, attrName)
+        
+        # Get the specific delay for this attribute
+        delayInSeconds = delayMap[attrName]
+        
+        # If this specific attribute has no delay, return current value
+        if delayInSeconds <= 0:
+            return getattr(status, attrName)
+        
+        # History exists and this attribute has a delay
+        if len(self.statusHistory) > 0:
+            # Calculate how many indices back we need to go for this specific attribute's delay
+            delayInIndex = delayInSeconds / config.simulationInterval
+            
+            # Find the delayed status index (oldest value still within delay window)
+            delayedStatusIndex = int((self.lastWriteIndex - delayInIndex + 1) % self.historySize)
+            
             if len(self.statusHistory) > delayedStatusIndex:
                 return getattr(self.statusHistory[delayedStatusIndex], attrName)
             else:
-                return 0
-        # all delays are 0
+                return getattr(status, attrName)
         else:
             return getattr(status, attrName)
 
@@ -126,15 +162,12 @@ class simulation:
             self._debug_counter += 1
 
             if self._debug_counter % 10 == 0:
-                print(
-                    f" doSimulation: valveIn={status.valveInOpenFraction:.2f}, valveOut={status.valveOutOpenFraction:.2f}, vol={status.liquidVolume:.1f}")
+                logger.debug(
+                    f"doSimulation: valveIn={status.valveInOpenFraction:.2f}, valveOut={status.valveOutOpenFraction:.2f}, vol={status.liquidVolume:.1f}")
 
-            # calculate new liquidVolume
-            status.liquidVolume = min(
-                status.liquidVolume + status.flowRateIn * self._timeSinceLastRun, config.tankVolume)
-
-            status.liquidVolume = max(
-                status.liquidVolume - status.flowRateOut * self._timeSinceLastRun, 0)
+            # calculate new liquidVolume (net flow with proper clamping)
+            net_flow = (status.flowRateIn - status.flowRateOut) * self._timeSinceLastRun
+            status.liquidVolume = max(0, min(config.tankVolume, status.liquidVolume + net_flow))
 
             # check if digital liquid level sensors are triggered
             status.digitalLevelSensorHighTriggered = (
@@ -143,15 +176,50 @@ class simulation:
                 status.liquidVolume >= config.digitalLevelSensorLowTriggerLevel)
 
             if (status.liquidVolume > 0):
-                # Calculate new liquid temperature
-                # Use an effective minimum volume to avoid extreme rates near empty tank
+                # Realistic thermal dynamics with non-linear response
+                # ========================================================
+                # This implements first-order thermal lag to simulate realistic
+                # process behavior with "sponginess" instead of linear response.
+                #
+                # The key insight: thermal response is exponential, not linear.
+                # We approach setpoint asymptotically, creating natural overshoot
+                # prevention and realistic transient behavior.
+                
+                # Use effective minimum volume to avoid extreme rates near empty tank
                 effective_volume = max(status.liquidVolume, 0.001)
-                status.liquidTemperature = min(
-                    status.liquidTemperature + config.heaterMaxPower * self.delayedHeaterPowerFraction / config.liquidSpecificHeatCapacity / config.liquidSpecificWeight / effective_volume * self._timeSinceLastRun,
-                    config.liquidBoilingTemp
-                )
+                
+                # Calculate thermal time constant (tau) in seconds
+                # Larger volumes and higher heat loss = longer response time
+                # This creates natural system damping
+                thermal_time_constant = (config.liquidSpecificHeatCapacity * 
+                                        config.liquidSpecificWeight * 
+                                        effective_volume) / config.tankHeatLoss
+                
+                # Calculate heat input rate (Joules/second = Watts)
+                heat_input_rate = config.heaterMaxPower * self.delayedHeaterPowerFraction
+                
+                # Calculate heat loss rate (proportional to temp difference)
+                # This creates exponential cooling behavior
+                temp_difference = status.liquidTemperature - config.ambientTemp
+                heat_loss_rate = config.tankHeatLoss * temp_difference
+                
+                # Net heat rate (Watts)
+                net_heat_rate = heat_input_rate - heat_loss_rate
+                
+                # Temperature change using exponential approach (first-order lag)
+                # This prevents overshoot and creates realistic "spongy" response
+                dT = (net_heat_rate / (config.liquidSpecificHeatCapacity * 
+                      config.liquidSpecificWeight * effective_volume)) * self._timeSinceLastRun
+                
+                # Apply first-order lag filter for smooth transitions
+                # The damping factor depends on thermal time constant
+                lag_factor = self._timeSinceLastRun / (thermal_time_constant + self._timeSinceLastRun)
+                dT_damped = dT * lag_factor
+                
+                # Update temperature with bounds
+                new_temp = status.liquidTemperature + dT_damped
                 status.liquidTemperature = max(
-                    status.liquidTemperature - config.tankHeatLoss * 1 / config.liquidSpecificHeatCapacity / config.liquidSpecificWeight / effective_volume * self._timeSinceLastRun,
+                    min(new_temp, config.liquidBoilingTemp),
                     config.ambientTemp
                 )
             else:

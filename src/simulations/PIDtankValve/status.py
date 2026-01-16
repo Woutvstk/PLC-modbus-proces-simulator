@@ -1,4 +1,23 @@
+"""
+Tank Simulation Status - Runtime state for PID tank simulation.
+
+Contains:
+- Valve positions (inlet/outlet opening fractions)
+- Heater power and temperature
+- Liquid volume and level sensors
+- Flow rates
+- PID controller state
+- General control commands
+
+External Libraries Used:
+- csv (Python Standard Library) - Status export to CSV file
+- logging (Python Standard Library) - Error and info logging
+"""
+
 import csv
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class status:
@@ -56,6 +75,8 @@ class status:
             "generalControl1Value", "generalControl2Value", "generalControl3Value",
             "indicator1", "indicator2", "indicator3", "indicator4",
             "analog1", "analog2", "analog3",
+            "pidStartCmd", "pidStopCmd", "pidResetCmd",
+            "temperatureSetpoint", "levelSetpoint",
         ]
 
         # General Controls - PLC Outputs reflected in status (written by: plc or force)
@@ -75,9 +96,32 @@ class status:
         self.analog2: int = 0
         self.analog3: int = 0
 
+        # PID Controls - commands to PLC (written by: gui)
+        self.pidStartCmd: bool = False
+        self.pidStopCmd: bool = False
+        self.pidResetCmd: bool = False
+
+        # PID Controls - setpoints (written by: gui or plc)
+        self.temperatureSetpoint: float = 50.0  # °C
+        self.levelSetpoint: float = 1000.0  # liters
+
+        # PID Valve Controls - commands from GUI (written by: gui)
+        self.pidPidValveStartCmd: bool = False
+        self.pidPidValveStopCmd: bool = False
+        self.pidPidValveResetCmd: bool = False
+        self.pidPidValveAutoCmd: bool = True
+        self.pidPidValveManCmd: bool = False
+        self.pidPidTankValveAItempCmd: bool = True  # Default: Analog temperature
+        self.pidPidTankValveDItempCmd: bool = False
+        self.pidPidTankValveAIlevelCmd: bool = True  # Default: Analog level
+        self.pidPidTankValveDIlevelCmd: bool = False
+        # PID Valve Controls - setpoint values (written by: gui)
+        self.pidPidTankTempSPValue: int = 0
+        self.pidPidTankLevelSPValue: int = 0
+
     def saveToFile(self, exportFileName, createFile: bool = False):
         """Save status to a CSV file"""
-        print(f"Exporting status to: {exportFileName}")
+        logger.info(f"Exporting status to: {exportFileName}")
         openMode: str
         if (createFile):
             openMode = "w"

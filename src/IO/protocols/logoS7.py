@@ -11,7 +11,7 @@ class logoS7:
     """
     analogMax = 32767  # Max value for signed 16-bit integer
 
-    def __init__(self, ip: str, tsapLogo: int, tsapServer: int, tcpport: int = 102):
+    def __init__(self, ip: str, tsapLogo: int, tsapServer: int, tcpport: int = 102, network_adapter: str = "auto"):
         """
         Initialize the LOGO client with IP, TSAP parameters and TCP port.
 
@@ -20,12 +20,14 @@ class logoS7:
         tsapLogo (int): TSAP address of the LOGO PLC
         tsapServer (int): TSAP address of the local server
         tcpport (int): TCP port for the connection (default: 102)
+        network_adapter (str): Network adapter to use ("auto" or adapter name)
         """
         try:
             self.ip = ip
             self.tsapLogo = tsapLogo
             self.tsapServer = tsapServer
             self.tcpport = tcpport
+            self.network_adapter = network_adapter
             self.logo = snap7.logo.Logo()
             
         except Exception as e:
@@ -94,8 +96,8 @@ class logoS7:
                 return int(bool(value))
             return -1
         except Exception as e:
-            print(f"SetDI() error at byte {byte}, bit {bit}: {e}")
-            return -1
+            # Raise to allow upper layers to disconnect on error
+            raise
 
     def GetDO(self, byte: int, bit: int) -> int:
         """
@@ -115,8 +117,8 @@ class logoS7:
                 return int(bool(data))
             return -1
         except Exception as e:
-            print(f"GetDO() error at byte {byte}, bit {bit}: {e}")
-            return -1
+            # Raise to allow upper layers to disconnect on error
+            raise
 
     def SetAI(self, byte: int, value: int) -> int:
         """
@@ -137,8 +139,8 @@ class logoS7:
                 return val
             return -1
         except Exception as e:
-            print(f"SetAI() error at byte {byte}: {e}")
-            return -1
+            # Raise to allow upper layers to disconnect on error
+            raise
 
     def GetAO(self, byte: int) -> int:
         """
@@ -157,8 +159,8 @@ class logoS7:
                 return int(data)
             return -1
         except Exception as e:
-            print(f"GetAO() error at byte {byte}: {e}")
-            return -1
+            # Raise to allow upper layers to disconnect on error
+            raise
 
     def SetDO(self, byte: int, bit: int, value: bool) -> int:
         """
@@ -179,8 +181,8 @@ class logoS7:
                 return int(bool(value))
             return -1
         except Exception as e:
-            print(f"SetDO() error at byte {byte}, bit {bit}: {e}")
-            return -1
+            # Raise to allow upper layers to disconnect on error
+            raise
 
     def SetAO(self, byte: int, value: int) -> int:
         """

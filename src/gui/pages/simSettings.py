@@ -9,8 +9,7 @@ if str(src_dir) not in sys.path:
     sys.path.insert(0, str(src_dir))
 
 from simulations.PIDtankValve.gui import VatWidget
-# TODO: conveyor simulation not yet migrated
-# from simulations.conveyorSim.SimGui import TransportbandWidget
+from simulations.conveyor.gui import ConveyorWidget
 
 # Import for address updates
 from gui.customWidgets import ReadOnlyTableWidgetItem
@@ -25,8 +24,7 @@ class ProcessSettingsMixin:
     def init_process_settings_page(self):
         """Initialize all process settings page components"""
         self._init_vat_widget()
-        # TODO: Conveyor simulation not yet migrated
-        # self._init_transportband_widget()
+        self._init_conveyor_widget()
         self._init_color_dropdown()
         self._init_controller_dropdown()
         self._init_checkboxes()
@@ -53,6 +51,26 @@ class ProcessSettingsMixin:
                 # Removed unnecessary print
         except Exception as e:
             # Removed unnecessary print
+            pass  # Silently fail if widget container is missing
+
+    def _init_conveyor_widget(self):
+        """Initialize ConveyorWidget"""
+        try:
+            self.conveyor_widget = ConveyorWidget()
+            container = self.findChild(QWidget, "conveyorWidgetContainer")
+
+            if container:
+                existing_layout = container.layout()
+
+                if existing_layout is None:
+                    container_layout = QVBoxLayout(container)
+                    container_layout.setContentsMargins(0, 0, 0, 0)
+                else:
+                    container_layout = existing_layout
+                    container_layout.setContentsMargins(0, 0, 0, 0)
+
+                container_layout.addWidget(self.conveyor_widget)
+        except Exception as e:
             pass  # Silently fail if widget container is missing
 
     def _init_transportband_widget(self):
@@ -106,22 +124,22 @@ class ProcessSettingsMixin:
         try:
             self.controlerDropDown.clear()
             controllers = [
-                "GUI",
-                "logo!",
-                "PLC S7-1500/1200/400/300/ET 200SP",
-                "PLCSim S7-1500 advanced",
-                "PLCSim S7-1500/1200/400/300/ET 200SP"
+                "GUI (MIL)",
+                "logo! (HIL)",
+                "PLC S7-1500/1200/400/300/ET 200SP (HIL)",
+                "PLCSim S7-1500 advanced (SIL)",
+                "PLCSim S7-1500/1200/400/300/ET 200SP (SIL)"
             ]
 
             for controller in controllers:
                 self.controlerDropDown.addItem(controller)
 
-            self.controlerDropDown.setCurrentText("GUI")
-            self.controlerDropDown.currentIndexChanged.connect(
+            self.controlerDropDown.setCurrentText("GUI (MIL)")
+            self.controlerDropDown.currentTextChanged.connect(
                 self.on_controller_changed)
 
             # Disable connect button in GUI mode
-            initial_mode = self.controlerDropDown.currentText()
+            initial_mode = self._get_controller_name(self.controlerDropDown.currentText())
             if initial_mode == "GUI":
                 try:
                     self.pushButton_connect.setEnabled(False)
@@ -130,13 +148,16 @@ class ProcessSettingsMixin:
         except AttributeError as e:
             pass
 
+    def _get_controller_name(self, controller_str):
+        """Extract base controller name from format 'name (MODE)'"""
+        if '(' in controller_str:
+            return controller_str[:controller_str.rfind('(')].strip()
+        return controller_str
+
     def _init_checkboxes(self):
         """Connect all checkboxes"""
         try:
-            self.adjustableValveCheckBox.toggled.connect(
-                self.on_config_changed)
-            self.adjustableHeatingCoilCheckBox.toggled.connect(
-                self.on_config_changed)
+            # Only level and temp checkboxes (valve and heating removed)
             self.levelSwitchesCheckBox.toggled.connect(
                 self.on_config_changed)
             self.analogValueTempCheckBox.toggled.connect(
@@ -159,7 +180,6 @@ class ProcessSettingsMixin:
             ]
             self.entryGroupPower = [
                 self.powerHeatingCoilEntry,
-                self.powerHeatingCoilEntry1,
                 self.powerHeatingCoilEntry2
             ]
 
@@ -178,16 +198,6 @@ class ProcessSettingsMixin:
             self.pushButton_startSimulation.toggled.connect(
                 self.toggle_simulation)
             self.pushButton_startSimulation.setText("START SIMULATION")
-            self.pushButton_startSimulation.setStyleSheet("""
-                QPushButton {
-                    background-color: #44FF44;
-                    color: black;
-                    font-weight: bold;
-                }
-                QPushButton:hover {
-                    background-color: #00CC00;
-                }
-            """)
         except AttributeError:
             pass
 
@@ -234,13 +244,14 @@ class ProcessSettingsMixin:
 
             # Controller mode
             controller_mode = self.controlerDropDown.currentText()
+            controller_mode_name = self._get_controller_name(controller_mode)
             self.vat_widget.controler = controller_mode
 
             # Water color
             self.vat_widget.waterColor = self.colorDropDown.currentData()
 
             # UI Elements visibility
-            is_gui_mode = (controller_mode == "GUI")
+            is_gui_mode = (controller_mode_name == "GUI")
 
             try:
                 if is_gui_mode and self.vat_widget.adjustableValve:
@@ -258,26 +269,17 @@ class ProcessSettingsMixin:
             except AttributeError:
                 pass
 
-            # Valve positions (Klep standen)
-            if self.vat_widget.adjustableValve:
-                try:
-                    self.vat_widget.adjustableValveInValue = min(100, int(
-                        self.valveInEntry.text() or 0))
-                except (ValueError, AttributeError):
-                    self.vat_widget.adjustableValveInValue = 0
-                try:
-                    self.vat_widget.adjustableValveOutValue = min(100, int(
-                        self.valveOutEntry.text() or 0))
-                except (ValueError, AttributeError):
-                    self.vat_widget.adjustableValveOutValue = 0
-            else:
-                try:
-                    top_checked = self.valveInCheckBox.isChecked()
-                    bottom_checked = self.valveOutCheckBox.isChecked()
-                    self.vat_widget.adjustableValveInValue = 100 if top_checked else 0
-                    self.vat_widget.adjustableValveOutValue = 100 if bottom_checked else 0
-                except AttributeError:
-                    pass
+            # Valve positions (always analog now)
+            try:
+                self.vat_widget.adjustableValveInValue = min(100, int(
+                    self.valveInEntry.text() or 0))
+            except (ValueError, AttributeError):
+                self.vat_widget.adjustableValveInValue = 0
+            try:
+                self.vat_widget.adjustableValveOutValue = min(100, int(
+                    self.valveOutEntry.text() or 0))
+            except (ValueError, AttributeError):
+                self.vat_widget.adjustableValveOutValue = 0
 
         except Exception as e:
             pass  # Silently ignore during init or minor update issues
@@ -344,60 +346,39 @@ class ProcessSettingsMixin:
         if checked:
             self.start_simulation()
             self.pushButton_startSimulation.setText("STOP SIMULATION")
-            self.pushButton_startSimulation.setStyleSheet("""
-                QPushButton {
-                    background-color: #FF4444;
-                    color: white;
-                    font-weight: bold;
-                }
-                QPushButton:hover {
-                    background-color: #CC0000;
-                }
-            """)
         else:
             self.stop_simulation()
             self.pushButton_startSimulation.setText("START SIMULATION")
-            self.pushButton_startSimulation.setStyleSheet("""
-                QPushButton {
-                    background-color: #44FF44;
-                    color: black;
-                    font-weight: bold;
-                }
-                QPushButton:hover {
-                    background-color: #00CC00;
-                }
-            """)
 
     def on_controller_changed(self):
         """Callback when controller dropdown changes"""
         new_controller = self.controlerDropDown.currentText()
+        new_controller_name = self._get_controller_name(new_controller)
         self.vat_widget.controler = new_controller
 
         if hasattr(self, 'mainConfig') and self.mainConfig:
             old_protocol = self.mainConfig.plcProtocol
-            self.mainConfig.plcProtocol = new_controller
+            self.mainConfig.plcProtocol = new_controller_name
 
-            if new_controller == "GUI":
+            if new_controller_name == "GUI":
                 self.mainConfig.plcGuiControl = "gui"
                 try:
                     self.pushButton_connect.setEnabled(False)
-                    # Removed unnecessary print
                 except:
                     pass
             else:
                 self.mainConfig.plcGuiControl = "plc"
                 try:
                     self.pushButton_connect.setEnabled(True)
-                    # Removed unnecessary print
+
                 except:
                     pass
 
             # Disconnect if switching to GUI mode
-            if new_controller == "GUI" and hasattr(self, 'validPlcConnection') and self.validPlcConnection:
+            if new_controller_name == "GUI" and hasattr(self, 'validPlcConnection') and self.validPlcConnection:
                 if hasattr(self, 'plc') and self.plc:
                     try:
                         self.plc.disconnect()
-                        # Removed unnecessary print
                     except:
                         pass
                 self.validPlcConnection = False
@@ -411,11 +392,16 @@ class ProcessSettingsMixin:
                     pass
 
             # Update addresses if switching to/from LOGO!
-            if (old_protocol == "logo!" or new_controller == "logo!") and old_protocol != new_controller:
+            if (old_protocol == "logo!" or new_controller_name == "logo!") and old_protocol != new_controller_name:
                 self._update_addresses_for_controller_change(
-                    old_protocol, new_controller)
+                    old_protocol, new_controller_name)
 
         self.vat_widget.rebuild()
+        
+        # Update PLC control widget index based on new mode
+        gui_mode = (new_controller == "GUI")
+        if hasattr(self.vat_widget, 'set_plc_pidcontrol_index'):
+            self.vat_widget.set_plc_pidcontrol_index(gui_mode)
 
     def _update_addresses_for_controller_change(self, old_protocol, new_protocol):
         """Update all addresses when switching to/from LOGO!"""
@@ -473,7 +459,6 @@ class ProcessSettingsMixin:
                         table._save_row_data(row)
                     except AttributeError:
                         pass
-                    # Removed unnecessary print
 
             table.blockSignals(False)
 
@@ -481,8 +466,5 @@ class ProcessSettingsMixin:
             if hasattr(self, 'io_screen'):
                 self.io_screen.save_configuration()
 
-            # Removed unnecessary print
-
         except Exception as e:
-            # Removed unnecessary print
             table.blockSignals(False)

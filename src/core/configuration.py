@@ -6,6 +6,13 @@ This module provides:
 - Save/Load complete simulation states via simulationManager
 - Centralized config access for all modules
 - JSON-based state persistence with validation
+
+External Libraries Used:
+- json (Python Standard Library) - State serialization and persistence
+- csv (Python Standard Library) - Legacy export functionality
+- pathlib (Python Standard Library) - File path handling
+- datetime (Python Standard Library) - Timestamp generation for saved states
+- typing (Python Standard Library) - Type hints for better code clarity
 """
 import csv
 import json
@@ -44,6 +51,10 @@ class configuration:
         self.tsapLogo: int = 0x0300  # CLIENT(sim) SIDE
         self.tsapServer: int = 0x0200  # LOGO SIDE
         
+        # Network adapter selection for PLC discovery
+        # "auto" = check all adapters, or specific adapter name = use only that adapter
+        self.selectedNetworkAdapter: str = "auto"
+        
         # Set True by gui, set False by main
         self.tryConnect: bool = False
         
@@ -51,7 +62,7 @@ class configuration:
         self.importExportVariableList = [
             "plcGuiControl", "plcProtocol",
             "plcIpAdress", "plcPort", "plcRack", "plcSlot", 
-            "tsapLogo", "tsapServer"
+            "tsapLogo", "tsapServer", "selectedNetworkAdapter"
         ]
     
     def saveToFile(self, exportFileName: str, createFile: bool = False) -> bool:
@@ -225,13 +236,11 @@ class configuration:
             with open(export_path, 'w') as f:
                 json.dump(state_data, f, indent=2)
             
-            logger.info(f"Complete state saved to: {export_filename}")
-            print(f"✓ Configuration saved to: {export_filename}")
+            logger.info(f"Configuration saved to: {export_filename}")
             return True
             
         except Exception as e:
-            logger.error(f"Failed to save complete state: {e}")
-            print(f"✗ Failed to save configuration: {e}")
+            logger.error(f"Failed to save configuration: {e}")
             return False
     
     def Load(self, simulation_manager: Optional['SimulationManager'], 
@@ -257,8 +266,7 @@ class configuration:
             import_path = Path(import_filename)
             
             if not import_path.exists():
-                logger.error(f"Import file not found: {import_filename}")
-                print(f"✗ Configuration file not found: {import_filename}")
+                logger.error(f"Configuration file not found: {import_filename}")
                 return False
             
             # Load JSON data
@@ -270,7 +278,6 @@ class configuration:
             for key in required_keys:
                 if key not in state_data:
                     logger.error(f"Invalid state file: missing '{key}'")
-                    print(f"✗ Invalid configuration file: missing '{key}'")
                     return False
             
             # Check version compatibility
@@ -296,14 +303,12 @@ class configuration:
                 # Check if simulation is registered
                 if sim_name not in simulation_manager.get_registered_simulations():
                     logger.error(f"Simulation '{sim_name}' not registered")
-                    print(f"✗ Simulation '{sim_name}' not available")
                     return False
                 
                 # Load the simulation (this will create a new instance)
                 logger.info(f"Loading simulation: {sim_name}")
                 if not simulation_manager.load_simulation(sim_name, sim_name + "_loaded"):
                     logger.error(f"Failed to load simulation: {sim_name}")
-                    print(f"✗ Failed to load simulation: {sim_name}")
                     return False
                 
                 active_sim = simulation_manager.get_active_simulation()
@@ -329,24 +334,19 @@ class configuration:
                             self._deserialize_dict_to_object(active_sim.status, state_data["simulation_status"])
                             logger.info("Simulation status restored")
                     
-                    logger.info(f"Simulation '{sim_name}' loaded and configured")
-                    print(f"✓ Simulation '{sim_name}' loaded successfully")
+                    logger.info(f"Simulation '{sim_name}' loaded successfully")
                 
                 # Note: IO configuration should be loaded separately by the IO handler
                 if "io_config_path" in state_data:
                     io_path = state_data["io_config_path"]
                     logger.info(f"IO configuration path: {io_path}")
-                    print(f"  IO configuration: {io_path}")
             
-            logger.info(f"Complete state loaded from: {import_filename}")
-            print(f"✓ Configuration loaded from: {import_filename}")
+            logger.info(f"Configuration loaded from: {import_filename}")
             return True
             
         except json.JSONDecodeError as e:
-            logger.error(f"Invalid JSON in state file: {e}")
-            print(f"✗ Invalid JSON in configuration file: {e}")
+            logger.error(f"Invalid JSON in configuration file: {e}")
             return False
         except Exception as e:
-            logger.error(f"Failed to load complete state: {e}")
-            print(f"✗ Failed to load configuration: {e}")
+            logger.error(f"Failed to load configuration: {e}")
             return False

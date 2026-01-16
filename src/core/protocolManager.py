@@ -5,6 +5,10 @@ This module is responsible for:
 - Activating specific protocol (Logo S7, PLC S7, PLCSimAPI)
 - Switching between protocol control and GUI control
 - Managing protocol lifecycle and connections
+
+External Libraries Used:
+- typing (Python Standard Library) - Type hints for method signatures
+- logging (Python Standard Library) - Error and info logging
 """
 from typing import Optional, Any
 import logging
@@ -160,8 +164,8 @@ class ProtocolManager:
         
         try:
             if hasattr(self._active_protocol, 'resetSendInputs'):
-                self._active_protocol.resetSendInputs(lowest_byte, highest_byte)
-                return True
+                result = self._active_protocol.resetSendInputs(lowest_byte, highest_byte)
+                return bool(result)  # Return the actual result from protocol
             else:
                 logger.warning(f"Protocol {self._protocol_type} has no resetSendInputs method")
                 return False
@@ -185,8 +189,8 @@ class ProtocolManager:
         
         try:
             if hasattr(self._active_protocol, 'resetSendOutputs'):
-                self._active_protocol.resetSendOutputs(lowest_byte, highest_byte)
-                return True
+                result = self._active_protocol.resetSendOutputs(lowest_byte, highest_byte)
+                return bool(result)  # Return the actual result from protocol
             else:
                 logger.warning(f"Protocol {self._protocol_type} has no resetSendOutputs method")
                 return False
@@ -230,6 +234,7 @@ class ProtocolManager:
         - plcSlot: int
         - tsapLogo: int
         - tsapServer: int
+        - selectedNetworkAdapter: str (optional, default "auto")
         """
         try:
             protocol_type = getattr(config, 'plcProtocol', None)
@@ -237,19 +242,27 @@ class ProtocolManager:
                 logger.warning("No plcProtocol specified in configuration")
                 return None
 
+            # Get network adapter setting, default to "auto"
+            network_adapter = getattr(config, 'selectedNetworkAdapter', 'auto')
+
             # Lazy imports to avoid hard dependencies when unused
             if protocol_type == "PLC S7-1500/1200/400/300/ET 200SP":
                 from IO.protocols.plcS7 import plcS7
-                return plcS7(config.plcIpAdress, config.plcRack, config.plcSlot)
+                return plcS7(config.plcIpAdress, config.plcRack, config.plcSlot, network_adapter=network_adapter)
             elif protocol_type == "logo!":
                 from IO.protocols.logoS7 import logoS7
-                return logoS7(config.plcIpAdress, config.tsapLogo, config.tsapServer)
+                return logoS7(config.plcIpAdress, config.tsapLogo, config.tsapServer, network_adapter=network_adapter)
             elif protocol_type == "PLCSim S7-1500 advanced":
                 from IO.protocols.PLCSimAPI.PLCSimAPI import plcSimAPI
-                return plcSimAPI()
+                return plcSimAPI(network_adapter=network_adapter)
             elif protocol_type == "PLCSim S7-1500/1200/400/300/ET 200SP":
+                # PLCSim protocols only work with local simulators - prevent connection to real PLC
+                ip_address = getattr(config, 'plcIpAdress', '')
+                if ip_address and ip_address != '127.0.0.1' and ip_address != 'localhost':
+                    logger.error(f"PLCSim protocol cannot connect to remote IP '{ip_address}'. PLCSim only works with local simulators (127.0.0.1).")
+                    return None
                 from IO.protocols.PLCSimS7 import plcSimS7
-                return plcSimS7(config.plcIpAdress, config.plcRack, config.plcSlot)
+                return plcSimS7(config.plcIpAdress, config.plcRack, config.plcSlot, network_adapter=network_adapter)
             else:
                 logger.error(f"Unsupported plcProtocol: {protocol_type}")
                 return None
@@ -259,9 +272,14 @@ class ProtocolManager:
 
     def initialize_and_connect(self, config: Any, lowest_byte: int, highest_byte: int) -> bool:
         """
-        Build protocol from config, activate and connect it, then reset IO ranges.
-
-        Returns True on successful connection; False otherwise.
+        Build protocol from config, activate and connect it, then verify IO operations.
+        
+        Connection is defined as:
+        1. TCP connection successful (isConnected() returns True)
+        2. Reset input operations successful 
+        3. Reset output operations successful
+        
+        Returns True only if ALL three conditions are met; False otherwise.
         """
         protocol_instance = self.build_protocol_from_config(config)
         if not protocol_instance:
@@ -271,14 +289,34 @@ class ProtocolManager:
         if not self.activate_protocol(getattr(config, 'plcProtocol', 'UNKNOWN'), protocol_instance):
             return False
 
+        # Attempt TCP connection
         if not self.connect():
+            logger.error("TCP connection failed")
+            self.deactivate()
             return False
 
-        # Prime IO ranges
+        # Verify communication by attempting to reset IO ranges
+        # This ensures the protocol actually works with the hardware
         try:
-            self.reset_inputs(lowest_byte, highest_byte)
-            self.reset_outputs(lowest_byte, highest_byte)
-        except Exception:
-            # Continue even if reset methods are not present
-            pass
-        return True
+            reset_inputs_ok = self.reset_inputs(lowest_byte, highest_byte)
+            if not reset_inputs_ok:
+                logger.error("Failed to reset inputs - protocol mismatch or communication error")
+                self.disconnect()
+                self.deactivate()
+                return False
+            
+            reset_outputs_ok = self.reset_outputs(lowest_byte, highest_byte)
+            if not reset_outputs_ok:
+                logger.error("Failed to reset outputs - protocol mismatch or communication error")
+                self.disconnect()
+                self.deactivate()
+                return False
+            
+            logger.info("Connection verified: isConnected=True AND reset operations successful")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Exception during IO verification: {e}")
+            self.disconnect()
+            self.deactivate()
+            return False

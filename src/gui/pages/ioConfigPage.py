@@ -1,4 +1,4 @@
-# ioConfigPage.py - I/O Configuration Page
+﻿# ioConfigPage.py - I/O Configuration Page
 # Handles:
 # - Custom table and tree widgets (drag & drop)
 # - IOScreen class for I/O management
@@ -116,9 +116,37 @@ class DroppableTableWidget(QTableWidget):
         self.setColumnWidth(7, 100)
     
     def on_item_changed(self, item):
-        """Callback when a cell changes - update address"""
+        """Callback when a cell changes - update address or name"""
         row = item.row()
         col = item.column()
+        
+        # Handle name changes (column 0)
+        if col == 0:
+            old_name = self.row_data.get(row, {}).get(0, "")
+            # Validate name: no empty, trim whitespace
+            name = item.text().strip()
+            if not name:
+                # Restore previous name if empty
+                if row in self.row_data and 'name' in self.row_data[row]:
+                    self.blockSignals(True)
+                    item.setText(self.row_data[row]['name'])
+                    self.blockSignals(False)
+                return
+            
+            # Save the name change
+            self._save_row_data(row)
+            # Mark IO configuration as dirty
+            if hasattr(self, 'parent') and hasattr(self.parent(), '_io_config_dirty'):
+                self.parent()._io_config_dirty = True
+            # Propagate rename to main window so labels/tree stay in sync
+            try:
+                mw = getattr(self, 'io_screen', None).main_window if getattr(self, 'io_screen', None) else None
+                if mw and hasattr(mw, "handle_io_signal_rename"):
+                    # Use old name as canonical fallback; mixin will add alias
+                    mw.handle_io_signal_rename(old_name, old_name, name)
+            except Exception:
+                pass
+            return
         
         if col not in [2, 3]:
             return
@@ -339,20 +367,20 @@ class DroppableTableWidget(QTableWidget):
         """)
         
         if row in self.forced_rows:
-            remove_action = QAction(f"🔓 Remove Force from '{signal_name}'", self)
+            remove_action = QAction(f"[U] Remove Force from '{signal_name}'", self)
             remove_action.triggered.connect(lambda: self.remove_force(row))
             menu.addAction(remove_action)
         else:
             if data_type == 'bool':
-                force_true = QAction(f"🔒 Force '{signal_name}' = TRUE", self)
+                force_true = QAction(f"[F] Force '{signal_name}' = TRUE", self)
                 force_true.triggered.connect(lambda: self.apply_force(row, True))
                 menu.addAction(force_true)
                 
-                force_false = QAction(f"🔒 Force '{signal_name}' = FALSE", self)
+                force_false = QAction(f"[F] Force '{signal_name}' = FALSE", self)
                 force_false.triggered.connect(lambda: self.apply_force(row, False))
                 menu.addAction(force_false)
             else:
-                force_value = QAction(f"🔒 Force '{signal_name}' to value...", self)
+                force_value = QAction(f"[F] Force '{signal_name}' to value...", self)
                 force_value.triggered.connect(lambda: self.apply_force_analog(row, signal_name))
                 menu.addAction(force_value)
         
@@ -368,16 +396,58 @@ class DroppableTableWidget(QTableWidget):
                 row_content[col] = item.text() if item else ""
             rows_data.append(row_content)
         
+        def parse_address(addr):
+            """Parse an address string (e.g., 'I0.5', 'IW10', 'Q2.3') into sortable components.
+            Returns: (prefix_char, number, bit_or_empty)
+            Examples: 'I0.5' -> ('I', 0, 5), 'IW10' -> ('I', 10, -1), 'Q2' -> ('Q', 2, -1)
+            """
+            if not addr:
+                return ('Z', float('inf'), -1)  # Sort empty to end
+            
+            addr = addr.strip()
+            # Try to match patterns like I0.5, IW10, Q2.3, etc.
+            import re
+            
+            # Pattern 1: Digital address with bit (I0.5, Q2.3, etc.)
+            match = re.match(r'^([DIQA])(\d+)\.(\d+)$', addr)
+            if match:
+                prefix, byte_num, bit_num = match.groups()
+                return (prefix, int(byte_num), int(bit_num))
+            
+            # Pattern 2: Word address (IW10, QW5, AW20, etc.)
+            match = re.match(r'^([DIQA])W(\d+)$', addr)
+            if match:
+                prefix, word_num = match.groups()
+                return (prefix, int(word_num), -1)  # -1 indicates word, not bit
+            
+            # Pattern 3: Just byte number (I0, Q2, etc.)
+            match = re.match(r'^([DIQA])(\d+)$', addr)
+            if match:
+                prefix, byte_num = match.groups()
+                return (prefix, int(byte_num), -1)
+            
+            # Fallback: treat as string
+            return (addr[0] if addr else 'Z', float('inf'), -1)
+        
         def sort_key(row_dict):
             val = row_dict.get(column, "")
             if not val:
-                return (1, "")
+                return (1, "", 0, -1)  # Empty rows sort last
             
+            # Try numeric sort first (for columns 2, 3 - byte/bit numbers)
             try:
                 num_val = float(val)
-                return (0, num_val, "")
+                return (0, "", num_val, -1)
             except (ValueError, TypeError):
-                return (0, float('inf'), val)
+                pass
+            
+            # For address column (column 4), use smart address parsing
+            if column == 4:
+                prefix, num, bit = parse_address(val)
+                return (0, prefix, num, bit)
+            
+            # Otherwise treat as string
+            return (0, "", float('inf'), val)
         
         rows_data.sort(key=sort_key, reverse=False)
         
@@ -390,7 +460,8 @@ class DroppableTableWidget(QTableWidget):
         for display_row, row_content in enumerate(rows_data):
             for col in range(self.columnCount()):
                 text = row_content.get(col, "")
-                if col in [2, 3]:
+                # Column 0 (name) and columns 2,3 (byte/bit) are editable
+                if col in [0, 2, 3]:
                     self.setItem(display_row, col, EditableTableWidgetItem(text))
                 else:
                     self.setItem(display_row, col, ReadOnlyTableWidgetItem(text))
@@ -550,10 +621,11 @@ class DroppableTableWidget(QTableWidget):
                         try:
                             json_bytes = event.mimeData().data("application/json")
                             signal_data = json.loads(bytes(json_bytes).decode('utf-8'))
-                        except Exception:                            pass
+                        except Exception:
+                            signal_data = None
                     
                     self.blockSignals(True)
-                    self.setItem(row, 0, ReadOnlyTableWidgetItem(dropped_text))
+                    self.setItem(row, 0, EditableTableWidgetItem(dropped_text))
                     
                     if signal_data:
                         data_type = signal_data.get('type', 'bool')
@@ -567,14 +639,36 @@ class DroppableTableWidget(QTableWidget):
                         else:
                             self.setItem(row, 3, EditableTableWidgetItem(""))
                         self.setItem(row, 4, ReadOnlyTableWidgetItem(full_address))
-                        if 'status' in signal_data:
-                            self.setItem(row, 5, ReadOnlyTableWidgetItem(signal_data['status']))
+                        # Always create a status item with blue background (default display color)
+                        status_text = signal_data.get('status', 'FALSE')
+                        status_item = ReadOnlyTableWidgetItem(status_text)
+                        status_item.setBackground(QColor(200, 230, 245))  # Blue
+                        self.setItem(row, 5, status_item)
+                        try:
+                            if data_type == 'bool':
+                                value = status_text.strip().upper() == 'TRUE'
+                            else:
+                                value = int(status_text)
+                        except Exception:
+                            value = 0
+                        self.update_status_column(row, value)
+                        # Guarantee color even if update_status_column replaced the item
+                        status_item = self.item(row, 5)
+                        if status_item:
+                            status_item.setBackground(QColor(200, 230, 245))  # Blue
                         if 'description' in signal_data:
                             self.setItem(row, 6, ReadOnlyTableWidgetItem(signal_data['description']))
                         if 'range' in signal_data:
                             self.setItem(row, 7, ReadOnlyTableWidgetItem(signal_data['range']))
                         self._save_row_data(row)
                     else:
+                        # No signal_data (e.g., plain text) – still ensure status column gets default blue
+                        data_type_item = self.item(row, 1)
+                        data_type = data_type_item.text() if data_type_item else 'bool'
+                        self.update_status_column(row, False if data_type == 'bool' else 0)
+                        status_item = self.item(row, 5)
+                        if status_item:
+                            status_item.setBackground(QColor(200, 230, 245))  # Blue
                         self._save_row_data(row)
                     
                     self.blockSignals(False)
@@ -612,10 +706,10 @@ class DroppableTableWidget(QTableWidget):
         """Apply force to a signal"""
         self.forced_rows[row] = {"value": value}
         
-        for col in range(self.columnCount()):
-            item = self.item(row, col)
-            if item:
-                item.setBackground(Qt.yellow)
+        # Only highlight the Status cell (column 5), not the entire row
+        item = self.item(row, 5)
+        if item:
+            item.setBackground(Qt.yellow)
 
     def apply_force_analog(self, row, signal_name):
         """Apply force to an analog signal with dialog"""
@@ -632,7 +726,7 @@ class DroppableTableWidget(QTableWidget):
         status_item = self.item(row, 5)
         if status_item and status_item.text():
             try:
-                text = status_item.text().replace("🔒", "").strip()
+                text = status_item.text().replace("[F]", "").strip()
                 current_value = int(text)
             except ValueError:
                 current_value = 0
@@ -655,11 +749,14 @@ class DroppableTableWidget(QTableWidget):
         if row in self.forced_rows:
             del self.forced_rows[row]
             
-            # Update color back to default (white)
-            for col in range(self.columnCount()):
-                item = self.item(row, col)
-                if item:
-                    item.setBackground(Qt.white)
+            # Only reset the Status cell (column 5)
+            item = self.item(row, 5)
+            if item:
+                # Restore green if force mode is still enabled, blue if disabled
+                if self.force_enabled:
+                    item.setBackground(QColor(200, 255, 200))  # Light green
+                else:
+                    item.setBackground(QColor(200, 230, 245))  # Blue
 
     def get_forced_value(self, row):
         """Get forced value for a row, or None if not forced"""
@@ -690,22 +787,27 @@ class DroppableTableWidget(QTableWidget):
         
         is_forced = self.is_row_forced(row)
         if is_forced:
-            display_text = f"[LOCKED] {display_text}"
+            display_text = f"[F] {display_text}"  # Lock icon instead of [LOCKED]
         
         if status_item:
             status_item.setText(display_text)
             
             if is_forced:
                 status_item.setBackground(Qt.yellow)
+            elif self.force_enabled:
+                # In force mode but not forced - use green to show available for forcing
+                status_item.setBackground(QColor(200, 255, 200))  # Light green
             else:
-                # Use a specific color for unforced, active status display
-                status_item.setBackground(QColor(200, 255, 200))
+                # Normal display - use blue
+                status_item.setBackground(QColor(200, 230, 245))
         else:
             new_item = ReadOnlyTableWidgetItem(display_text)
             if is_forced:
                 new_item.setBackground(Qt.yellow)
+            elif self.force_enabled:
+                new_item.setBackground(QColor(200, 255, 200))  # Light green
             else:
-                new_item.setBackground(QColor(200, 255, 200))
+                new_item.setBackground(QColor(200, 230, 245))  # Blue
             self.setItem(row, 5, new_item)
 
 
@@ -758,6 +860,7 @@ class IOScreen:
         }
         
         self.config_file = Path("io_config.json")
+        self.loading_config = False  # Flag to prevent auto-resolution during config loads
 
     def get_offset(self, offset_type):
         """Get a byte offset"""
@@ -785,9 +888,50 @@ class IOScreen:
                 return True, row
         
         return False, None
+
+    def find_first_free_address(self, io_prefix, data_type, exclude_row=None):
+        """Find the first available address for the given prefix and data type, respecting byte offsets"""
+        table = self.main_window.tableWidget_IO
+        
+        # Determine the offset type and stepping based on data type and io_prefix
+        if data_type == 'bool':
+            offset_type = f"Bool{('Input' if io_prefix == 'I' else 'Output')}"
+            step = 1
+            start_byte = self.byte_offsets.get(offset_type, 0)
+            max_byte = 256
+            
+            for byte_num in range(start_byte, max_byte, step):
+                for bit_num in range(8):
+                    address = f"{io_prefix}{byte_num}.{bit_num}"
+                    in_use, _ = self.is_address_in_use(address, exclude_row=exclude_row)
+                    if not in_use:
+                        return address, byte_num, bit_num
+        
+        elif data_type in ['int', 'word']:
+            # For WORD/DWORD, the offset is in bytes, so we need to convert to word addresses
+            offset_type = f"DWORD{('Input' if io_prefix == 'I' else 'Output')}"
+            byte_offset = self.byte_offsets.get(offset_type, 0)
+            # Convert byte offset to word address (divide by 2 since each word is 2 bytes)
+            start_byte = byte_offset
+            step = 2  # WORD addresses are 2 bytes apart
+            max_byte = 256
+            
+            for byte_num in range(start_byte, max_byte, step):
+                address = f"{io_prefix}W{byte_num}"
+                in_use, _ = self.is_address_in_use(address, exclude_row=exclude_row)
+                if not in_use:
+                    return address, byte_num, -1
+        
+        return None, None, None
     
     def validate_and_fix_manual_address(self, row):
-        """Validate a manually entered address"""
+        """Validate a manually entered address and resolve conflicts automatically"""
+        # Don't auto-resolve during config loads - just validate
+        if getattr(self, 'loading_config', False):
+            table = self.main_window.tableWidget_IO
+            table._save_row_data(row)
+            return
+        
         table = self.main_window.tableWidget_IO
         
         byte_item = table.item(row, 2)
@@ -817,19 +961,83 @@ class IOScreen:
             else:
                 return
             
-            in_use, _ = self.is_address_in_use(proposed_address, exclude_row=row)
+            in_use, conflict_row = self.is_address_in_use(proposed_address, exclude_row=row)
             
-            if in_use:
-                old_address = old_row_data.get(4, "")
+            if in_use and conflict_row is not None:
+                # Address is in use by another tag - find first free address for conflicting tag
                 table.blockSignals(True)
-                if addr_item:
-                    addr_item.setText(old_address)
-                table.blockSignals(False)
+                
+                # Get the conflicting tag's data type to find appropriate free address
+                conflict_type_item = table.item(conflict_row, 1)
+                conflict_type = conflict_type_item.text() if conflict_type_item else 'bool'
+                conflict_signal = table.item(conflict_row, 0).text() if table.item(conflict_row, 0) else "unknown"
+                
+                # Find first free address for the conflicting tag
+                free_addr, free_byte, free_bit = self.find_first_free_address(io_prefix, conflict_type, exclude_row=conflict_row)
+                
+                if free_addr:
+                    # Move the conflicting tag to the free address
+                    conflict_byte_item = table.item(conflict_row, 2)
+                    conflict_addr_item = table.item(conflict_row, 4)
+                    
+                    # Update byte column (make sure it's an EditableTableWidgetItem)
+                    if not isinstance(conflict_byte_item, EditableTableWidgetItem):
+                        conflict_byte_item = EditableTableWidgetItem(str(free_byte))
+                        table.setItem(conflict_row, 2, conflict_byte_item)
+                    else:
+                        conflict_byte_item.setText(str(free_byte))
+                    
+                    # Update bit column if bool
+                    if conflict_type == 'bool' and free_bit >= 0:
+                        conflict_bit_item = table.item(conflict_row, 3)
+                        if not isinstance(conflict_bit_item, EditableTableWidgetItem):
+                            conflict_bit_item = EditableTableWidgetItem(str(free_bit))
+                            table.setItem(conflict_row, 3, conflict_bit_item)
+                        else:
+                            conflict_bit_item.setText(str(free_bit))
+                    
+                    # Update address column (make sure it's a ReadOnlyTableWidgetItem)
+                    if not isinstance(conflict_addr_item, ReadOnlyTableWidgetItem):
+                        conflict_addr_item = ReadOnlyTableWidgetItem(free_addr)
+                        table.setItem(conflict_row, 4, conflict_addr_item)
+                    else:
+                        conflict_addr_item.setText(free_addr)
+                    
+                    # Update current row's address to the proposed address (which is now free)
+                    if not isinstance(addr_item, ReadOnlyTableWidgetItem):
+                        addr_item = ReadOnlyTableWidgetItem(proposed_address)
+                        table.setItem(row, 4, addr_item)
+                    else:
+                        addr_item.setText(proposed_address)
+                    
+                    # Save both rows
+                    table._save_row_data(conflict_row)
+                    table._save_row_data(row)
+                    
+                    table.blockSignals(False)
+                    self.save_configuration()
+                    
+                    # Mark config as dirty to trigger reload
+                    try:
+                        if hasattr(self.main_window, '_io_config_dirty'):
+                            self.main_window._io_config_dirty = True
+                    except:
+                        pass
+                    
+                    print(f"[AUTO-RESOLVE] Moved '{conflict_signal}' from {proposed_address} to {free_addr}")
+                else:
+                    # No free address found, revert the change
+                    old_address = old_row_data.get(4, "")
+                    table.blockSignals(True)
+                    if addr_item:
+                        addr_item.setText(old_address)
+                    table.blockSignals(False)
             else:
+                # No conflict, just save the new address
                 table._save_row_data(row)
                 self.save_configuration()
             
-        except (ValueError, AttributeError):
+        except (ValueError, AttributeError) as e:
             pass
     
     def save_configuration(self):
@@ -838,7 +1046,7 @@ class IOScreen:
         tank_dir = root_dir.parent 
         tank_dir.mkdir(exist_ok=True)
 
-        self.config_file = tank_dir / "tankSim" / "io_configuration.json"
+        self.config_file = tank_dir / "IO" / "IO_configuration.json"
         table = self.main_window.tableWidget_IO
             
         config_data = {
@@ -948,6 +1156,7 @@ class IOConfigMixin:
         self._connect_offset_buttons()
         self._connect_io_buttons()
         self._connect_force_button()
+        self._init_force_state_label()
         
         # Don't load tree at startup - only load when simulation is started
         # Tree will be loaded when start_simulation() is called
@@ -980,7 +1189,8 @@ class IOConfigMixin:
             
             self.treeWidget_IO = DraggableTreeWidget(parent)
             self.treeWidget_IO.setHeaderLabel("IN/OUTPUTS")
-            self.treeWidget_IO.setMinimumSize(250, 300)
+            self.treeWidget_IO.setMinimumSize(0, 0)
+            self.treeWidget_IO.setMaximumWidth(300)
             
             if layout:
                 layout.replaceWidget(old_tree, self.treeWidget_IO)
@@ -1002,6 +1212,7 @@ class IOConfigMixin:
             self.pushButton_SaveIO.clicked.connect(self.save_io_configuration)
             self.pushButton_LoadIO.clicked.connect(self.load_io_configuration)
             self.pushButton_ReloadConfig.clicked.connect(self.reload_io_config)
+            self.QPushButtonLoadAllTags.clicked.connect(self.load_all_tags_to_table)
         except AttributeError:
             pass # Removed print
     
@@ -1012,6 +1223,18 @@ class IOConfigMixin:
             self.pushButton_AllowForce.setCheckable(True)
         except AttributeError:
             pass # Removed print
+    
+    def _init_force_state_label(self):
+        """Initialize the force state label on startup"""
+        if hasattr(self, 'Label_Forcestate'):
+            self.Label_Forcestate.setText("● Forcing OFF")
+            self.Label_Forcestate.setStyleSheet("""QLabel {
+    background-color: #f5f5f5;
+    border: 1px solid #d0d0d0;
+    border-radius: 4px;
+    padding: 8px;
+    color: #333333;
+}""")
     
     def load_io_tree(self):
         """Load IO signals from XML file based on active simulation"""
@@ -1058,15 +1281,19 @@ class IOConfigMixin:
             tree = ET.parse(str(xml_file))
             root = tree.getroot()
             
-            # Always load GeneralControls first
-            general = root.find('GeneralControls')
-            if general is not None:
-                self._load_generalcontrols_signals(general)
-            
-            # Load simulation-specific signals
+            # Load simulation-specific signals (original format)
             pidtank = root.find('PIDtankValve')
             if pidtank is not None:
                 self._load_simulation_signals(pidtank, "PIDtankValve")
+            
+            # Load split PIDtankValve sections (sensors and controls)
+            pidtank_sensors = root.find('PIDtankValve_Sensors_Actuators')
+            if pidtank_sensors is not None:
+                self._load_simulation_signals(pidtank_sensors, "PIDtankValve_Sensors_Actuators")
+            
+            pidtank_controls = root.find('PIDtankValve_PLC_Controls')
+            if pidtank_controls is not None:
+                self._load_simulation_signals(pidtank_controls, "PIDtankValve_PLC_Controls")
             
             conveyor = root.find('ConveyorSim')
             if conveyor is not None:
@@ -1077,8 +1304,20 @@ class IOConfigMixin:
             if tanksim is not None:
                 self._load_tanksim_signals(tanksim)
             
+            # Load GeneralControls last
+            general = root.find('GeneralControls')
+            if general is not None:
+                self._load_generalcontrols_signals(general)
+            
             self.treeWidget_IO.expandAll()
             logger.info(f"IO tree loaded successfully from {active_sim}")
+
+            # Refresh labels if custom names exist
+            try:
+                if hasattr(self, '_refresh_general_control_labels_from_mapping'):
+                    self._refresh_general_control_labels_from_mapping()
+            except Exception:
+                pass
             
         except Exception as e:
             logger.error(f"Error loading IO tree: {e}", exc_info=True)
@@ -1168,6 +1407,160 @@ class IOConfigMixin:
                     if hasattr(self.treeWidget_IO, 'signal_data'):
                         self.treeWidget_IO.signal_data[signal_name] = signal_info
     
+    def load_all_tags_to_table(self):
+        """Load all draggable tags from tree into table"""
+        if not hasattr(self, 'treeWidget_IO') or self.treeWidget_IO is None:
+            QMessageBox.warning(self, "Error", "No tags available to load")
+            return
+        
+        if not hasattr(self, 'tableWidget_IO') or self.tableWidget_IO is None:
+            QMessageBox.warning(self, "Error", "Table not initialized")
+            return
+        
+        # Update byte offsets from UI before loading tags
+        try:
+            bool_input = int(self.QLineEdit_BoolInput.text())
+            bool_output = int(self.QLineEdit_BoolOutput.text())
+            dword_input = int(self.QLineEdit_DWORDInput.text())
+            dword_output = int(self.QLineEdit_DWORDOutput.text())
+            
+            self.io_screen.byte_offsets = {
+                'BoolInput': bool_input,
+                'BoolOutput': bool_output,
+                'DWORDInput': dword_input,
+                'DWORDOutput': dword_output
+            }
+        except (ValueError, AttributeError):
+            pass
+        
+        # Prevent auto-conflict resolution while loading all tags
+        self.io_screen.loading_config = True
+        
+        try:
+            # Get all signal items from the tree (leaf nodes only)
+            all_signals = []
+            
+            def collect_signals(item):
+                """Recursively collect all leaf items (signals)"""
+                if item.childCount() == 0:
+                    # This is a leaf node (actual signal)
+                    signal_name = item.text(0)
+                    # Skip category labels and empty items
+                    if signal_name and signal_name not in ['Inputs', 'Outputs', 'Digital', 'Analog', 'TankSim', 'ConveyorSim', 'GeneralControls']:
+                        # Get signal data if available
+                        signal_data = None
+                        if hasattr(self.treeWidget_IO, 'signal_data') and signal_name in self.treeWidget_IO.signal_data:
+                            signal_data = self.treeWidget_IO.signal_data[signal_name].copy()
+                        all_signals.append((signal_name, signal_data))
+                else:
+                    # Recurse through children
+                    for i in range(item.childCount()):
+                        collect_signals(item.child(i))
+            
+            # Start from root
+            root = self.treeWidget_IO.invisibleRootItem()
+            for i in range(root.childCount()):
+                collect_signals(root.child(i))
+
+            # Deduplicate by name to avoid blank rows when duplicates exist in the tree
+            seen = set()
+            dedup_signals = []
+            for name, sd in all_signals:
+                if name in seen:
+                    continue
+                seen.add(name)
+                dedup_signals.append((name, sd))
+            all_signals = dedup_signals
+            
+            if not all_signals:
+                QMessageBox.information(self, "No Tags", "No tags found to load")
+                return
+            
+            # Replace table contents from scratch to avoid leading empty rows
+            table = self.tableWidget_IO
+            table.blockSignals(True)
+            table.setRowCount(0)
+            table.setRowCount(len(all_signals))
+
+            # Add all signals to table
+            for current_row, (signal_name, signal_data) in enumerate(all_signals):
+                # Remove duplicates first (defensive if table had prior entries)
+                table.remove_duplicate_signals(signal_name, exclude_row=current_row)
+
+                # Set signal name
+                table.setItem(current_row, 0, EditableTableWidgetItem(signal_name))
+
+                # If signal_data is missing (shouldn't happen), fall back to a safe default
+                if not signal_data:
+                    signal_data = {
+                        'type': 'bool',
+                        'io_prefix': 'I',
+                        'status': 'FALSE',
+                        'description': '',
+                        'range': ''
+                    }
+
+                data_type = signal_data.get('type', 'bool')
+                table.setItem(current_row, 1, ReadOnlyTableWidgetItem(data_type))
+
+                io_prefix = signal_data.get('io_prefix', 'I')
+                byte_num, bit_num, full_address = table.find_free_address(io_prefix, data_type)
+                table.setItem(current_row, 2, EditableTableWidgetItem(str(byte_num)))
+                if bit_num is not None:
+                    table.setItem(current_row, 3, EditableTableWidgetItem(str(bit_num)))
+                else:
+                    table.setItem(current_row, 3, EditableTableWidgetItem(""))
+                table.setItem(current_row, 4, ReadOnlyTableWidgetItem(full_address))
+
+                # Status column with blue background (default display color)
+                status_text = signal_data.get('status', 'FALSE')
+                status_item = ReadOnlyTableWidgetItem(status_text)
+                status_item.setBackground(QColor(200, 230, 245))  # Blue
+                table.setItem(current_row, 5, status_item)
+
+                # Update status value
+                try:
+                    if data_type == 'bool':
+                        value = status_text.strip().upper() == 'TRUE'
+                    else:
+                        value = int(status_text)
+                except Exception:
+                    value = 0
+                table.update_status_column(current_row, value)
+
+                # Ensure blue background is maintained
+                status_item = table.item(current_row, 5)
+                if status_item:
+                    status_item.setBackground(QColor(200, 230, 245))  # Blue
+
+                if 'description' in signal_data:
+                    table.setItem(current_row, 6, ReadOnlyTableWidgetItem(signal_data['description']))
+                if 'range' in signal_data:
+                    table.setItem(current_row, 7, ReadOnlyTableWidgetItem(signal_data['range']))
+
+                table._save_row_data(current_row)
+            
+            table.blockSignals(False)
+            
+            # Save configuration
+            if self.io_screen:
+                self.io_screen.save_configuration()
+                # Mark IO configuration as dirty
+                try:
+                    if hasattr(self, '_mark_io_dirty'):
+                        self._mark_io_dirty()
+                except Exception:
+                    pass
+            
+            QMessageBox.information(self, "Success", f"Loaded {len(all_signals)} tags into table")
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to load tags: {str(e)}")
+            logger.error(f"Error loading all tags: {e}", exc_info=True)
+        finally:
+            # Re-enable auto-conflict resolution after loading
+            self.io_screen.loading_config = False
+    
     def apply_offsets(self):
         """Apply offset values"""
         try:
@@ -1212,8 +1605,8 @@ class IOConfigMixin:
         """Reset offsets to defaults"""
         self.QLineEdit_BoolInput.setText("0")
         self.QLineEdit_BoolOutput.setText("0")
-        self.QLineEdit_DWORDInput.setText("2")
-        self.QLineEdit_DWORDOutput.setText("2")
+        self.QLineEdit_DWORDInput.setText("4")
+        self.QLineEdit_DWORDOutput.setText("4")
         
         self.io_screen.reset_offsets_to_default()
         # Mark dirty due to offset changes
@@ -1237,6 +1630,13 @@ class IOConfigMixin:
                 'offsets': self.io_screen.byte_offsets.copy(),
                 'signals': []
             }
+
+            # Persist custom signal name overrides (e.g., Control/Indicator aliases)
+            try:
+                if hasattr(self, 'tanksim_config') and hasattr(self.tanksim_config, 'custom_signal_names'):
+                    config_data['custom_signal_names'] = self.tanksim_config.custom_signal_names.copy()
+            except Exception:
+                pass
             
             for row in range(table.rowCount()):
                 name_item = table.item(row, 0)
@@ -1279,6 +1679,20 @@ class IOConfigMixin:
             if 'signals' not in config_data:
                 QMessageBox.warning(self, "Invalid File", "Invalid configuration")
                 return
+
+            # Restore custom signal names into mapping before applying table data
+            if hasattr(self, 'tanksim_config') and 'custom_signal_names' in config_data:
+                for attr, custom_name in config_data['custom_signal_names'].items():
+                    # Find all existing keys pointing to this attr and add alias
+                    if hasattr(self.tanksim_config, 'io_signal_mapping'):
+                        for default_name, attr_name in list(self.tanksim_config.io_signal_mapping.items()):
+                            if attr_name == attr:
+                                self.tanksim_config.io_signal_mapping[custom_name] = attr
+                                if hasattr(self.tanksim_config, 'reverse_io_mapping'):
+                                    self.tanksim_config.reverse_io_mapping[attr] = custom_name
+                        # Persist in config
+                        if hasattr(self.tanksim_config, 'custom_signal_names'):
+                            self.tanksim_config.custom_signal_names[attr] = custom_name
             
             reply = QMessageBox.question(
                 self, "Confirm Load",
@@ -1288,35 +1702,43 @@ class IOConfigMixin:
             if reply == QMessageBox.No:
                 return
             
-            table = self.tableWidget_IO
-            table.blockSignals(True)
+            # Prevent auto-conflict resolution while loading config
+            self.io_screen.loading_config = True
             
-            # Clear all current data
-            for row in range(table.rowCount()):
-                table._clear_row_data(row)
-            
-            if 'offsets' in config_data:
-                self.io_screen.byte_offsets = config_data['offsets'].copy()
-                self.QLineEdit_BoolInput.setText(str(config_data['offsets'].get('BoolInput', 0)))
-                self.QLineEdit_BoolOutput.setText(str(config_data['offsets'].get('BoolOutput', 0)))
-                self.QLineEdit_DWORDInput.setText(str(config_data['offsets'].get('DWORDInput', 2)))
-                self.QLineEdit_DWORDOutput.setText(str(config_data['offsets'].get('DWORDOutput', 2)))
-            
-            for idx, signal in enumerate(config_data['signals']):
-                if idx >= table.rowCount():
-                    break
+            try:
+                table = self.tableWidget_IO
+                table.blockSignals(True)
                 
-                table.setItem(idx, 0, ReadOnlyTableWidgetItem(signal.get('name', '')))
-                table.setItem(idx, 1, ReadOnlyTableWidgetItem(signal.get('type', '')))
-                table.setItem(idx, 2, EditableTableWidgetItem(signal.get('byte', '')))
-                table.setItem(idx, 3, EditableTableWidgetItem(signal.get('bit', '')))
-                table.setItem(idx, 4, ReadOnlyTableWidgetItem(signal.get('address', '')))
-                table.setItem(idx, 5, ReadOnlyTableWidgetItem(signal.get('status', '')))
-                table.setItem(idx, 6, ReadOnlyTableWidgetItem(signal.get('description', '')))
-                table.setItem(idx, 7, ReadOnlyTableWidgetItem(signal.get('range', '')))
-                table._save_row_data(idx)
-            
-            table.blockSignals(False)
+                # Clear all current data
+                for row in range(table.rowCount()):
+                    table._clear_row_data(row)
+                
+                if 'offsets' in config_data:
+                    self.io_screen.byte_offsets = config_data['offsets'].copy()
+                    self.QLineEdit_BoolInput.setText(str(config_data['offsets'].get('BoolInput', 0)))
+                    self.QLineEdit_BoolOutput.setText(str(config_data['offsets'].get('BoolOutput', 0)))
+                    self.QLineEdit_DWORDInput.setText(str(config_data['offsets'].get('DWORDInput', 2)))
+                    self.QLineEdit_DWORDOutput.setText(str(config_data['offsets'].get('DWORDOutput', 2)))
+                
+                for idx, signal in enumerate(config_data['signals']):
+                    if idx >= table.rowCount():
+                        break
+                    
+                    # Column 0 (name) should be editable, all others read-only except byte/bit
+                    table.setItem(idx, 0, EditableTableWidgetItem(signal.get('name', '')))
+                    table.setItem(idx, 1, ReadOnlyTableWidgetItem(signal.get('type', '')))
+                    table.setItem(idx, 2, EditableTableWidgetItem(signal.get('byte', '')))
+                    table.setItem(idx, 3, EditableTableWidgetItem(signal.get('bit', '')))
+                    table.setItem(idx, 4, ReadOnlyTableWidgetItem(signal.get('address', '')))
+                    table.setItem(idx, 5, ReadOnlyTableWidgetItem(signal.get('status', '')))
+                    table.setItem(idx, 6, ReadOnlyTableWidgetItem(signal.get('description', '')))
+                    table.setItem(idx, 7, ReadOnlyTableWidgetItem(signal.get('range', '')))
+                    table._save_row_data(idx)
+                
+                table.blockSignals(False)
+            finally:
+                # Re-enable auto-conflict resolution after loading
+                self.io_screen.loading_config = False
             QMessageBox.information(self, "Success", "Configuration loaded")
             self.io_screen.save_configuration()
             # Loading does not activate; mark dirty
@@ -1328,34 +1750,85 @@ class IOConfigMixin:
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to load: {str(e)}")
 
-    def reload_io_config(self):
-        """Reload IO configuration"""
+    def reload_io_config(self, skip_confirmation=False):
+        """Reload IO configuration - saves current table first, then reloads from file"""
         try:
             if not hasattr(self, 'tanksim_config') or self.tanksim_config is None:
                 QMessageBox.warning(self, "Error", "TankSim config unavailable")
                 return
             
-            project_root = Path(__file__).resolve().parent.parent
-            io_config_path = project_root / "tankSim" / "io_configuration.json"
+            # __file__ is in src/gui/pages/ioConfigPage.py
+            # .parent = src/gui/pages
+            # .parent.parent = src/gui
+            # .parent.parent.parent = src
+            project_root = Path(__file__).resolve().parent.parent.parent
+            io_config_path = project_root / "IO" / "IO_configuration.json"
             
-            if not io_config_path.exists():
-                QMessageBox.warning(self, "File Not Found", f"Config file not found")
+            # Ensure IO directory exists
+            io_config_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Skip confirmation dialog if skip_confirmation=True
+            if not skip_confirmation:
+                reply = QMessageBox.question(
+                    self, "Confirm Activation",
+                    "Activate and reload configuration?\n\n"
+                    "This will:\n"
+                    "1. Save current table to IO_configuration.json\n"
+                    "2. Reload configuration from file\n"
+                    "3. Disconnect active PLC connections if needed",
+                    QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+                
+                if reply == QMessageBox.No:
+                    return
+            
+            # STEP 1: Save the current table to the default JSON location
+            try:
+                table = self.tableWidget_IO
+                config_data = {
+                    'offsets': self.io_screen.byte_offsets.copy(),
+                    'signals': []
+                }
+                
+                # Persist custom signal name overrides
+                try:
+                    if hasattr(self.tanksim_config, 'custom_signal_names'):
+                        config_data['custom_signal_names'] = self.tanksim_config.custom_signal_names.copy()
+                except Exception:
+                    pass
+                
+                # Save all signals from table
+                for row in range(table.rowCount()):
+                    name_item = table.item(row, 0)
+                    if not name_item or not name_item.text():
+                        continue
+                    
+                    cfg = {
+                        'name': table.item(row, 0).text(),
+                        'type': table.item(row, 1).text() if table.item(row, 1) else "",
+                        'byte': table.item(row, 2).text() if table.item(row, 2) else "",
+                        'bit': table.item(row, 3).text() if table.item(row, 3) else "",
+                        'address': table.item(row, 4).text() if table.item(row, 4) else "",
+                        'status': table.item(row, 5).text() if table.item(row, 5) else "",
+                        'description': table.item(row, 6).text() if table.item(row, 6) else "",
+                        'range': table.item(row, 7).text() if table.item(row, 7) else ""
+                    }
+                    config_data['signals'].append(cfg)
+                
+                # Write to JSON file
+                with open(io_config_path, 'w', encoding='utf-8') as f:
+                    json.dump(config_data, f, indent=2, ensure_ascii=False)
+                    
+            except Exception as e:
+                QMessageBox.critical(self, "Save Error", f"Failed to save configuration: {str(e)}")
                 return
             
-            reply = QMessageBox.question(
-                self, "Confirm Reload",
-                "Reload configuration? Active PLC connections may be affected.",
-                QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
-            
-            if reply == QMessageBox.No:
-                return
-            
-            # Disconnect PLC if connected
+            # STEP 2: Disconnect PLC if connected
             if hasattr(self, 'validPlcConnection') and self.validPlcConnection:
                 if hasattr(self, 'plc') and self.plc:
                     try:
                         self.plc.disconnect()
-                    except Exception:                        pass
+                    except Exception:
+                        pass
                 
                 self.validPlcConnection = False
                 self.plc = None
@@ -1365,12 +1838,13 @@ class IOConfigMixin:
                     self.pushButton_connect.blockSignals(True)
                     self.pushButton_connect.setChecked(False)
                     self.pushButton_connect.blockSignals(False)
-                except Exception:                    pass
+                except Exception:
+                    pass
             
-            # Load config from file into main object
+            # STEP 3: Load config from file into main object
             self.tanksim_config.load_io_config_from_file(io_config_path)
             
-            # Update GUI offsets from loaded config
+            # STEP 4: Update GUI offsets from loaded config
             try:
                 with open(io_config_path, 'r', encoding='utf-8') as f:
                     config_data = json.load(f)
@@ -1382,19 +1856,307 @@ class IOConfigMixin:
                     self.QLineEdit_DWORDInput.setText(str(config_data['offsets'].get('DWORDInput', 2)))
                     self.QLineEdit_DWORDOutput.setText(str(config_data['offsets'].get('DWORDOutput', 2)))
             except Exception as e:
-                pass # Removed print
+                pass
             
-            self._update_table_from_config()
+            # STEP 5: Update table from reloaded config
+            # Prevent auto-conflict resolution while loading config
+            self.io_screen.loading_config = True
+            try:
+                self._update_table_from_config()
+            finally:
+                self.io_screen.loading_config = False
             
-            QMessageBox.information(self, "Success", "Configuration reloaded")
+            # STEP 5.5: Start forced write period (500ms) to initialize all IO states
+            try:
+                if hasattr(self, 'mainConfig') and hasattr(self.mainConfig, 'ioHandler'):
+                    self.mainConfig.ioHandler.start_force_write_period()
+                    logger.info("Configuration reloaded - starting 500ms IO initialization period")
+            except Exception as e:
+                logger.warning(f"Could not start force write period: {e}")
+            
+            QMessageBox.information(self, "Success", "Configuration activated and reloaded successfully")
             # Reload activates config; clear dirty state
             try:
                 self._io_config_dirty = False
             except Exception:
                 pass
             
+            # STEP 6: Auto-connect after successful configuration load
+            try:
+                # Only auto-connect if not in GUI mode
+                if (hasattr(self, 'mainConfig') and self.mainConfig and 
+                    self.mainConfig.plcGuiControl != "gui" and
+                    hasattr(self, 'pushButton_connect') and self.pushButton_connect):
+                    
+                    self.pushButton_connect.blockSignals(True)
+                    self.pushButton_connect.setChecked(True)
+                    self.pushButton_connect.blockSignals(False)
+                    
+                    # Trigger the connect action
+                    if hasattr(self, 'mainConfig'):
+                        self.mainConfig.tryConnect = True
+            except Exception as e:
+                pass  # Silently fail if auto-connect fails
+            
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to reload: {str(e)}")
+            QMessageBox.critical(self, "Error", f"Failed to activate/reload: {str(e)}")
+        
+    def _reload_io_config_without_confirmation(self):
+        """Reload IO configuration without showing confirmation dialog - same as reload_io_config but skips dialog"""
+        
+        try:
+            if not hasattr(self, 'tanksim_config') or self.tanksim_config is None:
+                # If tanksim_config not available here, try calling reload directly
+                self.reload_io_config()
+                return
+            
+            # __file__ is in src/gui/pages/ioConfigPage.py
+            project_root = Path(__file__).resolve().parent.parent.parent
+            io_config_path = project_root / "IO" / "IO_configuration.json"
+            
+            # Ensure IO directory exists
+            io_config_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            # STEP 1: Save the current table to the default JSON location
+            try:
+                table = self.tableWidget_IO
+                config_data = {
+                    'offsets': self.io_screen.byte_offsets.copy(),
+                    'signals': []
+                }
+                
+                # Persist custom signal name overrides
+                try:
+                    if hasattr(self.tanksim_config, 'custom_signal_names'):
+                        config_data['custom_signal_names'] = self.tanksim_config.custom_signal_names.copy()
+                except Exception:
+                    pass
+                
+                # Save all signals from table
+                for row in range(table.rowCount()):
+                    name_item = table.item(row, 0)
+                    if not name_item or not name_item.text():
+                        continue
+                    
+                    cfg = {
+                        'name': table.item(row, 0).text(),
+                        'type': table.item(row, 1).text() if table.item(row, 1) else "",
+                        'byte': table.item(row, 2).text() if table.item(row, 2) else "",
+                        'bit': table.item(row, 3).text() if table.item(row, 3) else "",
+                        'address': table.item(row, 4).text() if table.item(row, 4) else "",
+                        'status': table.item(row, 5).text() if table.item(row, 5) else "",
+                        'description': table.item(row, 6).text() if table.item(row, 6) else "",
+                        'range': table.item(row, 7).text() if table.item(row, 7) else ""
+                    }
+                    config_data['signals'].append(cfg)
+                
+                # Write to JSON file
+                with open(io_config_path, 'w', encoding='utf-8') as f:
+                    json.dump(config_data, f, indent=2, ensure_ascii=False)
+                    
+            except Exception as e:
+                return
+            
+            # STEP 2: Disconnect PLC if connected
+            if hasattr(self, 'validPlcConnection') and self.validPlcConnection:
+                if hasattr(self, 'plc') and self.plc:
+                    try:
+                        self.plc.disconnect()
+                    except Exception:
+                        pass
+                
+                self.validPlcConnection = False
+                self.plc = None
+                self.update_connection_status_icon()
+                
+                try:
+                    self.pushButton_connect.blockSignals(True)
+                    self.pushButton_connect.setChecked(False)
+                    self.pushButton_connect.blockSignals(False)
+                except Exception:
+                    pass
+            
+            # STEP 3: Load config from file into main object
+            self.tanksim_config.load_io_config_from_file(io_config_path)
+            
+            # STEP 4: Update GUI offsets from loaded config
+            try:
+                with open(io_config_path, 'r', encoding='utf-8') as f:
+                    config_data = json.load(f)
+                
+                if 'offsets' in config_data:
+                    self.io_screen.byte_offsets = config_data['offsets'].copy()
+                    self.QLineEdit_BoolInput.setText(str(config_data['offsets'].get('BoolInput', 0)))
+                    self.QLineEdit_BoolOutput.setText(str(config_data['offsets'].get('BoolOutput', 0)))
+                    self.QLineEdit_DWORDInput.setText(str(config_data['offsets'].get('DWORDInput', 2)))
+                    self.QLineEdit_DWORDOutput.setText(str(config_data['offsets'].get('DWORDOutput', 2)))
+            except Exception as e:
+                pass
+            
+            # STEP 5: Update table from reloaded config
+            self.io_screen.loading_config = True
+            try:
+                self._update_table_from_config()
+            finally:
+                self.io_screen.loading_config = False
+            
+            # Clear dirty state
+            try:
+                self._io_config_dirty = False
+            except Exception:
+                pass
+            
+            # STEP 6: Auto-connect after successful configuration load
+            try:
+                if (hasattr(self, 'mainConfig') and self.mainConfig and 
+                    self.mainConfig.plcGuiControl != "gui" and
+                    hasattr(self, 'pushButton_connect') and self.pushButton_connect):
+                    
+                    self.pushButton_connect.blockSignals(True)
+                    self.pushButton_connect.setChecked(True)
+                    self.pushButton_connect.blockSignals(False)
+                    
+                    if hasattr(self, 'mainConfig'):
+                        self.mainConfig.tryConnect = True
+            except Exception as e:
+                pass
+            
+        except Exception as e:
+            pass
+        
+    def _auto_reload_io_config(self):
+        """
+        Automatically reload IO configuration without user confirmation.
+        Called when navigating to IO page to ensure communication uses latest tag addresses.
+        Only reloads if configuration has been modified (dirty flag set).
+        """
+        try:
+            if not hasattr(self, 'tanksim_config') or self.tanksim_config is None:
+                return  # Silent fail for auto-reload
+            
+            # Only reload if config is dirty (has unsaved changes)
+            if not getattr(self, '_io_config_dirty', False):
+                return  # No changes to reload
+            
+            project_root = Path(__file__).resolve().parent.parent.parent
+            io_config_path = project_root / "IO" / "IO_configuration.json"
+            
+            # Ensure IO directory exists
+            io_config_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Check if IO config file exists
+            if not io_config_path.exists():
+                return  # Silent fail - no file to reload from
+            
+            # STEP 1: Save the current table to JSON
+            try:
+                table = self.tableWidget_IO
+                config_data = {
+                    'offsets': self.io_screen.byte_offsets.copy(),
+                    'signals': []
+                }
+                
+                # Persist custom signal name overrides
+                try:
+                    if hasattr(self.tanksim_config, 'custom_signal_names'):
+                        config_data['custom_signal_names'] = self.tanksim_config.custom_signal_names.copy()
+                except Exception:
+                    pass
+                
+                # Save all signals from table
+                for row in range(table.rowCount()):
+                    name_item = table.item(row, 0)
+                    if not name_item or not name_item.text():
+                        continue
+                    
+                    cfg = {
+                        'name': table.item(row, 0).text(),
+                        'type': table.item(row, 1).text() if table.item(row, 1) else "",
+                        'byte': table.item(row, 2).text() if table.item(row, 2) else "",
+                        'bit': table.item(row, 3).text() if table.item(row, 3) else "",
+                        'address': table.item(row, 4).text() if table.item(row, 4) else "",
+                        'status': table.item(row, 5).text() if table.item(row, 5) else "",
+                        'description': table.item(row, 6).text() if table.item(row, 6) else "",
+                        'range': table.item(row, 7).text() if table.item(row, 7) else ""
+                    }
+                    config_data['signals'].append(cfg)
+                
+                # Write to JSON file
+                with open(io_config_path, 'w', encoding='utf-8') as f:
+                    json.dump(config_data, f, indent=2, ensure_ascii=False)
+                    
+            except Exception as e:
+                return  # Silent fail for auto-reload
+            
+            # STEP 2: Disconnect PLC if connected
+            if hasattr(self, 'validPlcConnection') and self.validPlcConnection:
+                if hasattr(self, 'plc') and self.plc:
+                    try:
+                        self.plc.disconnect()
+                    except Exception:
+                        pass
+                
+                self.validPlcConnection = False
+                self.plc = None
+                self.update_connection_status_icon()
+                
+                try:
+                    self.pushButton_connect.blockSignals(True)
+                    self.pushButton_connect.setChecked(False)
+                    self.pushButton_connect.blockSignals(False)
+                except Exception:
+                    pass
+            
+            # STEP 3: Load config from file into main object
+            # Prevent auto-conflict resolution while loading config
+            self.io_screen.loading_config = True
+            try:
+                self.tanksim_config.load_io_config_from_file(io_config_path)
+                
+                # STEP 4: Update GUI offsets from loaded config
+                try:
+                    with open(io_config_path, 'r', encoding='utf-8') as f:
+                        config_data = json.load(f)
+                    
+                    if 'offsets' in config_data:
+                        self.io_screen.byte_offsets = config_data['offsets'].copy()
+                        self.QLineEdit_BoolInput.setText(str(config_data['offsets'].get('BoolInput', 0)))
+                        self.QLineEdit_BoolOutput.setText(str(config_data['offsets'].get('BoolOutput', 0)))
+                        self.QLineEdit_DWORDInput.setText(str(config_data['offsets'].get('DWORDInput', 2)))
+                        self.QLineEdit_DWORDOutput.setText(str(config_data['offsets'].get('DWORDOutput', 2)))
+                except Exception as e:
+                    return  # Silent fail
+                
+                # STEP 5: Update table from reloaded config
+                self._update_table_from_config()
+            finally:
+                self.io_screen.loading_config = False
+            
+            # Auto-reload activates config; clear dirty state (silent success)
+            try:
+                self._io_config_dirty = False
+            except Exception:
+                pass
+            
+            # STEP 6: Auto-connect after successful configuration load
+            try:
+                # Only auto-connect if not in GUI mode
+                if (hasattr(self, 'mainConfig') and self.mainConfig and 
+                    self.mainConfig.plcGuiControl != "gui" and
+                    hasattr(self, 'pushButton_connect') and self.pushButton_connect):
+                    
+                    self.pushButton_connect.blockSignals(True)
+                    self.pushButton_connect.setChecked(True)
+                    self.pushButton_connect.blockSignals(False)
+                    
+                    # Trigger the connect action
+                    if hasattr(self, 'mainConfig'):
+                        self.mainConfig.tryConnect = True
+            except Exception as e:
+                pass  # Silently fail if auto-connect fails
+            
+        except Exception as e:
+            return  # Silent fail for auto-reload
         
     def _update_table_from_config(self):
         """Update the GUI table with addresses from the config"""
@@ -1464,6 +2226,30 @@ class IOConfigMixin:
     def toggle_force_mode(self, checked):
         """Toggle force mode on/off"""
         self.tableWidget_IO.set_force_mode(checked)
+        
+        # Update the force state label dynamically
+        if hasattr(self, 'Label_Forcestate'):
+            if checked:
+                self.Label_Forcestate.setText(
+                    "● Forcing ON: Double-click any cell in Status column to force values\n"
+                    "● Yellow = Forced | ● Green = Available to force"
+                )
+                self.Label_Forcestate.setStyleSheet("""QLabel {
+    background-color: #e3f2fd;
+    border: 1px solid #64b5f6;
+    border-radius: 4px;
+    padding: 8px;
+    color: #0d47a1;
+}""")
+            else:
+                self.Label_Forcestate.setText("● Forcing OFF")
+                self.Label_Forcestate.setStyleSheet("""QLabel {
+    background-color: #f5f5f5;
+    border: 1px solid #d0d0d0;
+    border-radius: 4px;
+    padding: 8px;
+    color: #333333;
+}""")
         
         if not checked:
             self.clear_all_forces()
@@ -1568,7 +2354,7 @@ class IOConfigMixin:
                         value = (status.heaterPowerFraction > 0)
                     elif attr_name == "AQHeaterFraction":
                         value = int(status.heaterPowerFraction * plc_analog_max)
-                    # General Controls - PLC Inputs fallback (Start/Stop/Reset, Control1-3)
+                    # General Controls - PLC Inputs (commands from GUI to PLC)
                     elif attr_name == "DIStart":
                         value = bool(getattr(status, 'generalStartCmd', False))
                     elif attr_name == "DIStop":
@@ -1581,6 +2367,7 @@ class IOConfigMixin:
                         value = int(getattr(status, 'generalControl2Value', 0))
                     elif attr_name == "AIControl3":
                         value = int(getattr(status, 'generalControl3Value', 0))
+                    # Sensor Inputs (from simulation to PLC)
                     elif attr_name == "DILevelSensorHigh":
                         value = status.digitalLevelSensorHighTriggered
                     elif attr_name == "DILevelSensorLow":
@@ -1589,7 +2376,7 @@ class IOConfigMixin:
                         value = int((status.liquidVolume / config.tankVolume) * plc_analog_max)
                     elif attr_name == "AITemperatureSensor":
                         value = int(((status.liquidTemperature + 50) / 300) * plc_analog_max)
-                    # General Controls - PLC Outputs fallback (Indicators, Analog1-3)
+                    # General Controls - PLC Outputs (from PLC to GUI indicators)
                     elif attr_name == "DQIndicator1":
                         value = bool(getattr(status, 'indicator1', False))
                     elif attr_name == "DQIndicator2":
@@ -1604,8 +2391,56 @@ class IOConfigMixin:
                         value = int(getattr(status, 'analog2', 0))
                     elif attr_name == "AQAnalog3":
                         value = int(getattr(status, 'analog3', 0))
+                    # PID Valve Controls - Specific handling for known PID controls
+                    elif attr_name == "DIPidValveStart":
+                        value = bool(getattr(status, 'pidPidValveStartCmd', False))
+                    elif attr_name == "DIPidValveStop":
+                        value = bool(getattr(status, 'pidPidValveStopCmd', False))
+                    elif attr_name == "DIPidValveReset":
+                        value = bool(getattr(status, 'pidPidValveResetCmd', False))
+                    elif attr_name == "DIPidValveAuto":
+                        value = bool(getattr(status, 'pidPidValveAutoCmd', True))
+                    elif attr_name == "DIPidValveMan":
+                        value = bool(getattr(status, 'pidPidValveManCmd', False))
+                    elif attr_name == "DIPidTankValveAItemp":
+                        value = bool(getattr(status, 'pidPidTankValveAItempCmd', False))
+                    elif attr_name == "DIPidTankValveDItemp":
+                        value = bool(getattr(status, 'pidPidTankValveDItempCmd', False))
+                    elif attr_name == "DIPidTankValveAIlevel":
+                        value = bool(getattr(status, 'pidPidTankValveAIlevelCmd', False))
+                    elif attr_name == "DIPidTankValveDIlevel":
+                        value = bool(getattr(status, 'pidPidTankValveDIlevelCmd', False))
+                    elif attr_name == "AIPidTankTempSP":
+                        value = int(getattr(status, 'pidPidTankTempSPValue', 0))
+                    elif attr_name == "AIPidTankLevelSP":
+                        value = int(getattr(status, 'pidPidTankLevelSPValue', 0))
+                    # PID Controls and other dynamic signals - Try to get value from dynamic attributes created by handler
+                    # Handler creates attributes like pidPidValveStartCmd for digital, pidPidTankTempSPValue for analog
+                    elif attr_name.startswith("DI") or attr_name.startswith("AI"):
+                        # Try to get the attribute dynamically - handler may have created it
+                        # Handler creates: attr = f"pid{name}Cmd" where name is like "PidValveStart"
+                        # So for DIPidValveStart, it would create pidPidValveStartCmd
+                        type_item = table.item(row, 1)
+                        data_type = type_item.text() if type_item else 'bool'
+                        
+                        attr_to_check = f"pid{attr_name[2:]}Cmd" if attr_name.startswith("DI") else f"pid{attr_name[2:]}Value"
+                        value = getattr(status, attr_to_check, None)
+                        
+                        if value is None:
+                            # Default value: False for bool, 0 for int
+                            # This ensures the status column gets updated with green background
+                            value = False if data_type == 'bool' else 0
                     else:
-                        continue
+                        # For any other signal types (DQ, AQ not matched above), use default values
+                        type_item = table.item(row, 1)
+                        data_type = type_item.text() if type_item else 'bool'
+                        value = False if data_type == 'bool' else 0
+                
+                # Ensure value is always set before updating status column
+                if value is None:
+                    type_item = table.item(row, 1)
+                    data_type = type_item.text() if type_item else 'bool'
+                    value = False if data_type == 'bool' else 0
                 
                 table.update_status_column(row, value)
                 
@@ -1652,6 +2487,78 @@ class IOConfigMixin:
                 forced_values[attr_name] = int(forced_value)
         
         return forced_values
+
+    # ----- Rename propagation from General Controls or table -----
+    def handle_io_signal_rename(self, canonical: str, old_display: str, new_display: str):
+        """Synchronize renamed signals across tree, table and config mapping.
+
+        canonical: stable mapping key (e.g., Control1, Start)
+        old_display: previous shown name
+        new_display: new shown name
+        """
+        if not canonical or not new_display or old_display == new_display:
+            return
+
+        # Update tree widget text (match either old_display or canonical)
+        try:
+            def _rename_tree_item(item):
+                if item.text(0) in (old_display, canonical):
+                    item.setText(0, new_display)
+                for i in range(item.childCount()):
+                    _rename_tree_item(item.child(i))
+            if hasattr(self, 'treeWidget_IO') and self.treeWidget_IO:
+                tree = self.treeWidget_IO
+                for i in range(tree.topLevelItemCount()):
+                    _rename_tree_item(tree.topLevelItem(i))
+                
+                # Update signal_data dictionary to maintain drag-and-drop functionality
+                if hasattr(tree, 'signal_data'):
+                    if old_display in tree.signal_data:
+                        tree.signal_data[new_display] = tree.signal_data[old_display]
+                        del tree.signal_data[old_display]
+                    elif canonical in tree.signal_data:
+                        tree.signal_data[new_display] = tree.signal_data[canonical]
+                        # Keep canonical as well for compatibility
+        except Exception:
+            pass
+
+        # Update table entries
+        try:
+            if hasattr(self, 'tableWidget_IO') and self.tableWidget_IO:
+                table = self.tableWidget_IO
+                table.blockSignals(True)
+                for row in range(table.rowCount()):
+                    item = table.item(row, 0)
+                    if item and item.text() in (old_display, canonical):
+                        item.setText(new_display)
+                        table._save_row_data(row)
+                table.blockSignals(False)
+        except Exception:
+            pass
+
+        # Update config mapping and reverse mapping
+        try:
+            cfg = getattr(self, 'tanksim_config', None)
+            if cfg and hasattr(cfg, 'io_signal_mapping'):
+                if canonical in cfg.io_signal_mapping:
+                    attr = cfg.io_signal_mapping[canonical]
+                    # Keep canonical mapping, add alias
+                    cfg.io_signal_mapping[new_display] = attr
+                    if hasattr(cfg, 'reverse_io_mapping'):
+                        cfg.reverse_io_mapping[attr] = new_display
+                    if hasattr(cfg, 'custom_signal_names'):
+                        cfg.custom_signal_names[attr] = new_display
+            # Mark dirty so user is prompted to apply
+            self._mark_io_dirty()
+        except Exception:
+            pass
+
+        # Refresh General Controls labels if they depend on this signal
+        try:
+            if hasattr(self, '_refresh_general_control_labels_from_mapping'):
+                self._refresh_general_control_labels_from_mapping()
+        except Exception:
+            pass
 
     # ----- Dirty-state helper -----
     def _mark_io_dirty(self):

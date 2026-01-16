@@ -6,6 +6,10 @@ This module is responsible for:
 - Providing current simulation status to other modules
 - Managing simulation lifecycle (start, stop, pause, reset)
 - Interface between core and simulation instances
+
+External Libraries Used:
+- typing (Python Standard Library) - Type hints for method signatures
+- logging (Python Standard Library) - Error and info logging
 """
 from typing import Dict, Optional, Any, List
 import logging

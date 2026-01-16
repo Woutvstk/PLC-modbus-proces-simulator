@@ -1,13 +1,14 @@
 # mainGui.py - Main GUI entry point and navigation
-# Alternative version with absolute imports
 
 import sys
 import os
 import subprocess
 from pathlib import Path
 
-from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QVBoxLayout, QPushButton, QDockWidget
+from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QVBoxLayout, QPushButton, QDockWidget, QGraphicsOpacityEffect
+from PyQt5 import QtCore
 from PyQt5.QtCore import QTimer, Qt, QPropertyAnimation, QEasingCurve
+from PyQt5.QtGui import QIcon
 from PyQt5 import uic
 
 # ============================================================================
@@ -20,13 +21,13 @@ from .pages.generalSettings import ProcessSettingsMixin
 from .pages.ioConfigPage import IOConfigMixin
 from .pages.generalControls import GeneralControlsMixin
 from .pages.simPage import SimPageMixin
+from .tooltipManager import setup_tooltip_manager
 # Tank simulation settings mixin from simulations package
 from simulations.PIDtankValve.settingsGui import TankSimSettingsMixin
 
 # Import from new structure
 from simulations.PIDtankValve.gui import VatWidget
-# TODO: conveyor simulation not yet migrated
-# from simulations.conveyorSim.SimGui import TransportbandWidget
+
 from core.configuration import configuration
 
 # =============================================================================
@@ -69,8 +70,6 @@ if ui_file.exists():
 else:
     raise FileNotFoundError(f"Cannot find {ui_file}! Searched in: {ui_file}")
 
-
-
 # =============================================================================
 # MainWindow class - Same as before
 # =============================================================================
@@ -84,21 +83,57 @@ class MainWindow(QMainWindow, Ui_MainWindow, ProcessSettingsMixin, IOConfigMixin
         super(MainWindow, self).__init__()
         self.setupUi(self)
         
+        # Set window icon
+        icon_path = Path(__file__).parent / "media" / "icon" / "simulation.ico"
+        if icon_path.exists():
+            self.setWindowIcon(QIcon(str(icon_path)))
+        
+        # Set a smaller default window height
+        self.resize(self.width(), 800)
+        # Remove maximum size constraint to enable maximize button
+        self.setMaximumSize(16777215, 16777215)  # Qt's QWIDGETSIZE_MAX
+        # Ensure fullscreen action is enabled if present
+        if hasattr(self, 'actionFullscreen'):
+            self.actionFullscreen.setEnabled(True)
+            self.actionFullscreen.setVisible(True)
+            self.actionFullscreen.triggered.connect(self.showFullScreen)
+        
         # Store reference to main configuration BEFORE initializing mixins
         self.mainConfig = mainConfig
         self.tanksim_config = None
         self.tanksim_status = None
 
-        # Sidebar: start collapsed (animate width), keep both widgets available
+        # Sidebar: simple single-widget animation approach
         try:
+            # Initialize menu state variables
+            self._menu_is_expanded = False
+            self._menu_anim = None
+            
+            # Hide icon-only widget completely - we'll only use fullMenuWidget
+            self.iconOnlyWidget.setVisible(False)
+            self.iconOnlyWidget.setMaximumWidth(0)
+            
+            # fullMenuWidget starts at icon-only width (70px for wider icons)
             self.fullMenuWidget.setVisible(True)
-            self.fullMenuWidget.setMaximumWidth(0)
-            # Restore dual-sidebar behavior
-            self.iconOnlyWidget.setVisible(True)
-            self.pushButton_menu.setChecked(False)
-            self.pushButton_menu.toggled.connect(self.toggle_menu)
-        except Exception:
-            pass
+            self.fullMenuWidget.setMinimumWidth(70)
+            self.fullMenuWidget.setMaximumWidth(70)
+            
+            # Hide logoText initially (collapsed state)
+            if hasattr(self, 'logoText'):
+                self.logoText.setVisible(False)
+            
+            # Setup menu button - ensure it's in iconOnlyWidget or fullMenuWidget
+            if hasattr(self, 'pushButton_menu'):
+                self.pushButton_menu.setCheckable(True)
+                self.pushButton_menu.setChecked(False)
+                # Use clicked instead of toggled to avoid issues
+                try:
+                    self.pushButton_menu.clicked.disconnect()
+                except:
+                    pass
+                self.pushButton_menu.clicked.connect(self.toggle_menu)
+        except Exception as e:
+            print(f"Sidebar setup error: {e}")
 
         # Initialize GENERAL CONTROLS page and dock default state
         try:
@@ -107,7 +142,14 @@ class MainWindow(QMainWindow, Ui_MainWindow, ProcessSettingsMixin, IOConfigMixin
             pass
 
         # Connect exit buttons
-        self.pushButton_Exit.clicked.connect(self.close)
+        try:
+            self.pushButton_Exit.clicked.connect(self.close)
+        except AttributeError:
+            pass
+        try:
+            self.pushButton_exit2.clicked.connect(self.close)
+        except AttributeError:
+            pass
 
         # Initialize connection variables
         self.validPlcConnection = False
@@ -124,8 +166,9 @@ class MainWindow(QMainWindow, Ui_MainWindow, ProcessSettingsMixin, IOConfigMixin
         self.pending_ip = None
 
         # Main update timer (start after pages init)
+        # Increased to 250ms to reduce GUI load - was causing excessive redraws
         self.timer = QTimer()
-        self.timer.setInterval(100)
+        self.timer.setInterval(250)
         self.timer.timeout.connect(self.update_all_values)
 
         # Connect button
@@ -136,6 +179,8 @@ class MainWindow(QMainWindow, Ui_MainWindow, ProcessSettingsMixin, IOConfigMixin
             pass
 
         try:
+            # Set up IP address input mask - enforce XXX.XXX.XXX.XXX format with fixed dots
+            self.lineEdit_IPAddress.setInputMask("999.999.999.999")
             self.lineEdit_IPAddress.textChanged.connect(self.on_ip_changed)
         except AttributeError:
             pass
@@ -161,17 +206,40 @@ class MainWindow(QMainWindow, Ui_MainWindow, ProcessSettingsMixin, IOConfigMixin
         # Initialize GUI mode
         QTimer.singleShot(100, self._initialize_gui_mode)
 
+        # Initialize tooltip manager for dynamic tooltips
+        try:
+            self.tooltip_manager = setup_tooltip_manager(self)
+        except Exception as e:
+            pass
+
         # Kick off updates and connection icon after init
         try:
             self.update_connection_status_icon()
         except Exception:
             pass
         self.timer.start()
+
+    def set_simulation_status(self, status):
+        """Set the simulation status and update button managers"""
+        self.tanksim_status = status
+        try:
+            if hasattr(self, '_button_manager'):
+                self._button_manager.set_button_status_obj('GeneralStart', status)
+                self._button_manager.set_button_status_obj('GeneralStop', status)
+                self._button_manager.set_button_status_obj('GeneralReset', status)
+        except Exception:
+            pass
+
     def _initialize_gui_mode(self):
         """Initialize GUI mode after mainConfig is available"""
         if hasattr(self, 'mainConfig') and self.mainConfig:
             self.mainConfig.plcGuiControl = "gui"
             self.mainConfig.plcProtocol = "GUI"
+            # Disable connect button in GUI mode
+            try:
+                self.pushButton_connect.setEnabled(False)
+            except AttributeError:
+                pass
         else:
             QTimer.singleShot(100, self._initialize_gui_mode)
 
@@ -188,65 +256,102 @@ class MainWindow(QMainWindow, Ui_MainWindow, ProcessSettingsMixin, IOConfigMixin
                 from PyQt5.QtWidgets import QMessageBox
                 reply = QMessageBox.question(
                     self,
-                    "IO configuration not activated",
-                    "You have IO configuration changes that are not activated. Continue without reloading?",
+                    "Configuration Not Activated",
+                    "Current configuration has changes that are not activated.\n\nWould you like to reload and activate the configuration?",
                     QMessageBox.Yes | QMessageBox.No,
-                    QMessageBox.No,
+                    QMessageBox.Yes,
                 )
-                return reply == QMessageBox.Yes
+                if reply == QMessageBox.Yes:
+                    # User wants to reload - trigger reload without confirmation
+                    try:
+                        # Call reload_io_config directly on self (MainWindow inherits IOConfigMixin)
+                        self.reload_io_config(skip_confirmation=True)
+                        # Return True to allow navigation after reload
+                        return True
+                    except Exception as e:
+                        return False
+                # User clicked No - block navigation to stay on IO page
+                return False
             return True
         except Exception:
             return True
 
-    # Sidebar animation helpers
-    def _setup_menu_animation(self):
+    # =========================================================================
+    # Sidebar toggle menu animation - Simple single widget approach
+    # =========================================================================
+    def toggle_menu(self):
+        """Toggle sidebar menu with smooth animation - single widget approach"""
         try:
-            self._menu_anim = QPropertyAnimation(self.fullMenuWidget, b"maximumWidth", self)
-            self._menu_anim.setDuration(600)
-            self._menu_anim.setEasingCurve(QEasingCurve.OutQuart)
-            self._menu_anim.finished.connect(self._on_menu_anim_finished)
-        except Exception:
-            self._menu_anim = None
-
-    def toggle_menu(self, checked):
-        try:
-            if not hasattr(self, "_menu_anim") or self._menu_anim is None:
-                self._setup_menu_animation()
-            target_width = 240 if checked else 0
-            # Ensure full menu is visible during animation
-            self.fullMenuWidget.setVisible(True)
-            # Hide icon-only immediately when opening; show only after close completes
-            if checked:
-                self.iconOnlyWidget.setVisible(False)
-            if hasattr(self, "_menu_anim") and self._menu_anim:
+            # Initialize animation if not exists
+            if self._menu_anim is None:
+                self._menu_anim = QPropertyAnimation(self.fullMenuWidget, b"maximumWidth", self)
+                self._menu_anim.setDuration(300)
+                self._menu_anim.setEasingCurve(QEasingCurve.InOutCubic)
+            
+            # Stop any running animation
+            if self._menu_anim.state() == QPropertyAnimation.Running:
                 self._menu_anim.stop()
-                self._menu_anim.setStartValue(self.fullMenuWidget.maximumWidth())
-                self._menu_anim.setEndValue(target_width)
-                self._menu_anim.start()
-        except Exception:
-            pass
-
-    def _on_menu_anim_finished(self):
-        try:
-            expanded = self.fullMenuWidget.maximumWidth() > 0
-            # Toggle icon-only vs full menu visibility
-            self.iconOnlyWidget.setVisible(not expanded)
-            self.fullMenuWidget.setVisible(True)
-        except Exception:
+            
+            # Toggle state
+            self._menu_is_expanded = not self._menu_is_expanded
+            
+            # Animate between 70px (icon-only) and 240px (full menu)
+            target_width = 240 if self._menu_is_expanded else 70
+            
+            # Hide/show logoText based on expanded state
+            if hasattr(self, 'logoText'):
+                self.logoText.setVisible(self._menu_is_expanded)
+            
+            # Also update minimum width during animation
+            self.fullMenuWidget.setMinimumWidth(target_width if self._menu_is_expanded else 70)
+            
+            # Start width animation
+            self._menu_anim.setStartValue(self.fullMenuWidget.maximumWidth())
+            self._menu_anim.setEndValue(target_width)
+            self._menu_anim.start()
+            
+            # Update button checked state
+            self.pushButton_menu.setChecked(self._menu_is_expanded)
+            
+        except Exception as e:
             pass
 
 
     def update_all_values(self):
         """Main update loop"""
+        # Stagger updates to reduce frame rate spikes
+        update_cycle = getattr(self, '_update_cycle', 0)
+        self._update_cycle = (update_cycle + 1) % 3
+        
+        # Every update: critical items
         self.update_tanksim_display()  
         self.write_gui_values_to_status() 
         self._write_general_controls_to_status()
-        self.update_io_status_display()
-        # Sync General Controls dock UI from status/PLC
-        self._update_general_controls_ui()
-        # Update connection status icon (handles timeout detection)
-        self.update_connection_status_icon()
+        
+        # Every 2nd cycle (500ms): IO table updates
+        if self._update_cycle == 0:
+            self.update_io_status_display()
+        
+        # Every 3rd cycle (750ms): UI syncs
+        if self._update_cycle == 1:
+            self._update_general_controls_ui()
+        
+        # Every 3rd cycle: Icon and button updates
+        if self._update_cycle == 2:
+            self.update_connection_status_icon()
+            self._update_connect_button_state()
+            if hasattr(self, 'tooltip_manager'):
+                self.tooltip_manager.update_disabled_button_tooltips()
 
+    def _update_connect_button_state(self):
+        """Update connect button enabled/disabled state based on protocol"""
+        try:
+            if hasattr(self, 'mainConfig') and self.mainConfig:
+                # Disable button if protocol is GUI, enable otherwise
+                is_gui_mode = (self.mainConfig.plcProtocol == "GUI")
+                self.pushButton_connect.setEnabled(not is_gui_mode)
+        except AttributeError:
+            pass
 
     def update_connection_status_icon(self):
         """Update connection status icon"""
@@ -267,35 +372,54 @@ class MainWindow(QMainWindow, Ui_MainWindow, ProcessSettingsMixin, IOConfigMixin
         except Exception:            pass
 
     def on_connect_toggled(self, checked):
-        """Handle connect button"""
+        """Handle connect button - try once only"""
         if not self.mainConfig:
             return
         if checked:
-            # Connect request
+            # Connect request - try once only
             self.mainConfig.tryConnect = True
         else:
             # Disconnect request
             if self.validPlcConnection and hasattr(self, 'plc') and self.plc:
                 try:
-                        self.iconOnlyWidget.setVisible(False)
-                        self.plc.disconnect()
-                        print("\nDisconnected from PLC")
+                    self.iconOnlyWidget.setVisible(False)
+                    self.plc.disconnect()
                 except Exception as e:
-                    print(f"\nError disconnecting: {e}")
                     pass
-                
                 self.validPlcConnection = False
                 self.plc = None
                 self.update_connection_status_icon()
 
     def on_ip_changed(self, text):
-        """Update IP with throttling"""
+        """Update IP with throttling and validation"""
         if not self.mainConfig:
             return
+        
+        # Validate IP format before accepting
+        if text and not self._is_valid_ip_format(text):
+            # Invalid format - don't update config yet, let user correct it
+            return
+        
         self.mainConfig.plcIpAdress = text
         self.pending_ip = text
         self.ip_change_timer.stop()
         self.ip_change_timer.start(500)
+    
+    def _is_valid_ip_format(self, ip_string: str) -> bool:
+        """Validate IP address format (XXX.XXX.XXX.XXX)"""
+        import re
+        if not ip_string:  # Allow empty
+            return True
+        # Pattern: 1-3 digits, dot, repeated 3 times, then 1-3 digits
+        pattern = r'^(\d{1,3})\.{1}(\d{1,3})\.{1}(\d{1,3})\.{1}(\d{1,3})$'
+        if not re.match(pattern, ip_string):
+            return False
+        # Also check that each octet is 0-255
+        octets = ip_string.split('.')
+        for octet in octets:
+            if int(octet) > 255:
+                return False
+        return True
 
     def _apply_ip_change(self):
         """Execute disconnect after throttle"""

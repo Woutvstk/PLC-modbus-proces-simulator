@@ -5,6 +5,9 @@ from PyQt5.QtCore import QTimer
 # Import for address updates
 from gui.customWidgets import ReadOnlyTableWidgetItem
 
+# Import conveyor widget
+from simulations.conveyor.gui import ConveyorWidget
+
 
 class ProcessSettingsMixin:
     """
@@ -17,36 +20,83 @@ class ProcessSettingsMixin:
         """Initialize general process settings (controller selection only)"""
         self._init_controller_dropdown()
         self._init_network_port_combobox()
+        self._init_conveyor_widget()
+        # Initialize label after controller dropdown so it shows correct initial value
+        self._init_active_method_label()
+
+    def _init_active_method_label(self):
+        """Initialize the active method label to show current protocol"""
+        try:
+            if hasattr(self, 'ActiveMethodLabel'):
+                # Set initial text based on current protocol
+                if hasattr(self, 'mainConfig') and self.mainConfig:
+                    protocol = self.mainConfig.plcProtocol
+                    self._update_active_method_label(protocol)
+        except AttributeError:
+            pass
+
+    def _update_active_method_label(self, protocol):
+        """Update the active method label text
+        
+        Args:
+            protocol: The protocol name to display
+        """
+        try:
+            if hasattr(self, 'ActiveMethodLabel'):
+                self.ActiveMethodLabel.setText(f"Active: {protocol}")
+        except AttributeError:
+            pass
 
     def _init_controller_dropdown(self):
         """Initialize controller dropdown"""
         try:
             self.controlerDropDown.clear()
             controllers = [
-                "GUI",
-                "logo!",
-                "PLC S7-1500/1200/400/300/ET 200SP",
-                "PLCSim S7-1500 advanced",
-                "PLCSim S7-1500/1200/400/300/ET 200SP"
+                "GUI (MIL)",
+                "logo! (HIL)",
+                "PLC S7-1500/1200/400/300/ET 200SP (HIL)",
+                "PLCSim S7-1500 advanced (SIL)",
+                "PLCSim S7-1500/1200/400/300/ET 200SP (SIL)"
             ]
 
             for controller in controllers:
                 self.controlerDropDown.addItem(controller)
 
-            self.controlerDropDown.setCurrentText("GUI")
-            self.controlerDropDown.currentIndexChanged.connect(
+            self.controlerDropDown.setCurrentText("GUI (MIL)")
+            
+            # Update mainConfig to match initial GUI selection
+            if hasattr(self, 'mainConfig') and self.mainConfig:
+                self.mainConfig.plcProtocol = "GUI"
+                self.mainConfig.plcGuiControl = "gui"
+            
+            self.controlerDropDown.currentTextChanged.connect(
                 self.on_controller_changed)
 
             # Disable connect button in GUI mode
-            initial_mode = self.controlerDropDown.currentText()
+            initial_controller = self.controlerDropDown.currentText()
+            initial_mode = self._get_controller_name(initial_controller)
             if initial_mode == "GUI":
                 try:
                     self.pushButton_connect.setEnabled(False)
+                    self.lineEdit_IPAddress.setEnabled(False)
                 except AttributeError:
                     pass
 
         except AttributeError as e:
             pass
+
+    def _get_controller_name(self, controller_str):
+        """Extract base controller name from 'name (MODE)' format
+        
+        Args:
+            controller_str: Controller dropdown text like "GUI (MIL)" or "logo! (HIL)"
+            
+        Returns:
+            Base controller name like "GUI" or "logo!"
+        """
+        if '(' in controller_str:
+            return controller_str[:controller_str.rfind('(')].strip()
+        return controller_str
 
     def _init_network_port_combobox(self):
         """Initialize network adapter combobox"""
@@ -113,6 +163,30 @@ class ProcessSettingsMixin:
         except:
             pass
 
+    def _init_conveyor_widget(self):
+        """Initialize ConveyorWidget"""
+        try:
+            self.conveyor_widget = ConveyorWidget()
+            container = self.findChild(QWidget, "conveyorWidgetContainer")
+
+            if container:
+                # Clear existing layout items (spacers, etc)
+                existing_layout = container.layout()
+                if existing_layout is not None:
+                    while existing_layout.count():
+                        item = existing_layout.takeAt(0)
+                        if item.widget():
+                            item.widget().deleteLater()
+                    container_layout = existing_layout
+                else:
+                    container_layout = QVBoxLayout(container)
+                
+                container_layout.setContentsMargins(0, 0, 0, 0)
+                container_layout.setSpacing(0)
+                container_layout.addWidget(self.conveyor_widget, 1)
+        except Exception as e:
+            pass  # Silently fail if widget container is missing
+
     def _on_network_port_changed(self, index):
         """Handle network port change"""
         try:
@@ -125,26 +199,52 @@ class ProcessSettingsMixin:
     def on_controller_changed(self):
         """Callback when controller dropdown changes"""
         new_controller = self.controlerDropDown.currentText()
+        new_controller_name = self._get_controller_name(new_controller)
 
         if hasattr(self, 'mainConfig') and self.mainConfig:
             old_protocol = self.mainConfig.plcProtocol
-            self.mainConfig.plcProtocol = new_controller
+            self.mainConfig.plcProtocol = new_controller_name
+            
+            # Update the active method label
+            self._update_active_method_label(new_controller_name)
 
-            if new_controller == "GUI":
+            if new_controller_name == "GUI":
                 self.mainConfig.plcGuiControl = "gui"
                 try:
                     self.pushButton_connect.setEnabled(False)
+                    self.lineEdit_IPAddress.setEnabled(False)
                 except:
                     pass
             else:
                 self.mainConfig.plcGuiControl = "plc"
                 try:
                     self.pushButton_connect.setEnabled(True)
+                    self.lineEdit_IPAddress.setEnabled(True)
                 except:
                     pass
 
-            # Disconnect if switching to GUI mode
-            if new_controller == "GUI" and hasattr(self, 'validPlcConnection') and self.validPlcConnection:
+            # Auto-set IP based on protocol
+            if "PLCSim" in new_controller_name:
+                self.mainConfig.plcIpAdress = "127.0.0.1"
+                try:
+                    if hasattr(self, 'lineEdit_IPAddress'):
+                        self.lineEdit_IPAddress.blockSignals(True)
+                        self.lineEdit_IPAddress.setText("127.0.0.1")
+                        self.lineEdit_IPAddress.blockSignals(False)
+                except:
+                    pass
+            elif new_controller_name in ["PLC S7-1500/1200/400/300/ET 200SP", "logo!"]:
+                self.mainConfig.plcIpAdress = "192.168.0.1"
+                try:
+                    if hasattr(self, 'lineEdit_IPAddress'):
+                        self.lineEdit_IPAddress.blockSignals(True)
+                        self.lineEdit_IPAddress.setText("192.168.0.1")
+                        self.lineEdit_IPAddress.blockSignals(False)
+                except:
+                    pass
+
+            # Disconnect if connection is active and protocol is being changed
+            if hasattr(self, 'validPlcConnection') and self.validPlcConnection:
                 if hasattr(self, 'plc') and self.plc:
                     try:
                         self.plc.disconnect()
@@ -161,9 +261,9 @@ class ProcessSettingsMixin:
                     pass
 
             # Update addresses if switching to/from LOGO!
-            if (old_protocol == "logo!" or new_controller == "logo!") and old_protocol != new_controller:
+            if (old_protocol == "logo!" or new_controller_name == "logo!") and old_protocol != new_controller_name:
                 self._update_addresses_for_controller_change(
-                    old_protocol, new_controller)
+                    old_protocol, new_controller_name)
 
         # Update tank widget controller mode if it exists
         if hasattr(self, 'vat_widget'):

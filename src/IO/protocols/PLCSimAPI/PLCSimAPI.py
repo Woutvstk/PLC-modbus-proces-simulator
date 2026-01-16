@@ -13,12 +13,16 @@ class plcSimAPI:
     Simatic.Simulation.Runtime API (requires IronPython/Python .NET for clr import).
     """
 
-    def __init__(self):
+    def __init__(self, network_adapter: str = "auto"):
         """
         Initialize the PLC simulator manager and attempt to load the required DLL.
+        
+        Parameters:
+        network_adapter (str): Network adapter to use ("auto" or adapter name)
         """
         self.manager = None
         self.simulation_instance = None
+        self.network_adapter = network_adapter
 
         try:
             # Determine the directory of the current script
@@ -181,8 +185,8 @@ class plcSimAPI:
                 return -1
             return -1
         except Exception as e:
-            print(f"Error in SetDI: {e}")
-            return -1
+            # Raise to allow upper layers to disconnect on error
+            raise
 
     def GetDO(self, byte: int, bit: int) -> int:
         """
@@ -205,8 +209,8 @@ class plcSimAPI:
                 return -1
             return -1
         except Exception as e:
-            print(f"Error in GetDO: {e}")
-            return -1
+            # Raise to allow upper layers to disconnect on error
+            raise
 
     def SetAI(self, byte: int, value: int) -> int:
         """
@@ -242,8 +246,8 @@ class plcSimAPI:
                 return -1
             return -1
         except Exception as e:
-            print(f"Error in SetAI: {e}")
-            return -1
+            # Raise to allow upper layers to disconnect on error
+            raise
 
     def GetAO(self, startByte: int) -> int:
         """
@@ -271,8 +275,8 @@ class plcSimAPI:
                 return -1
             return -1
         except Exception as e:
-            print(f"Error in GetAO: {e}")
-            return -1
+            # Raise to allow upper layers to disconnect on error
+            raise
 
     def SetDO(self, byte: int, bit: int, value: int) -> int:
         """
@@ -295,8 +299,8 @@ class plcSimAPI:
                 return -1
             return -1
         except Exception as e:
-            print(f"Error in SetDO: {e}")
-            return -1
+            # Raise to allow upper layers to disconnect on error
+            raise
 
     def SetAO(self, byte: int, value: int) -> int:
         """
@@ -334,8 +338,8 @@ class plcSimAPI:
                 return -1
             return -1
         except Exception as e:
-            print(f"Error in SetAO: {e}")
-            return -1
+            # Raise to allow upper layers to disconnect on error
+            raise
 
     def resetSendInputs(self, startByte: int, endByte: int) -> bool:
         """
@@ -359,8 +363,8 @@ class plcSimAPI:
                 return False
             return False
         except Exception as e:
-            print(f"Error in resetSendInputs: {e}")
-            return False
+            # Raise to allow upper layers to disconnect on error
+            raise
 
     def resetSendOutputs(self, startByte: int, endByte: int) -> bool:
         """
@@ -385,5 +389,5 @@ class plcSimAPI:
                 return False
             return False
         except Exception as e:
-            print(f"Error in resetSendOutputs: {e}")
-            return False
+            # Raise to allow upper layers to disconnect on error
+            raise
