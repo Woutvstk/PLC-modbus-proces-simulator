@@ -560,7 +560,7 @@ QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
           </size>
          </property>
          <property name="currentIndex">
-          <number>0</number>
+          <number>6</number>
          </property>
          <widget class="QWidget" name="singleTankPage">
           <layout class="QGridLayout" name="gridLayout_3">
@@ -1065,7 +1065,7 @@ QRadioButton:disabled {
                 <item>
                  <layout class="QHBoxLayout" name="horizontalLayout_29">
                   <item>
-                   <widget class="QPushButton" name="pushButton_PidValveAuto_2">
+                   <widget class="QPushButton" name="trendTempButton">
                     <property name="sizePolicy">
                      <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
                       <horstretch>0</horstretch>
@@ -1135,7 +1135,7 @@ QPushButton:pressed {
                    </widget>
                   </item>
                   <item>
-                   <widget class="QPushButton" name="pushButton_PidValveMan_2">
+                   <widget class="QPushButton" name="trendLevelButton">
                     <property name="sizePolicy">
                      <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
                       <horstretch>0</horstretch>
@@ -4054,8 +4054,8 @@ border: 3px solid rgb(193, 193, 193);
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>1066</width>
-                <height>1023</height>
+                <width>1077</width>
+                <height>1058</height>
                </rect>
               </property>
               <layout class="QVBoxLayout" name="verticalLayout_tankSimScroll_2">
@@ -6113,8 +6113,8 @@ QPushButton:pressed {
                    <rect>
                     <x>0</x>
                     <y>0</y>
-                    <width>1034</width>
-                    <height>1119</height>
+                    <width>1045</width>
+                    <height>1112</height>
                    </rect>
                   </property>
                   <layout class="QVBoxLayout" name="verticalLayout_tankSimScroll">
@@ -6604,7 +6604,7 @@ QGroupBox::title {
                              </font>
                             </property>
                             <property name="text">
-                             <string>10000.0</string>
+                             <string>750.0</string>
                             </property>
                            </widget>
                           </item>

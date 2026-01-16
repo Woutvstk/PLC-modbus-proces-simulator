@@ -20,6 +20,10 @@ class status:
         self.liquidVolume: float = 100.0
         self.liquidTemperature: float = 0.0
 
+        # Warning configuration (written by: gui settings)
+        # Default water boiling point at sea level
+        self.boilingTemperature: float = 100.0
+
         # Simulation status (written by: gui)
         self.simRunning = False
 
@@ -101,4 +105,3 @@ class status:
                     if row["variable"] == variable:
                         setattr(self, variable, type(
                             getattr(self, variable))(row["value"]))
-

@@ -4,6 +4,13 @@ Main Entry Point - Industrial Simulation Framework
 This is the refactored main entry point using the new modular architecture.
 It initializes core components, registers simulations, and runs the main loop.
 """
+from gui.mainGui import MainWindow
+from PyQt5.QtWidgets import QApplication
+from simulations.PIDtankValve.simulation import PIDTankSimulation
+from IO.handler import IOHandler
+from core.protocolManager import ProtocolManager
+from core.simulationManager import SimulationManager
+from core.configuration import configuration as mainConfigClass
 import sys
 import os
 import time
@@ -16,19 +23,12 @@ if str(src_dir) not in sys.path:
     sys.path.insert(0, str(src_dir))
 
 # Core imports
-from core.configuration import configuration as mainConfigClass
-from core.simulationManager import SimulationManager
-from core.protocolManager import ProtocolManager
 
 # IO imports
-from IO.handler import IOHandler
 
 # Simulation imports
-from simulations.PIDtankValve.simulation import PIDTankSimulation
 
 # GUI imports
-from PyQt5.QtWidgets import QApplication
-from gui.mainGui import MainWindow
 
 # Configure logging
 logging.basicConfig(
@@ -51,7 +51,8 @@ mainConfig.simulationManager = simulationManager
 
 # Register available simulations
 simulationManager.register_simulation("PIDtankValve", PIDTankSimulation)
-logger.info("Registered simulations: " + str(simulationManager.get_registered_simulations()))
+logger.info("Registered simulations: " +
+            str(simulationManager.get_registered_simulations()))
 
 # Load the tank simulation by default
 if simulationManager.load_simulation("PIDtankValve", "tankSimSimulation0"):
@@ -113,10 +114,10 @@ connectionLostLogged = False
 if __name__ == "__main__":
     try:
         logger.info("Starting main loop...")
-        
+
         while not mainConfig.doExit:
             app.processEvents()
-            
+
             # Check for connect command from GUI
             if mainConfig.tryConnect:
                 validPlcConnection = False
@@ -152,11 +153,11 @@ if __name__ == "__main__":
                 window.validPlcConnection = validPlcConnection
                 window.plc = protocolManager.get_active_protocol() if validPlcConnection else None
                 window.update_connection_status_icon()
-            
+
             # Process loop for simulation and data exchange
             # Throttle calculations and data exchange
             if (time.time() - timeLastUpdate) > active_config.simulationInterval:
-                
+
                 # Get process control from PLC or GUI
                 if validPlcConnection:
                     try:
@@ -174,10 +175,10 @@ if __name__ == "__main__":
                         else:
                             # Connection OK - reset flag
                             connectionLostLogged = False
-                            
+
                             # Get forced values from GUI
                             forced_values = window.get_forced_io_values()
-                            
+
                             # Update IO with force support
                             ioHandler.updateIO(
                                 protocolManager.get_active_protocol(),
@@ -185,7 +186,7 @@ if __name__ == "__main__":
                                 active_config,
                                 active_status,
                                 forced_values=forced_values)
-                    
+
                     except Exception as e:
                         if not connectionLostLogged:
                             print(f"\nPLC communication error: {e}")
@@ -201,25 +202,25 @@ if __name__ == "__main__":
                     # If control is PLC but no PLC connection, pretend PLC outputs are all 0
                     ioHandler.resetOutputs(
                         mainConfig, active_config, active_status)
-                
+
                 # Update process values (Run simulation)
                 # Using the simulation manager's update method
                 dt = time.time() - timeLastUpdate
                 simulationManager.update_simulation(dt)
-                
+
                 # Update GUI display with new process values
                 window.update_tanksim_display()
-                
+
                 timeLastUpdate = time.time()
-        
+
         # ===== EXIT CLEANUP =====
         logger.info("Exiting application...")
-        
+
         # Disconnect from PLC
         if validPlcConnection and protocolManager:
             protocolManager.disconnect()
             print("Disconnected from PLC")
-        
+
         # Kill any remaining NetToPLCSim processes
         try:
             import subprocess
@@ -233,18 +234,18 @@ if __name__ == "__main__":
                 print("Terminated NetToPLCSim.exe processes")
         except:
             pass
-        
+
         sys.exit(0)
-    
+
     except KeyboardInterrupt:
         logger.info("Keyboard interrupt received")
         mainConfig.doExit = True
-        
+
         # Cleanup
         if validPlcConnection and protocolManager:
             protocolManager.disconnect()
             print("Disconnected from PLC")
-        
+
         # Kill any remaining NetToPLCSim processes
         try:
             import subprocess
@@ -256,9 +257,9 @@ if __name__ == "__main__":
             )
         except:
             pass
-        
+
         sys.exit(0)
-    
+
     except Exception as e:
         logger.error(f"Unexpected error in main loop: {e}", exc_info=True)
         print(f"ERROR: {e}")

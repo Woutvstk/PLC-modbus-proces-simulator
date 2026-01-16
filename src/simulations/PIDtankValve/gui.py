@@ -80,27 +80,33 @@ class VatWidget(QWidget):
         self.waterInVat = None
         self.originalY = 0.0
         self.originalHeight = 0.0
-        self.maxheightGUI = 80
+        self.maxheightGUI = 85
         self.lowestY = 0.0
 
         try:
             # Try multiple paths to find SVGVat.svg (handles different architectures)
             possible_paths = [
-                Path(__file__).parent.parent.parent / "gui" / "media" / "SVGVat.svg",
-                Path(__file__).parent.parent / "guiCommon" / "media" / "SVGVat.svg",
-                Path(__file__).parent.parent.parent / "gui" / "media" / "icon" / "SVG vat.svg",
-                Path(__file__).parent.parent.parent / "guiCommon" / "media" / "SVGVat.svg",
+                Path(__file__).parent.parent.parent /
+                "gui" / "media" / "SVGVat.svg",
+                Path(__file__).parent.parent /
+                "guiCommon" / "media" / "SVGVat.svg",
+                Path(__file__).parent.parent.parent /
+                "gui" / "media" / "icon" / "SVG vat.svg",
+                Path(__file__).parent.parent.parent /
+                "guiCommon" / "media" / "SVGVat.svg",
             ]
-            
+
             svg_path = None
             for path in possible_paths:
                 if path.exists():
                     svg_path = path
                     break
-            
+
             if svg_path is None:
-                raise FileNotFoundError(f"SVG file not found in any of the expected locations: {possible_paths}")
-            
+                raise FileNotFoundError(
+                    f"SVG file not found in any of the expected locations: {possible_paths}")
+
+            self.svg_path = svg_path  # Store for later use
             self.tree = ET.parse(svg_path)
             self.root = self.tree.getroot()
             self.ns = {"svg": "http://www.w3.org/2000/svg"}
@@ -111,12 +117,205 @@ class VatWidget(QWidget):
         self.svg_widget = SvgDisplay(self.renderer)
         layout.addWidget(self.svg_widget)
 
+        # Update SVG text elements with configured signal names
+        self._update_svg_text_labels()
+
         self.rebuild()
+
+    def _get_signal_names_from_io_config(self):
+        """
+        Get signal name customizations from IO configuration JSON.
+        Returns a dict mapping default signal names to configured names.
+        """
+        signal_names = {}
+        try:
+            # Try to load the IO configuration JSON file
+            io_json_path = Path(__file__).parent.parent.parent / \
+                "IO" / "IO_configuration.json"
+
+            if not io_json_path.exists():
+                io_json_path = Path(__file__).parent.parent / \
+                    "IO" / "IO_configuration.json"
+
+            if io_json_path.exists():
+                import json
+                with open(io_json_path, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                    if 'signals' in config:
+                        for signal in config['signals']:
+                            if 'name' in signal:
+                                signal_names[signal['name']] = signal['name']
+        except Exception:
+            pass
+
+        return signal_names
+
+    def _update_svg_text_labels(self):
+        """
+        Update SVG text elements with signal names from the IO configuration.
+        Maps SVG text element IDs to their corresponding signal names.
+        Checks both XML and JSON configuration files.
+        """
+        try:
+            # Find the IO configuration file
+            io_config_path = Path(__file__).parent.parent.parent / \
+                "IO" / "IO_treeList_PIDtankValve.xml"
+
+            if not io_config_path.exists():
+                # Fallback: try alternative paths
+                io_config_path = Path(__file__).parent.parent / \
+                    "IO" / "IO_treeList_PIDtankValve.xml"
+
+            if not io_config_path.exists():
+                return  # Config file not found, skip text update
+
+            # Load signal names from the XML
+            tree = ET.parse(io_config_path)
+            root = tree.getroot()
+
+            # Mapping of SVG text element IDs to signal names in the config
+            element_mapping = {
+                'tagValveOut': 'ValveOut',
+                'tagValveIn': 'ValveIn',
+                'tagHeater': 'Heater',
+                'tagTempValue': 'TemperatureSensor',
+                'tagLevelSensor': 'LevelSensor',
+                'tagLevelSwitchMax': 'LevelSensorHigh',
+                'tagLevelSwitchMin': 'LevelSensorLow',
+            }
+
+            # Extract signal names from PIDtankValve section
+            pid_tank = root.find('PIDtankValve')
+            if pid_tank is None:
+                return
+
+            signal_names = {}
+
+            # Get all signals from Inputs and Outputs
+            for section in pid_tank.findall('.//Signal'):
+                signal_name = section.text.strip() if section.text else ''
+                if signal_name:
+                    signal_names[signal_name] = signal_name
+
+            # Also check JSON config for any customized names
+            json_signal_names = self._get_signal_names_from_io_config()
+            signal_names.update(json_signal_names)
+
+            # Update SVG text elements with actual signal names
+            for text_element_id, config_signal_name in element_mapping.items():
+                # Get the signal name, prefer JSON config over XML, fallback to config_signal_name
+                signal_name = signal_names.get(
+                    config_signal_name, config_signal_name)
+
+                # Find the text element by ID - search all elements with tag name 'text'
+                # Try both with and without namespace
+                found = False
+                for text_elem in self.root.iter():
+                    # Check if this is a text element (with or without namespace)
+                    tag = text_elem.tag
+                    if tag.endswith('text') or tag == 'text':
+                        if text_elem.get('id') == text_element_id:
+                            # Find tspan child and update text
+                            for child in text_elem:
+                                child_tag = child.tag
+                                if child_tag.endswith('tspan') or child_tag == 'tspan':
+                                    child.text = signal_name
+                                    found = True
+                                    break
+
+                            # If no tspan found, update text directly
+                            if not found:
+                                text_elem.text = signal_name
+                            break
+
+            # Write updated SVG back to the file
+            self.tree.write(str(self.svg_path),
+                            encoding='utf-8', xml_declaration=True)
+
+            # Reload the renderer with updated SVG
+            self.renderer.load(str(self.svg_path))
+
+        except Exception as e:
+            # Silently fail if config cannot be loaded
+            pass
+
+    def update_tag_text_from_config(self, signal_config_mapping):
+        """
+        Update SVG tag text based on current IO configuration.
+        Called when IO settings are modified.
+
+        Args:
+            signal_config_mapping: Dict mapping SVG element IDs to signal names
+                Example: {'tagHeatingCoil': 'HeaterCustom', 'tagValueTemp': 'TempSensorCustom'}
+        """
+        try:
+            # Mapping of SVG text element IDs to default signal names
+            element_mapping = {
+                'tagValveOut': 'ValveOut',
+                'tagValveIn': 'ValveIn',
+                'tagHeater': 'Heater',
+                'tagTempValue': 'TemperatureSensor',
+                'tagLevelSensor': 'LevelSensor',
+                'tagLevelSwitchMax': 'LevelSensorHigh',
+                'tagLevelSwitchMin': 'LevelSensorLow',
+            }
+
+            # Update SVG text elements with provided signal names
+            for text_element_id, default_signal_name in element_mapping.items():
+                signal_name = signal_config_mapping.get(
+                    default_signal_name, default_signal_name)
+
+                # Find the text element by ID - search all elements with tag name 'text'
+                # Try both with and without namespace
+                found = False
+                for text_elem in self.root.iter():
+                    # Check if this is a text element (with or without namespace)
+                    tag = text_elem.tag
+                    if tag.endswith('text') or tag == 'text':
+                        if text_elem.get('id') == text_element_id:
+                            # Find tspan child and update text
+                            for child in text_elem:
+                                child_tag = child.tag
+                                if child_tag.endswith('tspan') or child_tag == 'tspan':
+                                    child.text = signal_name
+                                    found = True
+                                    break
+
+                            # If no tspan found, update text directly
+                            if not found:
+                                text_elem.text = signal_name
+                            break
+
+            # Write updated SVG back to the file
+            self.tree.write(str(self.svg_path),
+                            encoding='utf-8', xml_declaration=True)
+
+            # Reload the renderer with updated SVG
+            self.renderer.load(str(self.svg_path))
+
+            # Refresh the widget display
+            self.svg_widget.update()
+
+        except Exception as e:
+            # Silently fail if update cannot be performed
+            pass
 
     def set_controller_mode(self, mode):
         """Set controller mode and update visibility of controls"""
         self.controler = mode
         self.updateControlsVisibility()
+
+    def updateControlsVisibility(self):
+        """Update visibility of GUI controls based on controller mode"""
+        # Show analog indicators in both GUI and PLC modes so users can see live PLC values
+        if self.adjustableValve:
+            self.visibilityGroup("adjustableValve", "shown")
+
+        if self.adjustableHeatingCoil:
+            self.visibilityGroup("adjustableHeatingCoil", "shown")
+
+        self.updateSVG()
+        self.svg_widget.update()
 
     def updateControlsVisibility(self):
         """Update visibility of GUI controls based on controller mode"""
@@ -150,12 +349,22 @@ class VatWidget(QWidget):
         red_val = int(round(255 * intensity))
         red_hex = f"#{red_val:02X}0000"
         self.setGroupColor("heatingCoil", red_hex)
+
+        # Show max/min level switches only if the main level indicator is displayed
+        # The main level indicator is always shown, but we check the levelSwitches flag
         if self.levelSwitches:
             self.visibilityGroup("levelSwitchMax", "shown")
             self.visibilityGroup("levelSwitchMin", "shown")
+            self.visibilityGroup("tagLevelSwitchMax", "shown")
+            self.visibilityGroup("tagLevelSwitchMin", "shown")
         else:
             self.visibilityGroup("levelSwitchMax", "hidden")
             self.visibilityGroup("levelSwitchMin", "hidden")
+            self.visibilityGroup("tagLevelSwitchMax", "hidden")
+            self.visibilityGroup("tagLevelSwitchMin", "hidden")
+
+        # Always show the main level sensor tag regardless of switch visibility
+        self.visibilityGroup("tagLevelSensor", "shown")
 
         if self.analogValueTemp:
             self.visibilityGroup("analogValueTemp", "shown")
@@ -183,7 +392,7 @@ class VatWidget(QWidget):
             self.ValveWidth("waterValveIn", self.adjustableValveInValue)
             self.setGroupColor("valveIn", self.waterColor)
 
-        if self.adjustableValveOutValue == 0:
+        if self.adjustableValveOutValue == 0 or liquidVolume <= 0:
             self.ValveWidth("waterValveOut", 0)
             self.setGroupColor("valveOut", "#FFFFFF")
         else:
@@ -241,6 +450,76 @@ class VatWidget(QWidget):
         """Fill the tank based on liquidVolume"""
         global liquidVolume
 
+        # Control water pipe visibility - show when there IS water in tank
+        waterPipe = self.root.find(f".//svg:*[@id='waterPipe']", self.ns)
+        if waterPipe is not None:
+            if liquidVolume > 0:
+                waterPipe.set("visibility", "visible")
+            else:
+                waterPipe.set("visibility", "hidden")
+
+        # Control inlet water visibility - show when inlet valve is open
+        waterValveIn = self.root.find(f".//svg:*[@id='waterValveIn']", self.ns)
+        if waterValveIn is not None:
+            if self.adjustableValveInValue > 0:
+                waterValveIn.set("visibility", "visible")
+                # Set the inlet water width based on actual flow
+                if liquidVolume > 0:
+                    # Normal case: tank has water, scale by inlet valve opening
+                    self.ValveWidth(
+                        "waterValveIn", self.adjustableValveInValue)
+                else:
+                    # No water in tank but inlet is open: scale by actual inlet flow
+                    actual_flow = (self.adjustableValveInValue /
+                                   100.0) * self.valveInMaxFlowValue
+                    equivalent_inlet_opening = (
+                        actual_flow / self.valveInMaxFlowValue) * 100.0
+                    equivalent_inlet_opening = min(
+                        100.0, equivalent_inlet_opening)
+                    self.ValveWidth("waterValveIn", equivalent_inlet_opening)
+            else:
+                waterValveIn.set("visibility", "hidden")
+
+        # Control outlet water visibility and width - show when:
+        # 1. There IS water AND outlet valve is open, OR
+        # 2. There is NO water AND BOTH inlet AND outlet valves are open (water through from inlet to outlet)
+        waterValveOut = self.root.find(
+            f".//svg:*[@id='waterValveOut']", self.ns)
+        if waterValveOut is not None:
+            if (liquidVolume > 0 and self.adjustableValveOutValue > 0) or \
+               (liquidVolume <= 0 and self.adjustableValveInValue > 0 and self.adjustableValveOutValue > 0):
+                # Set the outlet water width based on actual flow FIRST
+                if liquidVolume > 0:
+                    # Normal case: tank has water, scale by outlet valve opening
+                    self.ValveWidth("waterValveOut",
+                                    self.adjustableValveOutValue)
+                else:
+                    # No water in tank but both valves open: scale by actual inlet flow
+                    # Actual flow = (inlet opening % × inlet max flow)
+                    # Convert to equivalent outlet valve opening = (actual flow / outlet max flow) × 100
+                    actual_flow = (self.adjustableValveInValue /
+                                   100.0) * self.valveInMaxFlowValue
+                    equivalent_outlet_opening = (
+                        actual_flow / self.valveOutMaxFlowValue) * 100.0
+                    # Cap at 100% to avoid overflow
+                    equivalent_outlet_opening = min(
+                        100.0, equivalent_outlet_opening)
+                    self.ValveWidth("waterValveOut", equivalent_outlet_opening)
+
+                # Then set visibility and color
+                waterValveOut.set("visibility", "visible")
+                waterValveOut.set("fill-opacity", "1")
+                self.setGroupColor("valveOut", blue)
+            else:
+                waterValveOut.set("visibility", "hidden")
+                waterValveOut.set("fill-opacity", "0")
+
+        # Hide water height indicator when there is no water AND outgoing valve is open
+        if liquidVolume <= 0 and self.adjustableValveOutValue > 0:
+            self.visibilityGroup("levelValue", "hidden")
+        else:
+            self.visibilityGroup("levelValue", "shown")
+
         if liquidVolume/self.maxVolume >= self.levelSwitchMaxHeight:
             self.setGroupColor("levelSwitchMax", green)
         else:
@@ -265,7 +544,7 @@ class VatWidget(QWidget):
         """Set the Y-position of an indicator"""
         item = self.root.find(f".//svg:*[@id='{itemId}']", self.ns)
         if item is not None:
-            item.set("y", str(hoogte))
+            item.set("y", str(hoogte-3))
 
     def setGroupColor(self, groupId, kleur):
         """Set the color of an SVG group"""
@@ -307,16 +586,18 @@ class VatWidget(QWidget):
             self.pushButton_PidValveMan.setCheckable(True)
             self.pushButton_PidValveAuto.setChecked(True)  # Default to Auto
             self.pushButton_PidValveAuto.toggled.connect(
-                lambda checked: self.pushButton_PidValveMan.setChecked(not checked)
+                lambda checked: self.pushButton_PidValveMan.setChecked(
+                    not checked)
             )
             self.pushButton_PidValveMan.toggled.connect(
-                lambda checked: self.pushButton_PidValveAuto.setChecked(not checked)
+                lambda checked: self.pushButton_PidValveAuto.setChecked(
+                    not checked)
             )
         # Connect digital buttons
         for btn_name in [
             'pushButton_PidValveStart', 'pushButton_PidValveStop',
             'radioButton_PidTankValveAItemp', 'radioButton_PidTankValveDItemp',
-            'radioButton_PidTankValveAIlevel', 'radioButton_PidTankValveDIlevel']:
+                'radioButton_PidTankValveAIlevel', 'radioButton_PidTankValveDIlevel']:
             btn = getattr(self, btn_name, None)
             if btn:
                 btn.setCheckable(True)
@@ -327,15 +608,17 @@ class VatWidget(QWidget):
         label_temp = getattr(self, 'label_PidTankTempSP', None)
         if slider_temp and label_temp:
             label_temp.setText(str(slider_temp.value()))
-            slider_temp.valueChanged.connect(lambda val: label_temp.setText(str(val)))
+            slider_temp.valueChanged.connect(
+                lambda val: label_temp.setText(str(val)))
         slider_level = getattr(self, 'slider_PidTankLevelSP', None)
         label_level = getattr(self, 'label_PidTankLevelSP', None)
         if slider_level and label_level:
             label_level.setText(str(slider_level.value()))
-            slider_level.valueChanged.connect(lambda val: label_level.setText(str(val)))
+            slider_level.valueChanged.connect(
+                lambda val: label_level.setText(str(val)))
 
     def set_plc_pidcontrol_index(self, gui_mode: bool):
-        """Set PLCControl_PIDControl index: 0 for PLC mode, 1 for GUI mode."""
+        """Set PLCControl_PIDControl index: 0 for PLC, 1 for GUI."""
         # This assumes the parent or main window exposes these widgets
         parent = self.parent()
         # Try to find the PLCControl_PIDControl widget in the parent hierarchy
@@ -348,6 +631,6 @@ class VatWidget(QWidget):
             w = getattr(w, 'parent', lambda: None)()
         if plc_control is not None:
             if gui_mode:
-                plc_control.setCurrentIndex(1)  # GUI mode shows PID controls
+                plc_control.setCurrentIndex(1)
             else:
-                plc_control.setCurrentIndex(0)  # PLC mode shows PLC controls
+                plc_control.setCurrentIndex(0)
