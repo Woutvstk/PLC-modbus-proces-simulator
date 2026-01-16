@@ -1,9 +1,17 @@
-# tankSimSettingsPage.py - Tank Simulation Specific Settings
-# Handles:
-# - VatWidget (tank visualization)
-# - Tank-specific UI elements (valves, heater, color, etc.)
-# - Reading from simulation status
-# - Writing GUI inputs to simulation status
+"""
+Tank Simulation Settings Page - GUI page mixin for PID tank simulation settings.
+
+Handles:
+- VatWidget (tank visualization) integration
+- Tank-specific UI elements (valves, heater, color selection)
+- Reading from simulation status
+- Writing GUI inputs to simulation status
+- PID valve mode controls (Auto/Manual)
+- Trend graph management
+
+External Libraries Used:
+- PyQt5 (GPL v3) - GUI framework for widgets, layouts, and button groups
+"""
 
 import sys
 import logging
@@ -65,7 +73,7 @@ class TankSimSettingsMixin:
                 # It just won't be displayed
                 pass
         except Exception as e:
-            print(f"Error initializing vat_widget: {e}")
+            logger.error(f"Error initializing vat_widget: {e}")
             self.vat_widget = None
             raise
 
@@ -288,7 +296,7 @@ class TankSimSettingsMixin:
             if hasattr(self, 'vat_widget') and self.vat_widget:
                 self.vat_widget.init_mainwindow_controls(self)
         except Exception as e:
-            print(f"Error initializing PID valve mode toggle: {e}")
+            logger.error(f"Error initializing PID valve mode toggle: {e}")
 
     def _init_pidvalve_control_buttons(self):
         """Initialize PID valve control buttons with press/release handlers."""
@@ -514,7 +522,7 @@ class TankSimSettingsMixin:
             try:
                 self._init_vat_widget()
             except Exception as e:
-                print(f"Warning: Could not initialize vat_widget: {e}")
+                logger.warning(f"Could not initialize vat_widget: {e}")
                 return
 
         gui_mode = False

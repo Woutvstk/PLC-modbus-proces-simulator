@@ -1,5 +1,22 @@
+"""
+Tank Simulation Configuration - Configuration parameters for PID tank simulation.
+
+Contains:
+- IO address mappings (PLC inputs/outputs)
+- Physical parameters (tank volume, flow rates, heating power)
+- PID controller settings
+- Simulation timing parameters
+
+External Libraries Used:
+- json (Python Standard Library) - IO configuration file parsing
+- pathlib (Python Standard Library) - File path handling
+"""
+
 import json
+import logging
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 class configuration:
@@ -179,7 +196,7 @@ class configuration:
                 config_data = json.load(f)
 
             if 'signals' not in config_data:
-                print("Warning: No signals found in IO configuration")
+                logger.warning("No signals found in IO configuration")
                 return
 
             # Reset enabled signals; will be repopulated based on file content
@@ -221,19 +238,19 @@ class configuration:
                             
                             self.enabled_attrs.add(attr_name)
                         else:
-                            print(f"Cannot parse byte value for signal '{signal_name}'")
+                            logger.warning(f"Cannot parse byte value for signal '{signal_name}'")
                             
                     except (ValueError, TypeError) as e:
-                        print(f"Cannot parse address for signal '{signal_name}': {e}")
+                        logger.warning(f"Cannot parse address for signal '{signal_name}': {e}")
 
             self.update_io_range()
 
         except FileNotFoundError:
-            print(f"IO configuration file not found: {config_file_path}")
+            logger.error(f"IO configuration file not found: {config_file_path}")
         except json.JSONDecodeError:
-            print(f"Invalid JSON in: {config_file_path}")
+            logger.error(f"Invalid JSON in: {config_file_path}")
         except Exception as e:
-            print(f"Error loading IO configuration: {e}")
+            logger.error(f"Error loading IO configuration: {e}")
 
     def get_signal_name_for_attribute(self, attr_name: str) -> str:
         """

@@ -1,4 +1,23 @@
+"""
+Tank Simulation Status - Runtime state for PID tank simulation.
+
+Contains:
+- Valve positions (inlet/outlet opening fractions)
+- Heater power and temperature
+- Liquid volume and level sensors
+- Flow rates
+- PID controller state
+- General control commands
+
+External Libraries Used:
+- csv (Python Standard Library) - Status export to CSV file
+- logging (Python Standard Library) - Error and info logging
+"""
+
 import csv
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class status:
@@ -102,7 +121,7 @@ class status:
 
     def saveToFile(self, exportFileName, createFile: bool = False):
         """Save status to a CSV file"""
-        print(f"Exporting status to: {exportFileName}")
+        logger.info(f"Exporting status to: {exportFileName}")
         openMode: str
         if (createFile):
             openMode = "w"

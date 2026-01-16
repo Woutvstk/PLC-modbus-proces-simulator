@@ -1,9 +1,29 @@
+"""
+PID Tank Valve Simulation - Core simulation logic for tank with PID control.
+
+Implements SimulationInterface with:
+- Liquid level physics (inflow, outflow, conservation)
+- Temperature dynamics (heating, cooling, thermal mass)
+- Valve control (analog positioning)
+- Level sensors (digital high/low switches)
+- Time delay simulation for realistic sensor lag
+- PID controller integration
+
+External Libraries Used:
+- time (Python Standard Library) - Timestamp tracking
+- copy (Python Standard Library) - Deep copy for delay queue
+- typing (Python Standard Library) - Type hints for clarity
+"""
+
 import time
 import copy
+import logging
 from typing import Dict, Any
 from simulations.PIDtankValve.config import configuration as configurationClass
 from simulations.PIDtankValve.status import status as statusClass
 from core.interface import SimulationInterface
+
+logger = logging.getLogger(__name__)
 
 
 class delayHandlerClass:
@@ -142,8 +162,8 @@ class simulation:
             self._debug_counter += 1
 
             if self._debug_counter % 10 == 0:
-                print(
-                    f" doSimulation: valveIn={status.valveInOpenFraction:.2f}, valveOut={status.valveOutOpenFraction:.2f}, vol={status.liquidVolume:.1f}")
+                logger.debug(
+                    f"doSimulation: valveIn={status.valveInOpenFraction:.2f}, valveOut={status.valveOutOpenFraction:.2f}, vol={status.liquidVolume:.1f}")
 
             # calculate new liquidVolume (net flow with proper clamping)
             net_flow = (status.flowRateIn - status.flowRateOut) * self._timeSinceLastRun
