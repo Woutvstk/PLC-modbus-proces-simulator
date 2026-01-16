@@ -1,11 +1,15 @@
 """
-customWidgets.py - Custom PyQt5 Widgets
+Custom PyQt5 Widgets - Enhanced table and tree widgets for IO configuration.
+
 Contains:
-- CustomTableWidgetItem (smart sorting)
-- EditableTableWidgetItem
-- ReadOnlyTableWidgetItem
-- DraggableTreeWidget (drag support)
-- DroppableTableWidget (drop support + force functionality)
+- CustomTableWidgetItem (smart sorting for PLC addresses)
+- EditableTableWidgetItem and ReadOnlyTableWidgetItem
+- DraggableTreeWidget (drag support for IO signals)
+- DroppableTableWidget (drop support with force functionality for IO testing)
+
+External Libraries Used:
+- PyQt5 (GPL v3) - GUI framework for custom widgets, drag-drop, and table/tree functionality
+- json (Python Standard Library) - MIME data serialization for drag-drop operations
 """
 
 import json
@@ -613,10 +617,8 @@ class DroppableTableWidget(QTableWidget):
                     
                     self.blockSignals(True)
                     self.setItem(row, 0, ReadOnlyTableWidgetItem(dropped_text))
-                    print(f"DEBUG dropEvent: dropped {dropped_text} at row {row}")
                     
                     if signal_data:
-                        print(f"DEBUG: signal_data found: {signal_data}")
                         data_type = signal_data.get('type', 'bool')
                         if 'type' in signal_data:
                             self.setItem(row, 1, ReadOnlyTableWidgetItem(data_type))
@@ -629,7 +631,6 @@ class DroppableTableWidget(QTableWidget):
                             self.setItem(row, 3, EditableTableWidgetItem(""))
                         self.setItem(row, 4, ReadOnlyTableWidgetItem(full_address))
                         if 'status' in signal_data:
-                            print(f"DEBUG: Setting status with value: {signal_data['status']}")
                             status_text = signal_data['status']
                             status_item = ReadOnlyTableWidgetItem(status_text)
                             status_item.setBackground(QColor(200, 230, 245))  # Blue
@@ -643,8 +644,6 @@ class DroppableTableWidget(QTableWidget):
                                     value = int(status_text)
                                 except:
                                     value = 0
-                            # Call update_status_column to ensure the color is properly set
-                            print(f"DEBUG: Calling update_status_column for row {row}")
                             self.update_status_column(row, value)
                         if 'description' in signal_data:
                             self.setItem(row, 6, ReadOnlyTableWidgetItem(signal_data['description']))
@@ -652,7 +651,6 @@ class DroppableTableWidget(QTableWidget):
                             self.setItem(row, 7, ReadOnlyTableWidgetItem(signal_data['range']))
                         self._save_row_data(row)
                     else:
-                        print(f"DEBUG: No signal_data found")
                         self._save_row_data(row)
                     
                     self.blockSignals(False)

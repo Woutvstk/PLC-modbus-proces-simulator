@@ -5,6 +5,10 @@ Ensures that:
 - Brief button clicks are always detected (even <1 frame)
 - Buttons stay active for a minimum pulse duration (100ms)
 - Modular and scalable across all button types
+
+External Libraries Used:
+- typing (Python Standard Library) - Type hints for better code clarity
+- time (Python Standard Library) - Monotonic timing for pulse duration control
 """
 import time
 from typing import Dict, Callable, Any

@@ -1,4 +1,12 @@
-# tooltipManager.py - Manage dynamic tooltips for the GUI
+"""
+Tooltip Manager - Manages dynamic tooltips for GUI elements based on application state.
+
+Provides context-aware tooltip updates when controls are enabled/disabled based on
+PLC connection state and communication mode selections.
+
+External Libraries Used:
+- PyQt5 (GPL v3) - GUI framework for Qt widgets and core functionality
+"""
 
 from PyQt5.QtWidgets import QPushButton, QLineEdit, QComboBox
 from PyQt5.QtCore import Qt

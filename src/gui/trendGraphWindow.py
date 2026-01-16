@@ -1,5 +1,15 @@
 """
-Trend Graph Window - Displays real-time temperature and level trends in floating windows
+Trend Graph Window - Displays real-time simulation trends in floating windows.
+
+Provides temperature and level trend visualization with:
+- Live mode (last 300 samples)
+- History mode (all samples from start)
+- Subplot displays for related metrics (heating power, valve positions)
+- Configurable Y-axis limits and data clearing
+
+External Libraries Used:
+- PyQt5 (GPL v3) - GUI framework for window management and widgets
+- matplotlib (PSF License) - Plotting library for real-time trend graphs
 """
 
 from PyQt5.QtWidgets import QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QSpinBox, QPushButton, QComboBox
