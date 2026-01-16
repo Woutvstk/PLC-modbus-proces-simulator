@@ -5,6 +5,9 @@ from PyQt5.QtCore import QTimer
 # Import for address updates
 from gui.customWidgets import ReadOnlyTableWidgetItem
 
+# Import conveyor widget
+from simulations.conveyor.gui import ConveyorWidget
+
 
 class ProcessSettingsMixin:
     """
@@ -17,6 +20,7 @@ class ProcessSettingsMixin:
         """Initialize general process settings (controller selection only)"""
         self._init_controller_dropdown()
         self._init_network_port_combobox()
+        self._init_conveyor_widget()
         # Initialize label after controller dropdown so it shows correct initial value
         self._init_active_method_label()
 
@@ -158,6 +162,30 @@ class ProcessSettingsMixin:
             self.comboBox_networkPort.currentIndexChanged.connect(self._on_network_port_changed)
         except:
             pass
+
+    def _init_conveyor_widget(self):
+        """Initialize ConveyorWidget"""
+        try:
+            self.conveyor_widget = ConveyorWidget()
+            container = self.findChild(QWidget, "conveyorWidgetContainer")
+
+            if container:
+                # Clear existing layout items (spacers, etc)
+                existing_layout = container.layout()
+                if existing_layout is not None:
+                    while existing_layout.count():
+                        item = existing_layout.takeAt(0)
+                        if item.widget():
+                            item.widget().deleteLater()
+                    container_layout = existing_layout
+                else:
+                    container_layout = QVBoxLayout(container)
+                
+                container_layout.setContentsMargins(0, 0, 0, 0)
+                container_layout.setSpacing(0)
+                container_layout.addWidget(self.conveyor_widget, 1)
+        except Exception as e:
+            pass  # Silently fail if widget container is missing
 
     def _on_network_port_changed(self, index):
         """Handle network port change"""

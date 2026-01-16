@@ -9,8 +9,7 @@ if str(src_dir) not in sys.path:
     sys.path.insert(0, str(src_dir))
 
 from simulations.PIDtankValve.gui import VatWidget
-# TODO: conveyor simulation not yet migrated
-# from simulations.conveyorSim.SimGui import TransportbandWidget
+from simulations.conveyor.gui import ConveyorWidget
 
 # Import for address updates
 from gui.customWidgets import ReadOnlyTableWidgetItem
@@ -25,8 +24,7 @@ class ProcessSettingsMixin:
     def init_process_settings_page(self):
         """Initialize all process settings page components"""
         self._init_vat_widget()
-        # TODO: Conveyor simulation not yet migrated
-        # self._init_transportband_widget()
+        self._init_conveyor_widget()
         self._init_color_dropdown()
         self._init_controller_dropdown()
         self._init_checkboxes()
@@ -53,6 +51,26 @@ class ProcessSettingsMixin:
                 # Removed unnecessary print
         except Exception as e:
             # Removed unnecessary print
+            pass  # Silently fail if widget container is missing
+
+    def _init_conveyor_widget(self):
+        """Initialize ConveyorWidget"""
+        try:
+            self.conveyor_widget = ConveyorWidget()
+            container = self.findChild(QWidget, "conveyorWidgetContainer")
+
+            if container:
+                existing_layout = container.layout()
+
+                if existing_layout is None:
+                    container_layout = QVBoxLayout(container)
+                    container_layout.setContentsMargins(0, 0, 0, 0)
+                else:
+                    container_layout = existing_layout
+                    container_layout.setContentsMargins(0, 0, 0, 0)
+
+                container_layout.addWidget(self.conveyor_widget)
+        except Exception as e:
             pass  # Silently fail if widget container is missing
 
     def _init_transportband_widget(self):
