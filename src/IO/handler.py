@@ -6,6 +6,11 @@ This module is responsible for:
 - Getting current simulation status from core.simulationManager
 - Writing inputs/outputs to PLC or GUI based on active protocol
 - Bridge between protocol layer and simulation layer
+
+External Libraries Used:
+- time (Python Standard Library) - Timing for button debouncing (TON logic)
+- logging (Python Standard Library) - Error and debug logging
+- typing (Python Standard Library) - Type hints for method signatures
 """
 import time
 import logging

@@ -3,6 +3,11 @@ Main Entry Point - Industrial Simulation Framework
 
 This is the refactored main entry point using the new modular architecture.
 It initializes core components, registers simulations, and runs the main loop.
+
+External Libraries Used:
+- PyQt5 (GPL v3) - GUI framework for main application window
+- logging (Python Standard Library) - Application-wide logging configuration
+- pathlib (Python Standard Library) - Path handling for imports
 """
 import sys
 import os

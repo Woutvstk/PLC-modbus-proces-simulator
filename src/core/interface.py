@@ -1,6 +1,13 @@
 """
 Uniform interface contract for all simulations.
 All simulation classes must inherit from SimulationInterface.
+
+Defines the standard API that all simulations must implement to ensure
+consistency and enable the SimulationManager to work with any simulation type.
+
+External Libraries Used:
+- abc (Python Standard Library) - Abstract base class support
+- typing (Python Standard Library) - Type hints for method signatures
 """
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
