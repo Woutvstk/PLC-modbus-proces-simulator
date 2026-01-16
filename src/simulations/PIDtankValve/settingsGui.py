@@ -291,6 +291,10 @@ class TankSimSettingsMixin:
         # Update temperature trend
         if hasattr(self, 'temp_trend_window') and self.temp_trend_window is not None and self.temp_trend_window.isVisible():
             try:
+                # Update simulation running state
+                sim_running = getattr(self.tanksim_status, 'simRunning', False)
+                self.temp_trend_window.set_simulation_running(sim_running)
+
                 # Get PID values for temperature
                 temp_pv = self.tanksim_status.liquidTemperature  # Process value
                 temp_sp = self.tanksim_status.tempSetpoint if hasattr(
@@ -305,6 +309,10 @@ class TankSimSettingsMixin:
         # Update level trend
         if hasattr(self, 'level_trend_window') and self.level_trend_window is not None and self.level_trend_window.isVisible():
             try:
+                # Update simulation running state
+                sim_running = getattr(self.tanksim_status, 'simRunning', False)
+                self.level_trend_window.set_simulation_running(sim_running)
+
                 # Calculate level percentage
                 cfg = getattr(self, 'tanksim_config', None)
                 if cfg and hasattr(cfg, 'tankVolume') and cfg.tankVolume:

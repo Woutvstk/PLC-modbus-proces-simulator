@@ -80,21 +80,26 @@ class SingleTrendDisplay(QWidget):
     def _init_ui(self):
         """Initialize the user interface"""
         main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(5, 5, 5, 5)  # Minimize margins
+        main_layout.setSpacing(2)  # Minimize spacing between elements
 
-        # Title
+        # Title - smaller and more compact
         title = QLabel(f"{self.trend_name} Trend Monitor")
-        title.setFont(QFont("Arial", 14, QFont.Bold))
+        title.setFont(QFont("Arial", 10, QFont.Bold))
+        title.setMaximumHeight(20)
         main_layout.addWidget(title)
 
         # Create matplotlib figure
         self.figure = Figure(figsize=(10, 6), dpi=100)
         self.canvas = FigureCanvas(self.figure)
 
-        # Add navigation toolbar for zoom and pan
+        # Add navigation toolbar for zoom and pan with minimal height
         self.toolbar = NavigationToolbar(self.canvas, self)
+        self.toolbar.setMaximumHeight(25)
         main_layout.addWidget(self.toolbar)
 
-        main_layout.addWidget(self.canvas)
+        # Add stretch factor to maximize canvas
+        main_layout.addWidget(self.canvas, 1)
 
         # Connect mouse events for hover tooltip
         self.canvas.mpl_connect('motion_notify_event', self.on_mouse_move)
@@ -103,34 +108,41 @@ class SingleTrendDisplay(QWidget):
 
         # Control buttons
         button_layout = QHBoxLayout()
+        button_layout.setContentsMargins(0, 5, 0, 0)
+        button_layout.setSpacing(5)
 
         # Left arrow button to pan left
         left_arrow_btn = QPushButton("← Left")
+        left_arrow_btn.setMinimumHeight(35)
         left_arrow_btn.clicked.connect(self.pan_left)
         left_arrow_btn.setStyleSheet("""
             QPushButton {
                 background-color: #2196F3;
                 color: white;
                 font-weight: bold;
-                padding: 5px 15px;
+                padding: 6px 12px;
+                font-size: 12px;
             }
         """)
         button_layout.addWidget(left_arrow_btn)
 
         # Right arrow button to pan right
         right_arrow_btn = QPushButton("Right →")
+        right_arrow_btn.setMinimumHeight(35)
         right_arrow_btn.clicked.connect(self.pan_right)
         right_arrow_btn.setStyleSheet("""
             QPushButton {
                 background-color: #2196F3;
                 color: white;
                 font-weight: bold;
-                padding: 5px 15px;
+                padding: 6px 12px;
+                font-size: 12px;
             }
         """)
         button_layout.addWidget(right_arrow_btn)
 
         self.pause_btn = QPushButton("Pause")
+        self.pause_btn.setMinimumHeight(35)
         self.pause_btn.setCheckable(True)
         self.pause_btn.clicked.connect(self.toggle_pause)
         self.pause_btn.setStyleSheet("""
@@ -138,7 +150,8 @@ class SingleTrendDisplay(QWidget):
                 background-color: #4CAF50;
                 color: white;
                 font-weight: bold;
-                padding: 5px 15px;
+                padding: 6px 12px;
+                font-size: 12px;
             }
             QPushButton:checked {
                 background-color: #FF9800;
@@ -147,11 +160,25 @@ class SingleTrendDisplay(QWidget):
         button_layout.addWidget(self.pause_btn)
 
         clear_btn = QPushButton("Clear Trend")
+        clear_btn.setMinimumHeight(35)
         clear_btn.clicked.connect(self.clear_trend)
+        clear_btn.setStyleSheet("""
+            QPushButton {
+                padding: 6px 12px;
+                font-size: 12px;
+            }
+        """)
         button_layout.addWidget(clear_btn)
 
         close_btn = QPushButton("Close")
+        close_btn.setMinimumHeight(35)
         close_btn.clicked.connect(self.close)
+        close_btn.setStyleSheet("""
+            QPushButton {
+                padding: 6px 12px;
+                font-size: 12px;
+            }
+        """)
         button_layout.addWidget(close_btn)
 
         main_layout.addLayout(button_layout)
@@ -509,8 +536,7 @@ class SingleTrendDisplay(QWidget):
         self.refresh_plot()
 
     def closeEvent(self, event):
-        """Handle window close event"""
-        self.is_running = False
+        """Handle window close event - just close this window, don't affect simulation"""
         event.accept()
 
 
