@@ -19,7 +19,7 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 
-class Configuration:
+class configuration:
     """Configuration object with default parameters for tank simulation."""
 
     def __init__(self):
