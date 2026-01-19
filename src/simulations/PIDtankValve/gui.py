@@ -79,7 +79,7 @@ class VatWidget(QWidget):
         # Default attribute values
         self.valveInMaxFlowValue = 0
         self.valveOutMaxFlowValue = 0
-        self.powerValue = 750.0
+        self.powerValue = 15000.0
         self.adjustableValve = False
         self.adjustableHeatingCoil = False
         self.levelSwitches = False

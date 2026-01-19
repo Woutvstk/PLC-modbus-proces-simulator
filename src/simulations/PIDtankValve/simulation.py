@@ -267,6 +267,11 @@ class PIDTankSimulation(SimulationInterface):
             dt: Time delta since last update (not used, internal timing used)
         """
         self._simulation.doSimulation(self.config, self.status)
+
+    def get_name(self) -> str:
+        """Get simulation name."""
+        return self.name
+    
     
     def get_status(self) -> Dict[str, Any]:
         """Get current simulation status as dictionary."""
@@ -301,10 +306,6 @@ class PIDTankSimulation(SimulationInterface):
         for key, value in config.items():
             if hasattr(self.config, key):
                 setattr(self.config, key, value)
-    
-    def get_name(self) -> str:
-        """Get simulation name."""
-        return self.name
     
     def get_config_object(self):
         """Get the configuration object directly (for save/load)."""

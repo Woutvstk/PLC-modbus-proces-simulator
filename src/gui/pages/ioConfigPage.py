@@ -2565,6 +2565,5 @@ class IOConfigMixin:
         """Mark IO configuration as dirty to trigger leave-page confirmation."""
         try:
             self._io_config_dirty = True
-            # One-time heads-up could be shown here if desired; keeping UX minimal.
         except Exception:
             pass

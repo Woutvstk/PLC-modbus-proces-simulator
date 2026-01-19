@@ -46,15 +46,12 @@ This file contains your simulation logic. It **must** implement these methods:
 ```python
 class MySimulation(SimulationInterface):
     def start(self) -> None:
-        """Called when user clicks Start button"""
         pass
     
     def stop(self) -> None:
-        """Called when user clicks Stop button"""
         pass
     
     def reset(self) -> None:
-        """Called when user clicks Reset button"""
         pass
     
     def update(self, dt: float) -> None:
