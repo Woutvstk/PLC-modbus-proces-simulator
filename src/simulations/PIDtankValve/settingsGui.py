@@ -106,6 +106,29 @@ class TankSimSettingsMixin:
 
     def _init_entry_fields(self):
         """Synchronize entry fields (flow and temp)"""
+        # Define min/max bounds for all entry fields
+        self.entry_bounds = {
+            'maxFlowInEntry': {'min': 0.1, 'max': 100, 'default': 5},
+            'maxFlowInEntry1': {'min': 0.1, 'max': 100, 'default': 5},
+            'maxFlowInEntry2': {'min': 0.1, 'max': 100, 'default': 5},
+            'maxFlowOutEntry': {'min': 0.1, 'max': 100, 'default': 2},
+            'maxFlowOutEntry1': {'min': 0.1, 'max': 100, 'default': 2},
+            'maxFlowOutEntry2': {'min': 0.1, 'max': 100, 'default': 2},
+            'powerHeatingCoilEntry': {'min': 1, 'max': 32747, 'default': 750},
+            'powerHeatingCoilEntry1': {'min': 1, 'max': 32747, 'default': 750},
+            'powerHeatingCoilEntry2': {'min': 1, 'max': 32747, 'default': 750},
+            'volumeEntry': {'min': 0.1, 'max': 10000, 'default': 2},
+            'levelSwitchMaxHeightEntry': {'min': 0, 'max': 100, 'default': 90},
+            'levelSwitchMinHeightEntry': {'min': 0, 'max': 100, 'default': 10},
+            'heatLossVatEntry': {'min': 0, 'max': 10000, 'default': 150},
+            'boilingTempEntry': {'min': 50, 'max': 150, 'default': 100},
+            'timeDelayfillingEntry': {'min': 0, 'max': 1000, 'default': 0},
+            'ambientTempEntry': {'min': -50, 'max': 60, 'default': 21},
+            'timeDelayTempEntry': {'min': 0, 'max': 1000, 'default': 0},
+            'specificWeightEntry': {'min': 1, 'max': 10000, 'default': 4186},
+            'specificHeatCapacityEntry': {'min': 0.1, 'max': 10, 'default': 0.997},
+        }
+
         try:
             self.entryGroupFlowIn = [
                 self.maxFlowInEntry,

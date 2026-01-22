@@ -4,7 +4,7 @@ Displays historical data with PV, Setpoint, and OP (Output)
 Includes pause, zoom, scroll, and hover tooltip features
 """
 
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QSpinBox, QDoubleSpinBox
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
 from collections import deque
@@ -100,6 +100,56 @@ class SingleTrendDisplay(QWidget):
 
         # Add stretch factor to maximize canvas
         main_layout.addWidget(self.canvas, 1)
+
+        # Axis range controls layout
+        axis_layout = QHBoxLayout()
+        axis_layout.setContentsMargins(0, 5, 0, 0)
+        axis_layout.setSpacing(10)
+
+        # X-axis (Time) range controls
+        axis_layout.addWidget(QLabel("X-axis range (s):"))
+        self.x_min_spinbox = QDoubleSpinBox()
+        self.x_min_spinbox.setMinimum(0)
+        self.x_min_spinbox.setMaximum(100000)
+        self.x_min_spinbox.setValue(0)
+        self.x_min_spinbox.setSingleStep(10)
+        self.x_min_spinbox.setMaximumWidth(80)
+        self.x_min_spinbox.valueChanged.connect(self._on_x_range_changed)
+        axis_layout.addWidget(self.x_min_spinbox)
+
+        axis_layout.addWidget(QLabel("to"))
+        self.x_max_spinbox = QDoubleSpinBox()
+        self.x_max_spinbox.setMinimum(0)
+        self.x_max_spinbox.setMaximum(100000)
+        self.x_max_spinbox.setValue(180)
+        self.x_max_spinbox.setSingleStep(10)
+        self.x_max_spinbox.setMaximumWidth(80)
+        self.x_max_spinbox.valueChanged.connect(self._on_x_range_changed)
+        axis_layout.addWidget(self.x_max_spinbox)
+
+        # Y-axis (Value) range controls
+        axis_layout.addWidget(QLabel("Y-axis range:"))
+        self.y_min_spinbox = QDoubleSpinBox()
+        self.y_min_spinbox.setMinimum(-1000)
+        self.y_min_spinbox.setMaximum(1000)
+        self.y_min_spinbox.setValue(0)
+        self.y_min_spinbox.setSingleStep(10)
+        self.y_min_spinbox.setMaximumWidth(80)
+        self.y_min_spinbox.valueChanged.connect(self._on_y_range_changed)
+        axis_layout.addWidget(self.y_min_spinbox)
+
+        axis_layout.addWidget(QLabel("to"))
+        self.y_max_spinbox = QDoubleSpinBox()
+        self.y_max_spinbox.setMinimum(-1000)
+        self.y_max_spinbox.setMaximum(1000)
+        self.y_max_spinbox.setValue(100)
+        self.y_max_spinbox.setSingleStep(10)
+        self.y_max_spinbox.setMaximumWidth(80)
+        self.y_max_spinbox.valueChanged.connect(self._on_y_range_changed)
+        axis_layout.addWidget(self.y_max_spinbox)
+
+        axis_layout.addStretch()
+        main_layout.addLayout(axis_layout)
 
         # Connect mouse events for hover tooltip
         self.canvas.mpl_connect('motion_notify_event', self.on_mouse_move)
@@ -224,6 +274,44 @@ class SingleTrendDisplay(QWidget):
         else:
             self.pause_btn.setText("Pause")
 
+    def _on_x_range_changed(self):
+        """Handle X-axis range change"""
+        try:
+            x_min = self.x_min_spinbox.value()
+            x_max = self.x_max_spinbox.value()
+
+            if x_max <= x_min:
+                self.x_max_spinbox.blockSignals(True)
+                self.x_max_spinbox.setValue(x_min + 10)
+                self.x_max_spinbox.blockSignals(False)
+                return
+
+            if self.ax:
+                # Store as custom range so it doesn't get overridden by auto-scrolling
+                self.custom_x_range = (x_max - x_min, x_min)
+                self.ax.set_xlim(x_min, x_max)
+                self.canvas.draw_idle()
+        except Exception as e:
+            print(f"Error setting X range: {e}")
+
+    def _on_y_range_changed(self):
+        """Handle Y-axis range change"""
+        try:
+            y_min = self.y_min_spinbox.value()
+            y_max = self.y_max_spinbox.value()
+
+            if y_max <= y_min:
+                self.y_max_spinbox.blockSignals(True)
+                self.y_max_spinbox.setValue(y_min + 10)
+                self.y_max_spinbox.blockSignals(False)
+                return
+
+            if self.ax:
+                self.ax.set_ylim(y_min, y_max)
+                self.canvas.draw_idle()
+        except Exception as e:
+            print(f"Error setting Y range: {e}")
+
     def keyPressEvent(self, event):
         """Handle keyboard events for arrow keys"""
         if not event.isAutoRepeat():  # Only handle new key presses, not repeats
@@ -280,31 +368,46 @@ class SingleTrendDisplay(QWidget):
         self.ax.set_xlabel("Time (seconds)", fontsize=10)
         self.ax.set_ylabel(f"Value ({self.unit})", fontsize=10)
 
-        # Set Y-axis range to 0-100%
-        self.ax.set_ylim(0, 100)
+        # Get Y-axis range from spinbox
+        y_min = self.y_min_spinbox.value()
+        y_max = self.y_max_spinbox.value()
+        self.ax.set_ylim(y_min, y_max)
 
-        # Auto-scrolling X-axis with 180-second window (or custom zoom if set)
+        # Get X-axis range from spinbox
+        x_min = self.x_min_spinbox.value()
+        x_max = self.x_max_spinbox.value()
+
+        # Auto-scrolling X-axis or use custom range
         if times:
             import matplotlib.ticker as ticker
-            self.ax.xaxis.set_major_locator(ticker.MultipleLocator(20))
 
             current_time = times[-1]
 
-            # Use custom zoom range if user has set it
-            if self.custom_x_range:
+            # Check if user has manually changed spinbox values from default
+            has_custom_x_range = (x_max - x_min) != 180 or x_min != 0
+
+            if has_custom_x_range:
+                # Use custom spinbox values
+                self.ax.set_xlim(x_min, x_max)
+                self._adjust_x_axis_interval(x_max - x_min)
+            elif self.custom_x_range:
+                # Use stored zoom range
                 width, left_edge = self.custom_x_range
-                # Use the stored left edge and width
                 self.ax.set_xlim(left_edge, left_edge + width)
-                # Adjust x-axis interval based on zoom level
                 self._adjust_x_axis_interval(width)
             else:
                 # Default 180-second window that scrolls as time progresses
                 if current_time > 180:
                     self.ax.set_xlim(current_time - 180, current_time)
+                    # Update spinbox without triggering signal
+                    self.x_min_spinbox.blockSignals(True)
+                    self.x_max_spinbox.blockSignals(True)
+                    self.x_min_spinbox.setValue(current_time - 180)
+                    self.x_max_spinbox.setValue(current_time)
+                    self.x_min_spinbox.blockSignals(False)
+                    self.x_max_spinbox.blockSignals(False)
                 else:
                     self.ax.set_xlim(0, 180)
-                # Use default 20-second intervals
-                import matplotlib.ticker as ticker
                 self.ax.xaxis.set_major_locator(ticker.MultipleLocator(20))
 
         self.ax.grid(True, alpha=0.3, linestyle='--', linewidth=0.5)
@@ -370,8 +473,16 @@ class SingleTrendDisplay(QWidget):
             pass
 
     def on_mouse_leave(self, event):
-        """Keep annotation visible for a bit after mouse leaves (persistence)"""
-        pass  # Keep showing the last annotation for a bit
+        """Keep annotation visible when paused - hide when not paused"""
+        if not self.is_paused:
+            # Hide annotation when not paused
+            if self.annotation:
+                try:
+                    self.annotation.remove()
+                    self.annotation = None
+                    self.canvas.draw_idle()
+                except:
+                    pass
 
     def _adjust_x_axis_interval(self, width):
         """Adjust x-axis tick interval based on zoom level"""
@@ -574,31 +685,46 @@ class LevelTrendDisplay(SingleTrendDisplay):
         self.ax.set_xlabel("Time (seconds)", fontsize=10)
         self.ax.set_ylabel(f"Value ({self.unit})", fontsize=10)
 
-        # Set Y-axis range to 0-100%
-        self.ax.set_ylim(0, 100)
+        # Get Y-axis range from spinbox
+        y_min = self.y_min_spinbox.value()
+        y_max = self.y_max_spinbox.value()
+        self.ax.set_ylim(y_min, y_max)
 
-        # Auto-scrolling X-axis with 180-second window (or custom zoom if set)
+        # Get X-axis range from spinbox
+        x_min = self.x_min_spinbox.value()
+        x_max = self.x_max_spinbox.value()
+
+        # Auto-scrolling X-axis or use custom range
         if times:
             import matplotlib.ticker as ticker
-            self.ax.xaxis.set_major_locator(ticker.MultipleLocator(20))
 
             current_time = times[-1]
 
-            # Use custom zoom range if user has set it
-            if self.custom_x_range:
+            # Check if user has manually changed spinbox values from default
+            has_custom_x_range = (x_max - x_min) != 180 or x_min != 0
+
+            if has_custom_x_range:
+                # Use custom spinbox values
+                self.ax.set_xlim(x_min, x_max)
+                self._adjust_x_axis_interval(x_max - x_min)
+            elif self.custom_x_range:
+                # Use stored zoom range
                 width, left_edge = self.custom_x_range
-                # Use the stored left edge and width
                 self.ax.set_xlim(left_edge, left_edge + width)
-                # Adjust x-axis interval based on zoom level
                 self._adjust_x_axis_interval(width)
             else:
                 # Default 180-second window that scrolls as time progresses
                 if current_time > 180:
                     self.ax.set_xlim(current_time - 180, current_time)
+                    # Update spinbox without triggering signal
+                    self.x_min_spinbox.blockSignals(True)
+                    self.x_max_spinbox.blockSignals(True)
+                    self.x_min_spinbox.setValue(current_time - 180)
+                    self.x_max_spinbox.setValue(current_time)
+                    self.x_min_spinbox.blockSignals(False)
+                    self.x_max_spinbox.blockSignals(False)
                 else:
                     self.ax.set_xlim(0, 180)
-                # Use default 20-second intervals
-                import matplotlib.ticker as ticker
                 self.ax.xaxis.set_major_locator(ticker.MultipleLocator(20))
 
         self.ax.grid(True, alpha=0.3, linestyle='--', linewidth=0.5)
