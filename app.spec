@@ -33,6 +33,14 @@ datas += collect_data_files("src/gui/pages")
 # IO configuration files
 datas += collect_data_files("src/IO", includes=["*.json", "*.xml"])
 
+datas += [
+    ("src/IO/IO_treeList_conveyor.xml", "IO"),
+    ("src/IO/IO_treeList_PIDtankValve.xml", "IO"),
+    ("src/IO/IO_configuration.json", "IO"),
+]
+
+
+
 # PLCSimS7 protocol files
 datas += collect_data_files("src/IO/protocols/PLCSimS7/NetToPLCsim")
 
@@ -88,7 +96,8 @@ exe = EXE(
     debug=False,
     strip=False,
     upx=True,
-    console=True,
+    console=False,
+	icon="icon.ico"
 )
 
 # -----------------------------
