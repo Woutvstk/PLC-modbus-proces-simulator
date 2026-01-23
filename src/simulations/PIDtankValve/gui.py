@@ -315,42 +315,8 @@ class VatWidget(QWidget):
             # Fallback to string conversion if formatting fails
             self.setSVGText("tempVatValue", str(tempVat) + "°C")
 
-        # Set tag names/labels from configured IO
-        # These display the PLC variable names associated with each tag
-        if hasattr(self, 'config') and self.config:
-            try:
-                # Set tag labels with signal names from IO configuration
-                tag_mapping = {
-                    'tagValveOut': 'DQValveOut',
-                    'tagValveIn': 'DQValveIn',
-                    'tagHeater': 'DQHeater',
-                    'tagLevelSwitchMax': 'DILevelSensorHigh',
-                    'tagLevelSwitchMin': 'DILevelSensorLow',
-                    'tagLevelSensor': 'AILevelSensor',
-                    'tagTempValue': 'AITemperatureSensor'
-                }
-
-                # Apply signal names from config.signal_names dictionary
-                for tag_id, attr_name in tag_mapping.items():
-                    if hasattr(self.config, 'signal_names') and attr_name in self.config.signal_names:
-                        signal_name = self.config.signal_names[attr_name]
-                        self.setSVGText(tag_id, signal_name)
-                    elif attr_name == 'DQValveOut':
-                        self.setSVGText(tag_id, "ValveOut")
-                    elif attr_name == 'DQValveIn':
-                        self.setSVGText(tag_id, "ValveIn")
-                    elif attr_name == 'DQHeater':
-                        self.setSVGText(tag_id, "Heater")
-                    elif attr_name == 'DILevelSensorHigh':
-                        self.setSVGText(tag_id, "LevelMax")
-                    elif attr_name == 'DILevelSensorLow':
-                        self.setSVGText(tag_id, "LevelMin")
-                    elif attr_name == 'AILevelSensor':
-                        self.setSVGText(tag_id, "LevelSensor")
-                    elif attr_name == 'AITemperatureSensor':
-                        self.setSVGText(tag_id, "TempSensor")
-            except Exception as e:
-                logger.debug(f"Could not set tag text: {e}")
+        # Update tag labels from configured IO
+        self.update_tag_labels()
 
         self.waterInVat = self.root.find(
             f".//svg:*[@id='waterInVat']", self.ns)
@@ -385,6 +351,53 @@ class VatWidget(QWidget):
             'inkscape', 'http://www.inkscape.org/namespaces/inkscape')
         xml_bytes = ET.tostring(self.root, encoding="utf-8")
         self.renderer.load(xml_bytes)
+
+    def update_tag_labels(self):
+        """Update SVG tag labels from current IO signal names configuration.
+
+        This can be called independently to refresh tags when signal names change,
+        without rebuilding the entire SVG (which is computationally expensive).
+        """
+        # Set tag names/labels from configured IO
+        # These display the PLC variable names associated with each tag
+        if hasattr(self, 'config') and self.config:
+            try:
+                # Set tag labels with signal names from IO configuration
+                tag_mapping = {
+                    'tagValveOut': 'DQValveOut',
+                    'tagValveIn': 'DQValveIn',
+                    'tagHeater': 'DQHeater',
+                    'tagLevelSwitchMax': 'DILevelSensorHigh',
+                    'tagLevelSwitchMin': 'DILevelSensorLow',
+                    'tagLevelSensor': 'AILevelSensor',
+                    'tagTempValue': 'AITemperatureSensor'
+                }
+
+                # Apply signal names from config.signal_names dictionary
+                for tag_id, attr_name in tag_mapping.items():
+                    if hasattr(self.config, 'signal_names') and attr_name in self.config.signal_names:
+                        signal_name = self.config.signal_names[attr_name]
+                        self.setSVGText(tag_id, signal_name)
+                    elif attr_name == 'DQValveOut':
+                        self.setSVGText(tag_id, "ValveOut")
+                    elif attr_name == 'DQValveIn':
+                        self.setSVGText(tag_id, "ValveIn")
+                    elif attr_name == 'DQHeater':
+                        self.setSVGText(tag_id, "Heater")
+                    elif attr_name == 'DILevelSensorHigh':
+                        self.setSVGText(tag_id, "LevelMax")
+                    elif attr_name == 'DILevelSensorLow':
+                        self.setSVGText(tag_id, "LevelMin")
+                    elif attr_name == 'AILevelSensor':
+                        self.setSVGText(tag_id, "LevelSensor")
+                    elif attr_name == 'AITemperatureSensor':
+                        self.setSVGText(tag_id, "TempSensor")
+
+                # Update the SVG renderer to reflect changes
+                self.updateSVG()
+                self.svg_widget.update()
+            except Exception as e:
+                logger.debug(f"Could not update tag labels: {e}")
 
     def _check_heating_warnings(self):
         """Check for heating-related warnings and show dialogs"""
