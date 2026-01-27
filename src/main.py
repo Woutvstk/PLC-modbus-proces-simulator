@@ -235,8 +235,8 @@ if __name__ == "__main__":
                             # Check if Manual mode is active (GUI controls valves/heater)
                             manual_mode = False
                             try:
-                                if hasattr(window, 'vat_widget') and window.vat_widget:
-                                    manual_mode = window.vat_widget.is_manual_mode()
+                                # Use generic method that works for any simulation
+                                manual_mode = window.is_manual_mode() if hasattr(window, 'is_manual_mode') else False
                             except Exception:
                                 manual_mode = False
                             
@@ -277,7 +277,15 @@ if __name__ == "__main__":
                             pass
                         
                         window.update_connection_status_icon()
-                        ioHandler.resetOutputs(mainConfig, active_config, active_status)
+                        
+                        # Get manual mode for reset
+                        manual_mode = False
+                        try:
+                            manual_mode = window.is_manual_mode() if hasattr(window, 'is_manual_mode') else False
+                        except Exception:
+                            manual_mode = False
+                        
+                        ioHandler.resetOutputs(mainConfig, active_config, active_status, manual_mode=manual_mode)
                         
                         # Log once
                         if not connectionLostLogged:
@@ -286,8 +294,15 @@ if __name__ == "__main__":
                             lastConnectionLossTime = time.time()
                 else:
                     # If control is PLC but no PLC connection, pretend PLC outputs are all 0
+                    # Get manual mode status
+                    manual_mode = False
+                    try:
+                        manual_mode = window.is_manual_mode() if hasattr(window, 'is_manual_mode') else False
+                    except Exception:
+                        manual_mode = False
+                    
                     ioHandler.resetOutputs(
-                        mainConfig, active_config, active_status)
+                        mainConfig, active_config, active_status, manual_mode=manual_mode)
                 
                 # Update button pulse timers
                 try:

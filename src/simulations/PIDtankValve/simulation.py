@@ -202,6 +202,10 @@ class simulation:
                 # Calculate heat input rate (Joules/second = Watts)
                 heat_input_rate = config.heaterMaxPower * self.delayedHeaterPowerFraction
                 
+                # Debug heat calculation every 10 cycles
+                if self._debug_counter == 0:
+                    print(f"[DEBUG SIM HEAT] heaterMaxPower={config.heaterMaxPower}W, delayedFraction={self.delayedHeaterPowerFraction:.3f}, heat_input={heat_input_rate:.1f}W")
+                
                 # Calculate heat loss rate (proportional to temp difference)
                 # This creates exponential cooling behavior
                 temp_difference = status.liquidTemperature - config.ambientTemp

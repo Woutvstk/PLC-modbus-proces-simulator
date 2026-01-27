@@ -197,13 +197,13 @@ class IOHandler:
                     status.valveOutOpenFraction = self.mapValue(
                         0, plc.analogMax, 0, 1, plc.GetAO(config.AQValveOutFraction["byte"]))
             
-            # Heater
+            # Heater - skip reading from PLC in manual mode (GUI controls it)
             if "DQHeater" in forced_values:
                 status.heaterPowerFraction = float(1 if forced_values["DQHeater"] else 0)
             elif "AQHeaterFraction" in forced_values:
                 status.heaterPowerFraction = self.mapValue(
                     0, plc.analogMax, 0, 1, forced_values["AQHeaterFraction"])
-            elif (mainConfig.plcGuiControl == "plc") and (config.DQHeater or config.AQHeaterFraction):
+            elif not manual_mode and (mainConfig.plcGuiControl == "plc") and (config.DQHeater or config.AQHeaterFraction):
                 if config.DQHeater and plc.GetDO(config.DQHeater["byte"], config.DQHeater["bit"]):
                     status.heaterPowerFraction = 1
                 elif config.AQHeaterFraction:
@@ -526,23 +526,26 @@ class IOHandler:
             else:
                 print(f"[HANDLER] Skipping {key}: is_enabled={is_enabled}, has_attr={has_attr}")
 
-    def resetOutputs(self, mainConfig: Any, config: Any, status: Any) -> None:
+    def reset_plc_outputs(self, mainConfig: Any, config: Any, status: Any, manual_mode: bool = False) -> None:
         """
         Reset actuators when PLC connection is lost.
+        In manual mode, don't reset heater/valves (GUI controls them).
         
         Args:
             mainConfig: Main configuration object
             config: Simulation-specific configuration
             status: Simulation-specific status
+            manual_mode: If True, don't reset valves/heater (GUI controls them)
         """
         if mainConfig.plcGuiControl == "plc":
-            # Reset actuators
-            if hasattr(status, 'valveInOpenFraction'):
-                status.valveInOpenFraction = float(0)
-            if hasattr(status, 'valveOutOpenFraction'):
-                status.valveOutOpenFraction = float(0)
-            if hasattr(status, 'heaterPowerFraction'):
-                status.heaterPowerFraction = float(0)
+            # Reset actuators only if NOT in manual mode
+            if not manual_mode:
+                if hasattr(status, 'valveInOpenFraction'):
+                    status.valveInOpenFraction = float(0)
+                if hasattr(status, 'valveOutOpenFraction'):
+                    status.valveOutOpenFraction = float(0)
+                if hasattr(status, 'heaterPowerFraction'):
+                    status.heaterPowerFraction = float(0)
             
             # Reset general controls commands/sliders
             if hasattr(status, 'generalStartCmd'):
@@ -561,3 +564,10 @@ class IOHandler:
             if not self.outputs_reset:
                 logger.info("PLC outputs reset (no connection)")
                 self.outputs_reset = True
+    
+    def resetOutputs(self, mainConfig: Any, config: Any, status: Any, manual_mode: bool = False) -> None:
+        """
+        Alias for reset_plc_outputs for backward compatibility.
+        In manual mode, don't reset heater/valves (GUI controls them).
+        """
+        self.reset_plc_outputs(mainConfig, config, status, manual_mode)

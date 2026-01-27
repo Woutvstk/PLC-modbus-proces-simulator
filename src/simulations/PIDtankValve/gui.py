@@ -206,9 +206,9 @@ class VatWidget(QWidget):
             self.levelSwitchMinHeight) + "%")
         self.setSVGText("levelSwitchMaxHeight", str(
             self.levelSwitchMaxHeight) + "%")
-        # Show heater power as percentage (0-100%) in SVG
-        heater_pct = int(self.heaterPowerFraction * 100.0)
-        self.setSVGText("powerValue", f"{heater_pct}%")
+        # Show heater power as actual watts in SVG (fraction * maxPower)
+        actual_watts = int(self.heaterPowerFraction * self.powerValue)
+        self.setSVGText("powerValue", f"{actual_watts}W")
         # Show tank water temperature with max 2 decimals
         try:
             self.setSVGText("tempVatValue", f"{float(tempVat):.2f}°C")

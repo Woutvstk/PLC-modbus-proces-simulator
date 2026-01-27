@@ -169,7 +169,10 @@ class TankSimSettingsMixin:
             
             # Update status - this is what gets sent to PLC
             if hasattr(self, 'tanksim_status') and self.tanksim_status:
+                old_fraction = self.tanksim_status.heaterPowerFraction
                 self.tanksim_status.heaterPowerFraction = fraction
+                if abs(old_fraction - fraction) > 0.01:  # Only log significant changes
+                    print(f"[DEBUG HEATER STATUS] Updated status.heaterPowerFraction: {old_fraction:.3f} → {fraction:.3f}")
             
             # Update all labels
             for label_name in ['heaterPowerValueLabel', 'heaterPowerValueLabel_3']:
@@ -177,12 +180,11 @@ class TankSimSettingsMixin:
                 if label:
                     label.setText(f"{value}%")
             
-            # heaterPowerValueLabel_2 shows actual watts (fraction * maxPower)
+            # heaterPowerValueLabel_2 shows percentage (not watts)
             label_2 = getattr(self, 'heaterPowerValueLabel_2', None)
-            if label_2 and hasattr(self, 'tanksim_config') and self.tanksim_config:
-                actual_watts = int(fraction * self.tanksim_config.heaterMaxPower)
-                label_2.setText(f"{actual_watts}W")
-                print(f"[DEBUG HEATER] Slider={value}% → Fraction={fraction:.2f} → Power={actual_watts}W (max={self.tanksim_config.heaterMaxPower}W)")
+            if label_2:
+                label_2.setText(f"{value}%")
+                print(f"[DEBUG HEATER] Slider={value}% → Fraction={fraction:.2f} → Power={int(fraction * self.tanksim_config.heaterMaxPower) if hasattr(self, 'tanksim_config') else 0}W (max={self.tanksim_config.heaterMaxPower if hasattr(self, 'tanksim_config') else 0}W)")
             
             # Sync vat_widget powerValue with config for SVG display
             if hasattr(self, 'vat_widget') and self.vat_widget and hasattr(self, 'tanksim_config'):
@@ -445,7 +447,7 @@ class TankSimSettingsMixin:
     def _update_temp_label(self, label, analog_value):
         """Update temperature label from analog slider value (0-27648)."""
         try:
-            # Map analog 0-27648 to temperature -50..boilingTemp °C
+            # Map analog 0-27648 to temperature 0..boilingTemp °C
             boiling_temp = 100.0
             if hasattr(self, 'boilingTempEntry'):
                 try:
@@ -455,9 +457,8 @@ class TankSimSettingsMixin:
             elif hasattr(self, 'tanksim_config') and self.tanksim_config:
                 boiling_temp = getattr(self.tanksim_config, 'liquidBoilingTemp', 100.0)
             
-            # Map: analog 0-27648 → temp -50 to boiling_temp
-            temp_range = boiling_temp - (-50)
-            temp_celsius = -50 + (analog_value / 27648.0) * temp_range
+            # Map: analog 0-27648 → temp 0 to boiling_temp (changed from -50)
+            temp_celsius = (analog_value / 27648.0) * boiling_temp
             label.setText(f"{temp_celsius:.1f}°C")
         except Exception as e:
             label.setText("--")
@@ -657,11 +658,57 @@ class TankSimSettingsMixin:
         # Step 7: Feed data to trend graphs if they're open
         try:
             if hasattr(self, 'trend_manager'):
-                self.trend_manager.add_temperature(self.tanksim_status.liquidTemperature)
-                self.trend_manager.add_level(self.tanksim_status.liquidVolume)
+                # Add temperature with heater power fraction (0-1) converted to percentage
+                power_pct = self.tanksim_status.heaterPowerFraction * 100.0
+                
+                # Get temperature setpoint from slider
+                temp_sp = None
+                try:
+                    slider_temp = getattr(self, 'slider_PidTankTempSP', None)
+                    if slider_temp:
+                        # Convert analog value (0-27648) to temperature (0-boilingTemp)
+                        boiling_temp = getattr(self.tanksim_config, 'liquidBoilingTemp', 100.0) if hasattr(self, 'tanksim_config') else 100.0
+                        temp_sp = (slider_temp.value() / 27648.0) * boiling_temp
+                except Exception:
+                    pass
+                
+                # Add to temperature trend with power and setpoint
+                self.trend_manager.add_temperature(
+                    pv_value=self.tanksim_status.liquidTemperature,
+                    setpoint_value=temp_sp,
+                    output_value=power_pct
+                )
+                
+                # Add level with valve fractions (convert to percentage)
+                valve_in_pct = self.tanksim_status.valveInOpenFraction * 100.0
+                valve_out_pct = self.tanksim_status.valveOutOpenFraction * 100.0
+                level_sp = None
+                try:
+                    slider_level = getattr(self, 'slider_PidTankLevelSP', None)
+                    if slider_level and hasattr(self, 'tanksim_config'):
+                        # Convert analog value to level percentage
+                        level_sp = (slider_level.value() / 27648.0) * 100.0
+                except Exception:
+                    pass
+                
+                self.trend_manager.add_level(
+                    pv_value=self.tanksim_status.liquidVolume / self.tanksim_config.tankVolume * 100.0 if hasattr(self, 'tanksim_config') else 0.0,
+                    setpoint_value=level_sp,
+                    valve_in_fraction=valve_in_pct,
+                    valve_out_fraction=valve_out_pct
+                )
         except Exception as e:
             logger.debug(f"Error updating trend graphs: {e}")
 
+    def is_manual_mode(self):
+        """Check if manual mode is active - generic method for main.py"""
+        try:
+            if hasattr(self, 'vat_widget') and self.vat_widget:
+                return self.vat_widget.is_manual_mode()
+        except Exception:
+            pass
+        return False
+    
     def _update_gui_panel_visibility(self):
         """Show GUI control panels based on controller mode, but never hide them."""
         try:
@@ -774,29 +821,12 @@ class TankSimSettingsMixin:
             except Exception as e:
                 logger.error(f"Error writing valve positions: {e}")
 
-            # Write heater state (always analog mode now)
-            try:
-                # Analog mode: Use the first visible heater slider; fallback to first available
-                slider_val = None
-                try:
-                    for slider in getattr(self, '_heater_power_sliders', []):
-                        if slider is None:
-                            continue
-                        if slider.isVisible():
-                            slider_val = int(slider.value())
-                            break
-                    if slider_val is None:
-                        first_slider = next((s for s in getattr(self, '_heater_power_sliders', []) if s is not None), None)
-                        if first_slider is not None:
-                            slider_val = int(first_slider.value())
-                    if slider_val is None:
-                        slider_val = 0
-                    # Convert from percentage (0-100) to fraction (0-1)
-                    self.tanksim_status.heaterPowerFraction = max(0.0, min(1.0, slider_val / 100.0))
-                except Exception:
-                    self.tanksim_status.heaterPowerFraction = 0.0
-            except Exception as e:
-                logger.error(f"Error writing heater state: {e}")
+            # Write heater state - SKIP THIS, _on_heater_slider_changed handles it directly
+            # Commenting out to prevent overwriting status.heaterPowerFraction with 0
+            # try:
+            #     # OLD CODE that overwrites heaterPowerFraction
+            # except Exception as e:
+            #     logger.error(f"Error writing heater state: {e}")
 
         # Also push key limits from GUI into the simulation configuration
         # so changes to max flows and heater power affect the physics.
