@@ -373,7 +373,10 @@ class VatWidget(QWidget):
             pass
     
     def _on_valve_in_entry_changed(self, text):
-        """Handle valve in entry text change - update SVG immediately."""
+        """Handle valve in entry text change - update SVG immediately.
+        Only updates adjustableValveInValue for display.
+        Status update happens via write_gui_values_to_status() with mode check.
+        """
         try:
             value = int(text) if text else 0
             self.adjustableValveInValue = max(0, min(100, value))
@@ -382,7 +385,10 @@ class VatWidget(QWidget):
             pass
     
     def _on_valve_out_entry_changed(self, text):
-        """Handle valve out entry text change - update SVG immediately."""
+        """Handle valve out entry text change - update SVG immediately.
+        Only updates adjustableValveOutValue for display.
+        Status update happens via write_gui_values_to_status() with mode check.
+        """
         try:
             value = int(text) if text else 0
             self.adjustableValveOutValue = max(0, min(100, value))
@@ -696,10 +702,8 @@ class VatWidget(QWidget):
             # Also update VatWidget properties for display consistency
             self.adjustableValveInValue = valve_in_pct
             self.adjustableValveOutValue = valve_out_pct
-            
-            print(f"[DEBUG] Manual mode init: Valve In={valve_in_pct}%, Valve Out={valve_out_pct}%")
         except Exception as e:
-            print(f"[DEBUG] Error writing valve positions: {e}")
+            pass
         
         try:
             # Read heater power from slider (try all possible slider names)
@@ -712,9 +716,8 @@ class VatWidget(QWidget):
             
             if slider_val is not None:
                 status.heaterPowerFraction = slider_val / 100.0
-                print(f"[DEBUG] Manual mode init: Heater power={slider_val}%")
         except Exception as e:
-            print(f"[DEBUG] Error writing heater power: {e}")
+            pass
     
     def _update_control_groupboxes(self, enabled):
         """Enable or disable control groupboxes based on Auto/Manual mode.

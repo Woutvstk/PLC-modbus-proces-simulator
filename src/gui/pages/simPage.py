@@ -319,6 +319,19 @@ class SimPageMixin:
                     if active_sim and hasattr(active_sim, 'status') and hasattr(active_sim.status, 'simRunning'):
                         active_sim.status.simRunning = False
                         logger.info("Set simRunning to False")
+                    
+                    # Reset START SIMULATION button to unchecked state
+                    try:
+                        start_btn = self.findChild(QPushButton, "pushButton_startSimulation")
+                        if start_btn:
+                            start_btn.blockSignals(True)
+                            start_btn.setChecked(False)
+                            start_btn.setText("START SIMULATION")
+                            start_btn.blockSignals(False)
+                            logger.info("Reset START SIMULATION button to unchecked state")
+                    except Exception as e:
+                        logger.warning(f"Could not reset START SIMULATION button: {e}")
+                    
                     # Then stop the simulation
                     sm.stop_simulation()
                     logger.info("Stopped simulation when closing sim page")

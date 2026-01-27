@@ -176,18 +176,34 @@ class TankSimSettingsMixin:
             print(f"[DEBUG INIT] Error setting up heater sliders: {e}")
 
     def _on_heater_slider_changed(self, value):
-        """Handle heater power slider change (0-100%)."""
+        """Handle heater power slider change (0-100%).
+        Only updates status when in GUI mode or Manual mode.
+        In Automatic mode, PLC controls the heater.
+        """
         try:
+            # Check if we should allow GUI control
+            gui_mode = (hasattr(self, 'mainConfig') and self.mainConfig and 
+                       self.mainConfig.plcGuiControl == "gui")
+            
+            manual_mode = False
+            if hasattr(self, 'vat_widget') and self.vat_widget:
+                try:
+                    manual_mode = self.vat_widget.is_manual_mode()
+                except Exception:
+                    pass
+            
+            # Only allow changes in GUI mode or Manual mode
+            if not (gui_mode or manual_mode):
+                # In Automatic mode with PLC - ignore GUI changes
+                return
+            
             # Clamp value
             value = max(0, min(100, int(value)))
             fraction = value / 100.0
             
             # Update status - this is what gets sent to PLC
             if hasattr(self, 'tanksim_status') and self.tanksim_status:
-                old_fraction = self.tanksim_status.heaterPowerFraction
                 self.tanksim_status.heaterPowerFraction = fraction
-                if abs(old_fraction - fraction) > 0.01:  # Only log significant changes
-                    print(f"[DEBUG HEATER STATUS] Updated status.heaterPowerFraction: {old_fraction:.3f} → {fraction:.3f}")
             
             # Update all labels
             for label_name in ['heaterPowerValueLabel', 'heaterPowerValueLabel_3']:
@@ -199,7 +215,6 @@ class TankSimSettingsMixin:
             label_2 = getattr(self, 'heaterPowerValueLabel_2', None)
             if label_2:
                 label_2.setText(f"{value}%")
-                print(f"[DEBUG HEATER] Slider={value}% → Fraction={fraction:.2f} → Power={int(fraction * self.tanksim_config.heaterMaxPower) if hasattr(self, 'tanksim_config') else 0}W (max={self.tanksim_config.heaterMaxPower if hasattr(self, 'tanksim_config') else 0}W)")
             
             # Sync vat_widget powerValue with config for SVG display
             if hasattr(self, 'vat_widget') and self.vat_widget and hasattr(self, 'tanksim_config'):

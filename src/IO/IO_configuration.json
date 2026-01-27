@@ -22,7 +22,7 @@
       "byte": "0",
       "bit": "1",
       "address": "I0.1",
-      "status": "FALSE",
+      "status": "TRUE",
       "description": "Water level is LOW (above threshold = true)",
       "range": "0-1"
     },
@@ -32,7 +32,7 @@
       "byte": "2",
       "bit": "",
       "address": "IW2",
-      "status": "6912",
+      "status": "689",
       "description": "Current water level in tank (0-100%)",
       "range": "0-27648"
     },
@@ -42,8 +42,8 @@
       "byte": "4",
       "bit": "",
       "address": "IW4",
-      "status": "4608",
-      "description": "Current water temperature (°C)",
+      "status": "7505",
+      "description": "Current water temperature (\u00c2\u00b0C)",
       "range": "0-27648"
     },
     {
@@ -202,8 +202,8 @@
       "byte": "6",
       "bit": "",
       "address": "IW6",
-      "status": "0",
-      "description": "Desired water temperature (-50 to 100°C)",
+      "status": "12534",
+      "description": "Desired water temperature (-50 to 100\u00c2\u00b0C)",
       "range": "0-27648"
     },
     {
@@ -212,7 +212,7 @@
       "byte": "8",
       "bit": "",
       "address": "IW8",
-      "status": "0",
+      "status": "16404",
       "description": "Desired water level (0-100%)",
       "range": "0-27648"
     },
@@ -348,6 +348,7 @@
     }
   ],
   "custom_signal_names": {
-    "DILevelSensorHigh": "Iktestdit"
+    "DILevelSensorHigh": "Iktestdit",
+    "DILevelSensorLow": "gqgz"
   }
 }
