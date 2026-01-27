@@ -169,7 +169,7 @@ class SimPageMixin:
 
         # Close simulation buttons
         try:
-            close_btn = self.findChild(QPushButton, "pushButton_PIDtankValve_2")
+            close_btn = self.findChild(QPushButton, "pushButton_closeDualTank2")
             if close_btn:
                 close_btn.clicked.connect(self._close_sim_and_close_sidebar)
         except AttributeError:
@@ -309,6 +309,22 @@ class SimPageMixin:
 
     def close_simulation(self):
         """Close current simulation and return to selection page."""
+        # Stop the running simulation and set simRunning to False
+        try:
+            if hasattr(self, 'mainConfig') and hasattr(self.mainConfig, 'simulationManager'):
+                sm = self.mainConfig.simulationManager
+                if sm and sm.get_active_simulation():
+                    active_sim = sm.get_active_simulation()
+                    # Set simRunning to False FIRST
+                    if active_sim and hasattr(active_sim, 'status') and hasattr(active_sim.status, 'simRunning'):
+                        active_sim.status.simRunning = False
+                        logger.info("Set simRunning to False")
+                    # Then stop the simulation
+                    sm.stop_simulation()
+                    logger.info("Stopped simulation when closing sim page")
+        except Exception as e:
+            logger.error(f"Error stopping simulation on close: {e}")
+        
         self.current_sim_page = None
         self.MainScreen.setCurrentIndex(5)
         try:

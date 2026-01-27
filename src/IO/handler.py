@@ -6,11 +6,6 @@ This module is responsible for:
 - Getting current simulation status from core.simulationManager
 - Writing inputs/outputs to PLC or GUI based on active protocol
 - Bridge between protocol layer and simulation layer
-
-External Libraries Used:
-- time (Python Standard Library) - Timing for button debouncing (TON logic)
-- logging (Python Standard Library) - Error and debug logging
-- typing (Python Standard Library) - Type hints for method signatures
 """
 import time
 import logging
@@ -36,7 +31,24 @@ class IOHandler:
         self._last_sent_di = {}
         self._last_sent_ai = {}
         self._first_update = True  # Track first update to force initial analog writes
-        self._force_write_until = None  # Timestamp until which all writes are forced (500ms period)
+        self._force_write_end_time = None  # Track forced write period end time
+    
+    def start_force_write_period(self, duration: float = 0.5) -> None:
+        """
+        Start a forced write period where all analog values are written to PLC.
+        This is useful after connection to ensure PLC has correct initial values.
+        
+        Args:
+            duration: Duration in seconds for the forced write period (default 500ms)
+        """
+        self._force_write_end_time = time.time() + duration
+        logger.info(f"Started {duration*1000:.0f}ms forced write period")
+    
+    def _is_in_force_write_period(self) -> bool:
+        """Check if currently in forced write period."""
+        if self._force_write_end_time is None:
+            return False
+        return time.time() < self._force_write_end_time
     
     def mapValue(self, oldMin: int, oldMax: int, newMin: int, newMax: int, old: float) -> float:
         """
@@ -55,16 +67,6 @@ class IOHandler:
         if oldMax == oldMin:
             return float(newMin)
         return round((old - oldMin) * (newMax - newMin) / (oldMax - oldMin) + newMin, 2)
-    
-    def start_force_write_period(self):
-        """Start a 500ms period where all IO values are force-written regardless of change."""
-        self._force_write_until = time.monotonic() + 0.5  # 500ms from now
-    
-    def _should_force_write(self) -> bool:
-        """Check if we're in the forced write period (500ms after init/connect/reload)."""
-        if self._force_write_until is None:
-            return False
-        return time.monotonic() < self._force_write_until
     
     def _ton_ready(self, key: str, desired: bool) -> bool:
         """
@@ -300,12 +302,8 @@ class IOHandler:
                     self._last_sent_di[key] = value
     
     def _write_analog_sensors(self, plc, mainConfig, config, status, forced_values):
-        """Write analog sensor values to PLC inputs. Writes on change OR during 500ms init period."""
-        
-        # Check if we're in the forced write period
-        do_force_write = self._should_force_write()
-        
-        # Analog Level Sensor - forced write period + change
+        """Write analog sensor values to PLC inputs."""
+        # Analog Level Sensor
         if "AILevelSensor" in forced_values:
             value = int(forced_values["AILevelSensor"])
         else:
@@ -318,19 +316,17 @@ class IOHandler:
             addr = config.AILevelSensor
             if addr:
                 key = "AILevelSensor"
-                # Write if: in forced period OR first update OR value changed
-                if do_force_write or self._first_update or self._last_sent_ai.get(key) != value:
+                # On first update, force write even if value seems unchanged
+                if self._first_update or self._last_sent_ai.get(key) != value:
                     plc.SetAI(addr["byte"], value)
                     self._last_sent_ai[key] = value
         
-        # Analog Temperature Sensor - forced write period + change
+        # Analog Temperature Sensor
         if "AITemperatureSensor" in forced_values:
             value = int(forced_values["AITemperatureSensor"])
         else:
             if hasattr(status, 'liquidTemperature'):
-                # Map temperature 0 to boilingTemp (°C) to analog 0-27648
-                boiling_temp = getattr(config, 'liquidBoilingTemp', 100.0)
-                value = int(self.mapValue(0, boiling_temp, 0, 27648, status.liquidTemperature))
+                value = int(self.mapValue(-50, 250, 0, plc.analogMax, status.liquidTemperature))
             else:
                 value = 0
         
@@ -338,17 +334,14 @@ class IOHandler:
             addr = config.AITemperatureSensor
             if addr:
                 key = "AITemperatureSensor"
-                # Write if: in forced period OR first update OR value changed
-                if do_force_write or self._first_update or self._last_sent_ai.get(key) != value:
+                # On first update, force write even if value seems unchanged
+                if self._first_update or self._last_sent_ai.get(key) != value:
                     plc.SetAI(addr["byte"], value)
                     self._last_sent_ai[key] = value
     
     
     def _write_general_controls_commands(self, plc, mainConfig, config, status, forced_values):
         """Write General Controls (Start/Stop/Reset buttons and sliders) to PLC inputs."""
-        
-        # Check if we're in the forced write period (500ms after init/connect/reload)
-        do_force_write = self._should_force_write()
         
         # Write digital command buttons (Start, Stop, Reset) to PLC inputs
         for cmd in ['Start', 'Stop', 'Reset']:
@@ -363,15 +356,20 @@ class IOHandler:
             else:
                 continue
             
-            # Write to PLC if address is configured - all buttons write on change or forced period
+            # Write to PLC if address is configured
             if self._is_enabled(config, key) and hasattr(config, key):
                 addr = getattr(config, key)
                 if addr:
                     cache_key = key
-                    # Write on change or during forced period
-                    if do_force_write or self._first_update or self._last_sent_di.get(cache_key) != desired:
+                    if cmd == 'Start':
+                        # Always send Start to guarantee a detectable pulse (no cache suppression)
                         plc.SetDI(addr["byte"], addr["bit"], desired)
                         self._last_sent_di[cache_key] = desired
+                    else:
+                        # On first update, force write even if value seems unchanged
+                        if self._first_update or self._last_sent_di.get(cache_key) != desired:
+                            plc.SetDI(addr["byte"], addr["bit"], desired)
+                            self._last_sent_di[cache_key] = desired
         
         # Write analog control sliders (Control1, Control2, Control3) to PLC inputs
         for i in range(1, 4):
@@ -391,10 +389,9 @@ class IOHandler:
                 addr = getattr(config, key)
                 if addr:
                     cache_key = key
-                    # Write on change or during forced period
-                    if do_force_write or self._first_update or self._last_sent_ai.get(cache_key) != value:
+                    # On first update, force write even if value seems unchanged
+                    if self._first_update or self._last_sent_ai.get(cache_key) != value:
                         plc.SetAI(addr["byte"], value)
-                        self._last_sent_ai[cache_key] = value
                         self._last_sent_ai[cache_key] = value
     
     def _read_plc_commands(self, plc, mainConfig, config, status, forced_values):
@@ -461,15 +458,15 @@ class IOHandler:
                     pass
 
     def _write_pidvalve_controls(self, plc, mainConfig, config, status, forced_values):
-        """Write GUI values to PLC inputs for PIDValve controls (Start/Stop/Reset, Mode, SP).
-        Non-button signals write on change OR during 500ms forced write period."""
+        """Write GUI values to PLC inputs for PIDValve controls (Start/Stop/Reset, Mode, SP)."""
         
-        # Check if we're in the forced write period (500ms after init/connect/reload)
-        do_force_write = self._should_force_write()
-        
-        # Write digital control radios (Auto, Man, Temp increment, Level increment) - forced period + change
-        mode_signals = ['PidValveAuto', 'PidValveMan', 'PidTankValveAItemp', 'PidTankValveDItemp', 'PidTankValveAIlevel', 'PidTankValveDIlevel']
-        for name in mode_signals:
+        # Write digital command buttons (Start, Stop, Reset, Auto, Man, Temp increment, Level increment)
+        for name in [
+            'PidValveStart', 'PidValveStop', 'PidValveReset',
+            'PidValveAuto', 'PidValveMan',
+            'PidTankValveAItemp', 'PidTankValveDItemp',
+            'PidTankValveAIlevel', 'PidTankValveDIlevel'
+        ]:
             key = f"DI{name}"
             attr = f"pid{name}Cmd"
             
@@ -481,49 +478,28 @@ class IOHandler:
             else:
                 continue
             
-            # Write to PLC if address is configured - forced period OR on change OR first update
+            # Write to PLC if address is configured
             is_enabled = self._is_enabled(config, key)
             has_attr = hasattr(config, key)
             if is_enabled and has_attr:
                 addr = getattr(config, key)
                 if addr:
+                    # On first update, bypass TON and force write initial state
+                    # This ensures PLC control mode (Auto/Manual) is set immediately on startup
                     ton_ready = self._first_update or self._ton_ready(key, desired)
                     if ton_ready:
                         cache_key = key
-                        # Write if: in forced period OR first update OR value changed
-                        if do_force_write or self._first_update or self._last_sent_di.get(cache_key) != desired:
+                        # On first update, force write even if value seems unchanged
+                        if self._first_update or self._last_sent_di.get(cache_key) != desired:
                             plc.SetDI(addr["byte"], addr["bit"], desired)
                             self._last_sent_di[cache_key] = desired
-        
-        # Write button commands on change only (not cyclic)
-        # NOTE: PidValve buttons use pidPidValveStartCmd/Stop/ResetCmd (separate from General Controls)
-        button_signals = [
-            ('PidValveStart', 'DIPidValveStart', 'pidPidValveStartCmd'),
-            ('PidValveStop', 'DIPidValveStop', 'pidPidValveStopCmd'),
-            ('PidValveReset', 'DIPidValveReset', 'pidPidValveResetCmd')
-        ]
-        for name, key_di, status_attr in button_signals:
-            # Determine value to write
-            if key_di in forced_values:
-                desired = bool(forced_values[key_di])
-            elif hasattr(status, status_attr):
-                desired = bool(getattr(status, status_attr, False))
+                            if "PidValve" in key:
+                                print(f"[HANDLER] Writing {key}={desired} to byte {addr['byte']}, bit {addr['bit']}")
             else:
-                continue
-            
-            # Write to PLC if address is configured - on change only
-            is_enabled = self._is_enabled(config, key_di)
-            has_attr = hasattr(config, key_di)
-            if is_enabled and has_attr:
-                addr = getattr(config, key_di)
-                if addr:
-                    cache_key = key_di
-                    # For buttons, write on change only (not cyclic)
-                    if self._last_sent_di.get(cache_key) != desired:
-                        plc.SetDI(addr["byte"], addr["bit"], desired)
-                        self._last_sent_di[cache_key] = desired
+                if "PidValve" in key and (name == "Start" or name == "Stop" or name == "Reset"):
+                    print(f"[HANDLER] Skipping {key}: is_enabled={is_enabled}, has_attr={has_attr}")
         
-        # Write analog setpoint sliders (TempSP, LevelSP) to PLC inputs - forced period + change
+        # Write analog setpoint sliders (TempSP, LevelSP) to PLC inputs
         for name in ['PidTankTempSP', 'PidTankLevelSP']:
             key = f"AI{name}"
             attr = f"pid{name}Value"
@@ -536,17 +512,19 @@ class IOHandler:
             else:
                 continue
             
-            # Write to PLC if address is configured - forced period OR on change
+            # Write to PLC if address is configured
             is_enabled = self._is_enabled(config, key)
             has_attr = hasattr(config, key)
             if is_enabled and has_attr:
                 addr = getattr(config, key)
                 if addr:
                     cache_key = key
-                    # Write if: in forced period OR value changed
-                    if do_force_write or self._last_sent_ai.get(cache_key) != value:
+                    if self._last_sent_ai.get(cache_key) != value:
                         plc.SetAI(addr["byte"], value)
                         self._last_sent_ai[cache_key] = value
+                        print(f"[HANDLER] Writing {key}={value} to byte {addr['byte']}")
+            else:
+                print(f"[HANDLER] Skipping {key}: is_enabled={is_enabled}, has_attr={has_attr}")
 
     def resetOutputs(self, mainConfig: Any, config: Any, status: Any) -> None:
         """

@@ -1,42 +1,22 @@
-"""
-Tank Visualization Widget - SVG-based graphical display for PID tank simulation.
-
-Provides real-time visual representation of:
-- Liquid level and color in tank
-- Heating coil activation
-- Valve positions (inlet/outlet)
-- Level switches and temperature sensors
-
-External Libraries Used:
-- PyQt5 (GPL v3) - GUI framework for widgets, SVG rendering, and painting
-- xml.etree.ElementTree (Python Standard Library) - XML manipulation for dynamic SVG updates
-"""
-
 import os
-import logging
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QMessageBox
+from PyQt5.QtWidgets import QWidget, QVBoxLayout
 from PyQt5.QtCore import QSize, QRectF
 from PyQt5.QtSvg import QSvgRenderer
 from PyQt5.QtGui import QPainter
 
-logger = logging.getLogger(__name__)
+# Colors
+red = "#FF0000"
+orange = "#FFA500"
+blue = "#1100FF"
+green = "#00FF00"
 
-# Color definitions for liquid display
-RED = "#FF0000"
-ORANGE = "#FFA500"
-BLUE = "#1100FF"
-GREEN = "#00FF00"
+# Global variables
 
-# Warning thresholds
-BOILING_TEMPERATURE = 100.0  # °C
-
-# Global state variables (deprecated - kept for backwards compatibility)
 heatingCoil = True
 liquidVolume = 0
 tempVat = 0
-simRunning = False  # Track if simulation is running
 
 
 class SvgDisplay(QWidget):
@@ -83,54 +63,44 @@ class VatWidget(QWidget):
         # Default attribute values
         self.valveInMaxFlowValue = 0
         self.valveOutMaxFlowValue = 0
-        self.powerValue = 15000.0
+        self.powerValue = 20000.0  # Will be synced with config.heaterMaxPower
         self.adjustableValve = False
         self.adjustableHeatingCoil = False
         self.levelSwitches = False
         self.analogValueTemp = False
         self.adjustableValveInValue = 0
         self.adjustableValveOutValue = 0
-        self.waterColor = BLUE
+        self.waterColor = blue
         self.controler = "GUI"
         self.maxVolume = 200.0  # Tank capacity in liters
         self.levelSwitchMaxHeight = 90.0
         self.levelSwitchMinHeight = 10.0
         self.heaterPowerFraction = 0.0
-        self._initialization_complete = False  # Track if initialization is done
-        # Track last warning to avoid spam (instance variable)
-        self._last_warning_shown = None
-        # Track last checked state to prevent duplicate warnings
-        self._last_checked_state = None
 
         self.waterInVat = None
         self.originalY = 0.0
         self.originalHeight = 0.0
-        self.maxheightGUI = 85
+        self.maxheightGUI = 80
         self.lowestY = 0.0
 
         try:
             # Try multiple paths to find SVGVat.svg (handles different architectures)
             possible_paths = [
-                Path(__file__).parent.parent.parent /
-                "gui" / "media" / "SVGVat.svg",
-                Path(__file__).parent.parent /
-                "guiCommon" / "media" / "SVGVat.svg",
-                Path(__file__).parent.parent.parent /
-                "gui" / "media" / "icon" / "SVG vat.svg",
-                Path(__file__).parent.parent.parent /
-                "guiCommon" / "media" / "SVGVat.svg",
+                Path(__file__).parent.parent.parent / "gui" / "media" / "SVGVat.svg",
+                Path(__file__).parent.parent / "guiCommon" / "media" / "SVGVat.svg",
+                Path(__file__).parent.parent.parent / "gui" / "media" / "icon" / "SVG vat.svg",
+                Path(__file__).parent.parent.parent / "guiCommon" / "media" / "SVGVat.svg",
             ]
-
+            
             svg_path = None
             for path in possible_paths:
                 if path.exists():
                     svg_path = path
                     break
-
+            
             if svg_path is None:
-                raise FileNotFoundError(
-                    f"SVG file not found in any of the expected locations: {possible_paths}")
-
+                raise FileNotFoundError(f"SVG file not found in any of the expected locations: {possible_paths}")
+            
             self.tree = ET.parse(svg_path)
             self.root = self.tree.getroot()
             self.ns = {"svg": "http://www.w3.org/2000/svg"}
@@ -159,14 +129,10 @@ class VatWidget(QWidget):
 
         self.updateSVG()
         self.svg_widget.update()
-        self._initialization_complete = True  # Mark initialization as complete
 
     def rebuild(self):
         """Complete rebuild of the SVG based on current values"""
         global liquidVolume
-
-        # Check for warnings
-        self._check_heating_warnings()
 
         self.setGroupColor("WaterGroup", self.waterColor)
 
@@ -185,11 +151,11 @@ class VatWidget(QWidget):
         red_hex = f"#{red_val:02X}0000"
         self.setGroupColor("heatingCoil", red_hex)
         if self.levelSwitches:
-            self.visibilityGroup("tagLevelSwitchMax", "shown")
-            self.visibilityGroup("tagLevelSwitchMin", "shown")
+            self.visibilityGroup("levelSwitchMax", "shown")
+            self.visibilityGroup("levelSwitchMin", "shown")
         else:
-            self.visibilityGroup("tagLevelSwitchMax", "hidden")
-            self.visibilityGroup("tagLevelSwitchMin", "hidden")
+            self.visibilityGroup("levelSwitchMax", "hidden")
+            self.visibilityGroup("levelSwitchMin", "hidden")
 
         if self.analogValueTemp:
             self.visibilityGroup("analogValueTemp", "shown")
@@ -201,96 +167,32 @@ class VatWidget(QWidget):
         if not self.adjustableHeatingCoil:
             self.visibilityGroup("adjustableHeatingCoil", "hidden")
             if heatingCoil:
-                self.setGroupColor("tagHeater", GREEN)
+                self.setGroupColor("heatingCoilValue", green)
             elif not heatingCoil:
-                self.setGroupColor("tagHeater", RED)
+                self.setGroupColor("heatingCoilValue", red)
             else:
-                self.setGroupColor("tagHeater", "#FFFFFF")
+                self.setGroupColor("heatingCoilValue", "#FFFFFF")
         else:
             # Keep visible even in PLC mode to reflect live heater power
             self.visibilityGroup("adjustableHeatingCoil", "shown")
 
-        # Control water pipe visibility - show when tank has water
-        waterPipe = self.root.find(f".//svg:*[@id='waterPipe']", self.ns)
-        if waterPipe is not None:
-            if liquidVolume > 0:
-                waterPipe.set("visibility", "visible")
-            else:
-                waterPipe.set("visibility", "hidden")
-
-        # Control inlet water visibility - show when inlet valve is open
-        waterValveIn = self.root.find(f".//svg:*[@id='waterValveIn']", self.ns)
-        if waterValveIn is not None:
-            if self.adjustableValveInValue > 0:
-                waterValveIn.set("visibility", "visible")
-                waterValveIn.set(
-                    "style", f"fill:{BLUE};fill-opacity:1;stroke:{BLUE}")
-                self.setGroupColor("valveIn", BLUE)
-                self.setGroupColor("tagValveIn", BLUE)
-                # Set the inlet water width based on actual flow
-                if liquidVolume > 0:
-                    # Normal case: tank has water, scale by inlet valve opening
-                    self.ValveWidth(
-                        "waterValveIn", self.adjustableValveInValue)
-                else:
-                    # No water in tank but inlet is open: scale by actual inlet flow
-                    actual_flow = (self.adjustableValveInValue /
-                                   100.0) * self.valveInMaxFlowValue
-                    equivalent_inlet_opening = (
-                        actual_flow / self.valveInMaxFlowValue) * 100.0
-                    equivalent_inlet_opening = min(
-                        100.0, equivalent_inlet_opening)
-                    self.ValveWidth("waterValveIn", equivalent_inlet_opening)
-            else:
-                waterValveIn.set("visibility", "hidden")
-                waterValveIn.set(
-                    "style", "fill:#FFFFFF;fill-opacity:0;stroke:#FFFFFF")
-                self.setGroupColor("valveIn", "#FFFFFF")
-                self.setGroupColor("tagValveIn", "#FFFFFF")
-
-        # Control outlet water visibility and width - show when:
-        # 1. There IS water AND outlet valve is open, OR
-        # 2. There is NO water AND BOTH inlet AND outlet valves are open (water through from inlet to outlet)
-        waterValveOut = self.root.find(
-            f".//svg:*[@id='waterValveOut']", self.ns)
-        if waterValveOut is not None:
-            if (liquidVolume > 0 and self.adjustableValveOutValue > 0) or \
-               (liquidVolume <= 0 and self.adjustableValveInValue > 0 and self.adjustableValveOutValue > 0):
-                # Set the outlet water width based on actual flow FIRST
-                if liquidVolume > 0:
-                    # Normal case: tank has water, scale by outlet valve opening
-                    self.ValveWidth("waterValveOut",
-                                    self.adjustableValveOutValue)
-                else:
-                    # No water in tank but both valves open: scale by actual inlet flow
-                    # Actual flow = (inlet opening % × inlet max flow)
-                    # Convert to equivalent outlet valve opening = (actual flow / outlet max flow) × 100
-                    actual_flow = (self.adjustableValveInValue /
-                                   100.0) * self.valveInMaxFlowValue
-                    equivalent_outlet_opening = (
-                        actual_flow / self.valveOutMaxFlowValue) * 100.0
-                    # Cap at 100% to avoid overflow
-                    equivalent_outlet_opening = min(
-                        100.0, equivalent_outlet_opening)
-                    self.ValveWidth("waterValveOut", equivalent_outlet_opening)
-
-                # Then set visibility and color
-                waterValveOut.set("visibility", "visible")
-                waterValveOut.set(
-                    "style", f"fill:{BLUE};fill-opacity:1;stroke:{BLUE}")
-                self.setGroupColor("valveOut", BLUE)
-                self.setGroupColor("tagValveOut", BLUE)
-            else:
-                waterValveOut.set("visibility", "hidden")
-                waterValveOut.set(
-                    "style", "fill:#FFFFFF;fill-opacity:0;stroke:#FFFFFF")
-                self.setGroupColor("valveOut", "#FFFFFF")
-                self.setGroupColor("tagValveOut", "#FFFFFF")
-
-        if tempVat == self.powerValue:
-            self.setGroupColor("tagTempValue", GREEN)
+        if self.adjustableValveInValue == 0:
+            self.ValveWidth("waterValveIn", 0)
+            self.setGroupColor("valveIn", "#FFFFFF")
         else:
-            self.setGroupColor("tagTempValue", RED)
+            self.ValveWidth("waterValveIn", self.adjustableValveInValue)
+            self.setGroupColor("valveIn", self.waterColor)
+
+        if self.adjustableValveOutValue == 0:
+            self.ValveWidth("waterValveOut", 0)
+            self.setGroupColor("valveOut", "#FFFFFF")
+        else:
+            self.ValveWidth("waterValveOut", self.adjustableValveOutValue)
+            self.setGroupColor("valveOut", self.waterColor)
+        if tempVat == self.powerValue:
+            self.setGroupColor("tempVat", green)
+        else:
+            self.setGroupColor("tempVat", red)
 
         self.setSVGText("adjustableValveInValue", str(
             self.adjustableValveInValue) + "%")
@@ -304,19 +206,15 @@ class VatWidget(QWidget):
             self.levelSwitchMinHeight) + "%")
         self.setSVGText("levelSwitchMaxHeight", str(
             self.levelSwitchMaxHeight) + "%")
-        # Calculate actual power delivered to heating coil (0 to max)
-        actual_power = self.powerValue * self.heaterPowerFraction
-        self.setSVGText("powerValue",
-                        f"{actual_power:.1f}W")
+        # Show heater power as percentage (0-100%) in SVG
+        heater_pct = int(self.heaterPowerFraction * 100.0)
+        self.setSVGText("powerValue", f"{heater_pct}%")
         # Show tank water temperature with max 2 decimals
         try:
             self.setSVGText("tempVatValue", f"{float(tempVat):.2f}°C")
         except Exception:
             # Fallback to string conversion if formatting fails
             self.setSVGText("tempVatValue", str(tempVat) + "°C")
-
-        # Update tag labels from configured IO
-        self.update_tag_labels()
 
         self.waterInVat = self.root.find(
             f".//svg:*[@id='waterInVat']", self.ns)
@@ -332,160 +230,34 @@ class VatWidget(QWidget):
             self.lowestY = self.originalY + self.originalHeight
             self.LevelChangeVat()
 
-        # Hide water height indicator when there is no water AND outgoing valve is open
-        if liquidVolume <= 0 and self.adjustableValveOutValue > 0:
-            self.visibilityGroup("tagLevelSensor", "hidden")
-        else:
-            self.visibilityGroup("tagLevelSensor", "visible")
-
         self.updateSVG()
         self.svg_widget.update()
-        # Mark initialization as complete after first rebuild
-        self._initialization_complete = True
 
     def updateSVG(self):
         """Update the renderer with the current SVG"""
-        # Register the namespace to preserve it in the output
-        ET.register_namespace('svg', 'http://www.w3.org/2000/svg')
-        ET.register_namespace(
-            'inkscape', 'http://www.inkscape.org/namespaces/inkscape')
         xml_bytes = ET.tostring(self.root, encoding="utf-8")
         self.renderer.load(xml_bytes)
-
-    def update_tag_labels(self):
-        """Update SVG tag labels from current IO signal names configuration.
-
-        This can be called independently to refresh tags when signal names change,
-        without rebuilding the entire SVG (which is computationally expensive).
-        """
-        # Set tag names/labels from configured IO
-        # These display the PLC variable names associated with each tag
-        if hasattr(self, 'config') and self.config:
-            try:
-                # Set tag labels with signal names from IO configuration
-                tag_mapping = {
-                    'tagValveOut': 'AQValveOutFraction',
-                    'tagValveIn': 'AQValveInFraction',
-                    'tagHeater': 'AQHeaterFraction',
-                    'tagLevelSwitchMax': 'DILevelSensorHigh',
-                    'tagLevelSwitchMin': 'DILevelSensorLow',
-                    'tagLevelSensor': 'AILevelSensor',
-                    'tagTempValue': 'AITemperatureSensor'
-                }
-
-                # Apply signal names from config using get_signal_name_for_attribute
-                for tag_id, attr_name in tag_mapping.items():
-                    # Try to get custom signal name from IO configuration
-                    signal_name = None
-
-                    # First check custom_signal_names
-                    if hasattr(self.config, 'custom_signal_names') and attr_name in self.config.custom_signal_names:
-                        signal_name = self.config.custom_signal_names[attr_name]
-                    # Then check reverse_io_mapping
-                    elif hasattr(self.config, 'reverse_io_mapping') and attr_name in self.config.reverse_io_mapping:
-                        signal_name = self.config.reverse_io_mapping[attr_name]
-                    # Finally use get_signal_name_for_attribute if available
-                    elif hasattr(self.config, 'get_signal_name_for_attribute'):
-                        signal_name = self.config.get_signal_name_for_attribute(
-                            attr_name)
-
-                    # If we got a signal name, use it; otherwise use default
-                    if signal_name:
-                        self.setSVGText(tag_id, signal_name)
-                    else:
-                        # Fallback to default names
-                        if attr_name == 'AQValveOutFraction':
-                            self.setSVGText(tag_id, "ValveOut")
-                        elif attr_name == 'AQValveInFraction':
-                            self.setSVGText(tag_id, "ValveIn")
-                        elif attr_name == 'AQHeaterFraction':
-                            self.setSVGText(tag_id, "Heater")
-                        elif attr_name == 'DILevelSensorHigh':
-                            self.setSVGText(tag_id, "LevelMax")
-                        elif attr_name == 'DILevelSensorLow':
-                            self.setSVGText(tag_id, "LevelMin")
-                        elif attr_name == 'AILevelSensor':
-                            self.setSVGText(tag_id, "LevelSensor")
-                        elif attr_name == 'AITemperatureSensor':
-                            self.setSVGText(tag_id, "TempSensor")
-
-                # Update the SVG renderer to reflect changes
-                self.updateSVG()
-                self.svg_widget.update()
-            except Exception as e:
-                logger.debug(f"Could not update tag labels: {e}")
-
-    def _check_heating_warnings(self):
-        """Check for heating-related warnings and show dialogs"""
-        global liquidVolume, tempVat, simRunning
-
-        # Skip warnings during initialization
-        if not self._initialization_complete:
-            return
-
-        # Only show warnings when simulation is running
-        if not simRunning:
-            # Reset warning tracker when simulation stops
-            self._last_warning_shown = None
-            self._last_checked_state = None
-            return
-
-        warning_key = None
-
-        # Determine current state
-        if self.heaterPowerFraction > 0 and liquidVolume <= 0:
-            warning_key = "no_water_heating"
-        elif tempVat >= BOILING_TEMPERATURE:
-            warning_key = "boiling_temperature"
-
-        # Only trigger warning on STATE CHANGE (when warning_key differs from last check)
-        if warning_key != self._last_checked_state:
-            self._last_checked_state = warning_key
-
-            # Show warning only if there IS a warning condition
-            if warning_key == "no_water_heating":
-                try:
-                    QMessageBox.warning(
-                        None,
-                        "Tank Warning",
-                        "⚠️ Warning: Heating element is on but there is no water in the tank!",
-                        QMessageBox.Ok
-                    )
-                except Exception as e:
-                    logger.error(f"Error showing warning dialog: {e}")
-            elif warning_key == "boiling_temperature":
-                try:
-                    QMessageBox.warning(
-                        None,
-                        "Tank Warning",
-                        f"⚠️ Warning: Water temperature ({tempVat:.1f}°C) exceeds boiling point ({BOILING_TEMPERATURE}°C)!",
-                        QMessageBox.Ok
-                    )
-                except Exception as e:
-                    logger.error(f"Error showing warning dialog: {e}")
 
     def LevelChangeVat(self):
         """Fill the tank based on liquidVolume"""
         global liquidVolume
 
         # Calculate percentage (0-100%) - maxVolume is in liters
-        level_percentage = min(
-            100.0, (liquidVolume / self.maxVolume) * 100.0) if self.maxVolume > 0 else 0
+        level_percentage = min(100.0, (liquidVolume / self.maxVolume) * 100.0) if self.maxVolume > 0 else 0
 
         # Level switches trigger at percentage of tank
         level_fraction = liquidVolume / self.maxVolume if self.maxVolume > 0 else 0
         if level_fraction * 100.0 >= self.levelSwitchMaxHeight:
-            self.setGroupColor("levelSwitchMax", GREEN)
+            self.setGroupColor("levelSwitchMax", green)
         else:
-            self.setGroupColor("levelSwitchMax", RED)
+            self.setGroupColor("levelSwitchMax", red)
         if level_fraction * 100.0 >= self.levelSwitchMinHeight:
-            self.setGroupColor("levelSwitchMin", GREEN)
+            self.setGroupColor("levelSwitchMin", green)
         else:
-            self.setGroupColor("levelSwitchMin", RED)
+            self.setGroupColor("levelSwitchMin", red)
 
         # Calculate GUI height: percentage (0-100) mapped to max GUI height
-        realGUIHeight = min(self.maxheightGUI,
-                            (level_percentage / 100.0) * self.maxheightGUI)
+        realGUIHeight = min(self.maxheightGUI, (level_percentage / 100.0) * self.maxheightGUI)
         newY = self.lowestY - realGUIHeight
 
         if self.waterInVat is not None:
@@ -499,7 +271,7 @@ class VatWidget(QWidget):
         """Set the Y-position of an indicator"""
         item = self.root.find(f".//svg:*[@id='{itemId}']", self.ns)
         if item is not None:
-            item.set("y", str(hoogte-3))
+            item.set("y", str(hoogte))
 
     def setGroupColor(self, groupId, kleur):
         """Set the color of an SVG group"""
@@ -541,7 +313,7 @@ class VatWidget(QWidget):
         for btn_name in [
             'pushButton_PidValveStart', 'pushButton_PidValveStop',
             'radioButton_PidTankValveAItemp', 'radioButton_PidTankValveDItemp',
-                'radioButton_PidTankValveAIlevel', 'radioButton_PidTankValveDIlevel']:
+            'radioButton_PidTankValveAIlevel', 'radioButton_PidTankValveDIlevel']:
             btn = getattr(self, btn_name, None)
             if btn:
                 btn.setCheckable(True)
@@ -549,63 +321,57 @@ class VatWidget(QWidget):
 
     def init_mainwindow_controls(self, mainwindow):
         """Initialize all MainWindow controls (buttons, toggles) from gui.py.
-
+        
         This centralizes all simulation screen logic in gui.py to maintain architecture.
         Called from settingsGui.py with MainWindow reference.
-
+        
         Args:
             mainwindow: Reference to MainWindow object containing the buttons
         """
         self.mainwindow = mainwindow
-        self._init_pidvalve_mode_toggle()
+        self._init_pid_valve_mode_toggle()
         self._init_valve_control_handlers()
-
+    
     def _init_valve_control_handlers(self):
         """Connect valve control widgets to event handlers for real-time SVG updates."""
         if not hasattr(self, 'mainwindow') or self.mainwindow is None:
             return
-
+        
         try:
             # Valve In Entry (analog control)
             valve_in_entry = getattr(self.mainwindow, 'valveInEntry', None)
             if valve_in_entry and hasattr(valve_in_entry, 'textChanged'):
                 try:
-                    valve_in_entry.textChanged.connect(
-                        self._on_valve_in_entry_changed)
+                    valve_in_entry.textChanged.connect(self._on_valve_in_entry_changed)
                 except Exception:
                     pass
-
+            
             # Valve Out Entry (analog control)
             valve_out_entry = getattr(self.mainwindow, 'valveOutEntry', None)
             if valve_out_entry and hasattr(valve_out_entry, 'textChanged'):
                 try:
-                    valve_out_entry.textChanged.connect(
-                        self._on_valve_out_entry_changed)
+                    valve_out_entry.textChanged.connect(self._on_valve_out_entry_changed)
                 except Exception:
                     pass
-
+            
             # Valve In CheckBox (digital control)
-            valve_in_checkbox = getattr(
-                self.mainwindow, 'valveInCheckBox', None)
+            valve_in_checkbox = getattr(self.mainwindow, 'valveInCheckBox', None)
             if valve_in_checkbox and hasattr(valve_in_checkbox, 'stateChanged'):
                 try:
-                    valve_in_checkbox.stateChanged.connect(
-                        self._on_valve_in_checkbox_changed)
+                    valve_in_checkbox.stateChanged.connect(self._on_valve_in_checkbox_changed)
                 except Exception:
                     pass
-
+            
             # Valve Out CheckBox (digital control)
-            valve_out_checkbox = getattr(
-                self.mainwindow, 'valveOutCheckBox', None)
+            valve_out_checkbox = getattr(self.mainwindow, 'valveOutCheckBox', None)
             if valve_out_checkbox and hasattr(valve_out_checkbox, 'stateChanged'):
                 try:
-                    valve_out_checkbox.stateChanged.connect(
-                        self._on_valve_out_checkbox_changed)
+                    valve_out_checkbox.stateChanged.connect(self._on_valve_out_checkbox_changed)
                 except Exception:
                     pass
         except Exception:
             pass
-
+    
     def _on_valve_in_entry_changed(self, text):
         """Handle valve in entry text change - update SVG immediately."""
         try:
@@ -614,7 +380,7 @@ class VatWidget(QWidget):
             self.rebuild()
         except (ValueError, AttributeError):
             pass
-
+    
     def _on_valve_out_entry_changed(self, text):
         """Handle valve out entry text change - update SVG immediately."""
         try:
@@ -623,41 +389,55 @@ class VatWidget(QWidget):
             self.rebuild()
         except (ValueError, AttributeError):
             pass
-
+    
     def _on_valve_in_checkbox_changed(self, state):
-        """Handle valve in checkbox state change - digital control."""
+        """Handle valve in checkbox state change."""
         try:
-            self.adjustableValveInValue = 100 if state else 0
             self.rebuild()
-        except AttributeError:
+        except Exception:
             pass
-
+    
     def _on_valve_out_checkbox_changed(self, state):
-        """Handle valve out checkbox state change - digital control."""
+        """Handle valve out checkbox state change."""
         try:
-            self.adjustableValveOutValue = 100 if state else 0
             self.rebuild()
-        except AttributeError:
+        except Exception:
             pass
-
-    def _init_pidvalve_mode_toggle(self):
-        """Initialize Auto/Manual flip-flop toggle."""
+    
+    def _init_pid_valve_mode_toggle(self):
+        """Initialize PID Valve Auto/Manual mode toggle buttons."""
         if not hasattr(self, 'mainwindow') or self.mainwindow is None:
+            print("[DEBUG TOGGLE] No mainwindow available")
             return
-
+        
         try:
-            auto_btn = getattr(
-                self.mainwindow, 'pushButton_PidValveAuto', None)
+            auto_btn = getattr(self.mainwindow, 'pushButton_PidValveAuto', None)
             man_btn = getattr(self.mainwindow, 'pushButton_PidValveMan', None)
-
+            
+            print(f"[DEBUG TOGGLE] Found buttons: Auto={auto_btn is not None}, Manual={man_btn is not None}")
+            
             if auto_btn:
                 auto_btn.setCheckable(True)
-                auto_btn.clicked.connect(self._toggle_auto_mode)
-
+                # Disconnect any existing connections first
+                try:
+                    auto_btn.clicked.disconnect()
+                except:
+                    pass
+                # Use clicked signal for direct response
+                auto_btn.clicked.connect(self._on_auto_button_clicked)
+                print("[DEBUG TOGGLE] Auto button connected")
+            
             if man_btn:
                 man_btn.setCheckable(True)
-                man_btn.clicked.connect(self._toggle_manual_mode)
-
+                # Disconnect any existing connections first
+                try:
+                    man_btn.clicked.disconnect()
+                except:
+                    pass
+                # Use clicked signal for direct response
+                man_btn.clicked.connect(self._on_manual_button_clicked)
+                print("[DEBUG TOGGLE] Manual button connected")
+            
             # Start with Auto active
             if auto_btn:
                 auto_btn.setChecked(True)
@@ -673,7 +453,7 @@ class VatWidget(QWidget):
                         padding: 8px 12px;
                     }
                 """)
-
+            
             if man_btn:
                 man_btn.setChecked(False)
                 man_btn.setStyleSheet("""
@@ -700,38 +480,67 @@ class VatWidget(QWidget):
                                                           stop:1 rgba(120, 120, 120, 255));
                     }
                 """)
-
+            
             # Gray out controls on startup if in Auto mode AND PLC control mode
             # Use QTimer to delay the check until mainConfig is fully initialized
             from PyQt5.QtCore import QTimer
             QTimer.singleShot(100, self._apply_startup_control_state)
         except Exception as e:
-            logger.error(f"Error initializing PID valve mode toggle: {e}")
-
+            print(f"Error initializing PID valve mode toggle: {e}")
+    
     def _apply_startup_control_state(self):
         """Apply control groupbox state after mainConfig is initialized."""
         try:
-            gui_mode = (hasattr(self.mainwindow, 'mainConfig') and
-                        self.mainwindow.mainConfig and
+            gui_mode = (hasattr(self.mainwindow, 'mainConfig') and 
+                        self.mainwindow.mainConfig and 
                         hasattr(self.mainwindow.mainConfig, 'plcGuiControl') and
                         self.mainwindow.mainConfig.plcGuiControl == "gui")
             if not gui_mode:
                 # In PLC control mode, gray out controls in Auto mode (default)
                 self._update_control_groupboxes(enabled=False)
         except Exception as e:
-            logger.error(f"Error applying startup control state: {e}")
-
+            print(f"Error applying startup control state: {e}")
+    
+    def _on_auto_button_clicked(self):
+        """Handle Auto button click - switch to automatic mode."""
+        auto_btn = getattr(self.mainwindow, 'pushButton_PidValveAuto', None)
+        man_btn = getattr(self.mainwindow, 'pushButton_PidValveMan', None)
+        
+        # Force button states
+        if auto_btn:
+            auto_btn.setChecked(True)
+        if man_btn:
+            man_btn.setChecked(False)
+        
+        # Apply Auto mode
+        self._toggle_auto_mode()
+        print("[DEBUG] Auto mode activated")
+    
+    def _on_manual_button_clicked(self):
+        """Handle Manual button click - switch to manual mode."""
+        auto_btn = getattr(self.mainwindow, 'pushButton_PidValveAuto', None)
+        man_btn = getattr(self.mainwindow, 'pushButton_PidValveMan', None)
+        
+        # Force button states
+        if man_btn:
+            man_btn.setChecked(True)
+        if auto_btn:
+            auto_btn.setChecked(False)
+        
+        # Apply Manual mode
+        self._toggle_manual_mode()
+        print("[DEBUG] Manual mode activated")
+    
     def _toggle_auto_mode(self):
         """Set Auto as active, Manual as inactive."""
         if not hasattr(self, 'mainwindow') or self.mainwindow is None:
             return
-
+            
         auto_btn = getattr(self.mainwindow, 'pushButton_PidValveAuto', None)
         man_btn = getattr(self.mainwindow, 'pushButton_PidValveMan', None)
-
+        
+        # Update button styles
         if auto_btn:
-            auto_btn.blockSignals(True)
-            auto_btn.setChecked(True)
             auto_btn.setStyleSheet("""
                 QPushButton {
                     background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, 
@@ -744,11 +553,8 @@ class VatWidget(QWidget):
                     padding: 8px 12px;
                 }
             """)
-            auto_btn.blockSignals(False)
-
+        
         if man_btn:
-            man_btn.blockSignals(True)
-            man_btn.setChecked(False)
             man_btn.setStyleSheet("""
                 QPushButton {
                     background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, 
@@ -773,31 +579,29 @@ class VatWidget(QWidget):
                                                       stop:1 rgba(120, 120, 120, 255));
                 }
             """)
-            man_btn.blockSignals(False)
-
-        # Update status
+        
+        # Update status (but DON'T save these)
         if hasattr(self.mainwindow, 'tanksim_status') and self.mainwindow.tanksim_status:
             self.mainwindow.tanksim_status.pidPidValveAutoCmd = True
             self.mainwindow.tanksim_status.pidPidValveManCmd = False
-
+        
         # Gray out control groupboxes in Auto mode ONLY if in PLC control mode
-        gui_mode = (hasattr(self.mainwindow, 'mainConfig') and
-                    self.mainwindow.mainConfig and
+        gui_mode = (hasattr(self.mainwindow, 'mainConfig') and 
+                    self.mainwindow.mainConfig and 
                     self.mainwindow.mainConfig.plcGuiControl == "gui")
         if not gui_mode:
             self._update_control_groupboxes(enabled=False)
-
+    
     def _toggle_manual_mode(self):
         """Set Manual as active, Auto as inactive."""
         if not hasattr(self, 'mainwindow') or self.mainwindow is None:
             return
-
+            
         auto_btn = getattr(self.mainwindow, 'pushButton_PidValveAuto', None)
         man_btn = getattr(self.mainwindow, 'pushButton_PidValveMan', None)
-
+        
+        # Update button styles
         if man_btn:
-            man_btn.blockSignals(True)
-            man_btn.setChecked(True)
             man_btn.setStyleSheet("""
                 QPushButton {
                     background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, 
@@ -810,11 +614,8 @@ class VatWidget(QWidget):
                     padding: 8px 12px;
                 }
             """)
-            man_btn.blockSignals(False)
-
+        
         if auto_btn:
-            auto_btn.blockSignals(True)
-            auto_btn.setChecked(False)
             auto_btn.setStyleSheet("""
                 QPushButton {
                     background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, 
@@ -839,26 +640,25 @@ class VatWidget(QWidget):
                                                       stop:1 rgba(120, 120, 120, 255));
                 }
             """)
-            auto_btn.blockSignals(False)
-
-        # Update status
+        
+        # Update status (but DON'T save these)
         if hasattr(self.mainwindow, 'tanksim_status') and self.mainwindow.tanksim_status:
             self.mainwindow.tanksim_status.pidPidValveAutoCmd = False
             self.mainwindow.tanksim_status.pidPidValveManCmd = True
-
+        
         # IMPORTANT: Force write of manual control values to status on mode switch
         # This ensures that if the user already set values in manual mode, they are immediately active
         try:
             self._write_manual_control_values_to_status()
         except Exception:
             pass
-
+        
         # Enable control groupboxes in Manual mode (allows override of PLC)
         self._update_control_groupboxes(enabled=True)
-
+    
     def _write_manual_control_values_to_status(self):
         """Write current manual control values (valve positions, heater) to status.
-
+        
         Called when switching from Auto to Manual mode to ensure already-set manual
         values are immediately active without requiring a user change.
         """
@@ -866,16 +666,16 @@ class VatWidget(QWidget):
             return
         if not hasattr(self.mainwindow, 'tanksim_status') or self.mainwindow.tanksim_status is None:
             return
-
+        
         status = self.mainwindow.tanksim_status
-
+        
         try:
             # Write valve positions from VatWidget adjustable values
             status.valveInOpenFraction = self.adjustableValveInValue / 100.0
             status.valveOutOpenFraction = self.adjustableValveOutValue / 100.0
         except Exception:
             pass
-
+        
         try:
             # Write heater power from slider (if available)
             # Get the first visible heater power slider, or the first available one
@@ -888,54 +688,50 @@ class VatWidget(QWidget):
                         slider_val = int(slider.value())
                         break
                 if slider_val is None:
-                    first_slider = next((s for s in getattr(
-                        self.mainwindow, '_heater_power_sliders', []) if s is not None), None)
+                    first_slider = next((s for s in getattr(self.mainwindow, '_heater_power_sliders', []) if s is not None), None)
                     if first_slider is not None:
                         slider_val = int(first_slider.value())
             except Exception:
                 pass
-
+            
             if slider_val is not None:
-                status.heaterPowerFraction = max(
-                    0.0, min(1.0, slider_val / 100.0))
+                status.heaterPowerFraction = max(0.0, min(1.0, slider_val / 100.0))
         except Exception:
             pass
-
+    
     def _update_control_groupboxes(self, enabled):
         """Enable or disable control groupboxes based on Auto/Manual mode.
-
+        
         Args:
             enabled: True for Manual mode (controls enabled), False for Auto mode (grayed out)
         """
         if not hasattr(self, 'mainwindow') or self.mainwindow is None:
             return
-
+        
         try:
             from PyQt5.QtWidgets import QGroupBox
-
+            
             # Find and update groupBox_simControls
-            groupbox1 = self.mainwindow.findChild(
-                QGroupBox, 'groupBox_simControls')
+            groupbox1 = self.mainwindow.findChild(QGroupBox, 'groupBox_simControls')
             if groupbox1:
                 groupbox1.setEnabled(enabled)
-
+            
             # Find and update groupBox_simControls2
-            groupbox2 = self.mainwindow.findChild(
-                QGroupBox, 'groupBox_simControls2')
+            groupbox2 = self.mainwindow.findChild(QGroupBox, 'groupBox_simControls2')
             if groupbox2:
                 groupbox2.setEnabled(enabled)
         except Exception:
             pass
-
+    
     def is_manual_mode(self):
         """Check if currently in Manual mode.
-
+        
         Returns:
             bool: True if Manual mode is active, False if Auto mode
         """
         if not hasattr(self, 'mainwindow') or self.mainwindow is None:
             return False
-
+        
         man_btn = getattr(self.mainwindow, 'pushButton_PidValveMan', None)
         if man_btn:
             return man_btn.isChecked()

@@ -1,6 +1,3 @@
-from gui.customWidgets import ReadOnlyTableWidgetItem
-from simulations.conveyor.gui import ConveyorWidget
-from simulations.PIDtankValve.gui import VatWidget
 import sys
 from pathlib import Path
 from PyQt5.QtWidgets import QWidget, QVBoxLayout
@@ -11,8 +8,12 @@ src_dir = Path(__file__).resolve().parent.parent
 if str(src_dir) not in sys.path:
     sys.path.insert(0, str(src_dir))
 
+from simulations.PIDtankValve.gui import VatWidget
+# TODO: conveyor simulation not yet migrated
+# from simulations.conveyorSim.SimGui import TransportbandWidget
 
 # Import for address updates
+from gui.customWidgets import ReadOnlyTableWidgetItem
 
 
 class ProcessSettingsMixin:
@@ -24,7 +25,8 @@ class ProcessSettingsMixin:
     def init_process_settings_page(self):
         """Initialize all process settings page components"""
         self._init_vat_widget()
-        self._init_conveyor_widget()
+        # TODO: Conveyor simulation not yet migrated
+        # self._init_transportband_widget()
         self._init_color_dropdown()
         self._init_controller_dropdown()
         self._init_checkboxes()
@@ -53,26 +55,6 @@ class ProcessSettingsMixin:
             # Removed unnecessary print
             pass  # Silently fail if widget container is missing
 
-    def _init_conveyor_widget(self):
-        """Initialize ConveyorWidget"""
-        try:
-            self.conveyor_widget = ConveyorWidget()
-            container = self.findChild(QWidget, "conveyorWidgetContainer")
-
-            if container:
-                existing_layout = container.layout()
-
-                if existing_layout is None:
-                    container_layout = QVBoxLayout(container)
-                    container_layout.setContentsMargins(0, 0, 0, 0)
-                else:
-                    container_layout = existing_layout
-                    container_layout.setContentsMargins(0, 0, 0, 0)
-
-                container_layout.addWidget(self.conveyor_widget)
-        except Exception as e:
-            pass  # Silently fail if widget container is missing
-
     def _init_transportband_widget(self):
         """Initialize TransportbandWidget (Conveyor Belt Widget)"""
         # TODO: Conveyor simulation not yet migrated - commenting out for now
@@ -93,7 +75,7 @@ class ProcessSettingsMixin:
         #             layout = QVBoxLayout(svg_container)
         #             layout.setContentsMargins(0, 0, 0, 0)
         #             layout.setSpacing(0)
-        #
+        #         
         #         layout.addWidget(self.transportband_widget, 1)
         # except Exception as e:
         #     pass  # Silently fail if widget container is missing
@@ -124,23 +106,22 @@ class ProcessSettingsMixin:
         try:
             self.controlerDropDown.clear()
             controllers = [
-                "GUI (MIL)",
-                "logo! (HIL)",
-                "PLC S7-1500/1200/400/300/ET 200SP (HIL)",
-                "PLCSim S7-1500 advanced (SIL)",
-                "PLCSim S7-1500/1200/400/300/ET 200SP (SIL)"
+                "GUI",
+                "logo!",
+                "PLC S7-1500/1200/400/300/ET 200SP",
+                "PLCSim S7-1500 advanced",
+                "PLCSim S7-1500/1200/400/300/ET 200SP"
             ]
 
             for controller in controllers:
                 self.controlerDropDown.addItem(controller)
 
-            self.controlerDropDown.setCurrentText("GUI (MIL)")
-            self.controlerDropDown.currentTextChanged.connect(
+            self.controlerDropDown.setCurrentText("GUI")
+            self.controlerDropDown.currentIndexChanged.connect(
                 self.on_controller_changed)
 
             # Disable connect button in GUI mode
-            initial_mode = self._get_controller_name(
-                self.controlerDropDown.currentText())
+            initial_mode = self.controlerDropDown.currentText()
             if initial_mode == "GUI":
                 try:
                     self.pushButton_connect.setEnabled(False)
@@ -148,12 +129,6 @@ class ProcessSettingsMixin:
                     pass
         except AttributeError as e:
             pass
-
-    def _get_controller_name(self, controller_str):
-        """Extract base controller name from format 'name (MODE)'"""
-        if '(' in controller_str:
-            return controller_str[:controller_str.rfind('(')].strip()
-        return controller_str
 
     def _init_checkboxes(self):
         """Connect all checkboxes"""
@@ -221,8 +196,7 @@ class ProcessSettingsMixin:
             except Exception:
                 m3_val = 2.0
             total_volume_liters = max(0.0, m3_val * 1000.0)
-            self.vat_widget.maxVolume = total_volume_liters / \
-                100.0 if total_volume_liters > 0 else 1.0
+            self.vat_widget.maxVolume = total_volume_liters / 100.0 if total_volume_liters > 0 else 1.0
             self.vat_widget.levelSwitchMaxHeight = float(
                 self.levelSwitchMaxHeightEntry.text() or 2.0)
             self.vat_widget.levelSwitchMinHeight = float(
@@ -246,14 +220,13 @@ class ProcessSettingsMixin:
 
             # Controller mode
             controller_mode = self.controlerDropDown.currentText()
-            controller_mode_name = self._get_controller_name(controller_mode)
             self.vat_widget.controler = controller_mode
 
             # Water color
             self.vat_widget.waterColor = self.colorDropDown.currentData()
 
             # UI Elements visibility
-            is_gui_mode = (controller_mode_name == "GUI")
+            is_gui_mode = (controller_mode == "GUI")
 
             try:
                 if is_gui_mode and self.vat_widget.adjustableValve:
@@ -273,11 +246,13 @@ class ProcessSettingsMixin:
 
             # Valve positions (always analog now)
             try:
-                self.vat_widget.adjustableValveInValue = int(self.valveInEntry.text() or 0)
+                self.vat_widget.adjustableValveInValue = min(100, int(
+                    self.valveInEntry.text() or 0))
             except (ValueError, AttributeError):
                 self.vat_widget.adjustableValveInValue = 0
             try:
-                self.vat_widget.adjustableValveOutValue = int(self.valveOutEntry.text() or 0)
+                self.vat_widget.adjustableValveOutValue = min(100, int(
+                    self.valveOutEntry.text() or 0))
             except (ValueError, AttributeError):
                 self.vat_widget.adjustableValveOutValue = 0
 
@@ -310,7 +285,6 @@ class ProcessSettingsMixin:
             from simulations.PIDtankValve import gui as gui_module
             gui_module.liquidVolume = self.tanksim_status.liquidVolume
             gui_module.tempVat = self.tanksim_status.liquidTemperature
-            gui_module.simRunning = self.tanksim_status.simRunning
 
         # Rebuild SVG
         self.vat_widget.rebuild()
@@ -354,14 +328,13 @@ class ProcessSettingsMixin:
     def on_controller_changed(self):
         """Callback when controller dropdown changes"""
         new_controller = self.controlerDropDown.currentText()
-        new_controller_name = self._get_controller_name(new_controller)
         self.vat_widget.controler = new_controller
 
         if hasattr(self, 'mainConfig') and self.mainConfig:
             old_protocol = self.mainConfig.plcProtocol
-            self.mainConfig.plcProtocol = new_controller_name
+            self.mainConfig.plcProtocol = new_controller
 
-            if new_controller_name == "GUI":
+            if new_controller == "GUI":
                 self.mainConfig.plcGuiControl = "gui"
                 try:
                     self.pushButton_connect.setEnabled(False)
@@ -376,7 +349,7 @@ class ProcessSettingsMixin:
                     pass
 
             # Disconnect if switching to GUI mode
-            if new_controller_name == "GUI" and hasattr(self, 'validPlcConnection') and self.validPlcConnection:
+            if new_controller == "GUI" and hasattr(self, 'validPlcConnection') and self.validPlcConnection:
                 if hasattr(self, 'plc') and self.plc:
                     try:
                         self.plc.disconnect()
@@ -393,13 +366,14 @@ class ProcessSettingsMixin:
                     pass
 
             # Update addresses if switching to/from LOGO!
-            if (old_protocol == "logo!" or new_controller_name == "logo!") and old_protocol != new_controller_name:
+            if (old_protocol == "logo!" or new_controller == "logo!") and old_protocol != new_controller:
                 self._update_addresses_for_controller_change(
-                    old_protocol, new_controller_name)
+                    old_protocol, new_controller)
 
         self.vat_widget.rebuild()
-
-        gui_mode = (new_controller_name == "GUI")
+        
+        # Update PLC control widget index based on new mode
+        gui_mode = (new_controller == "GUI")
         if hasattr(self.vat_widget, 'set_plc_pidcontrol_index'):
             self.vat_widget.set_plc_pidcontrol_index(gui_mode)
 

@@ -72,14 +72,12 @@ class status:
         self.importExportVariableList = [
             "liquidVolume", "liquidTemperature",
             "valveInOpenFraction", "valveOutOpenFraction", "heaterPowerFraction",
-            "simRunning",
             "generalStartCmd", "generalStopCmd", "generalResetCmd",
             "generalControl1Value", "generalControl2Value", "generalControl3Value",
             "indicator1", "indicator2", "indicator3", "indicator4",
             "analog1", "analog2", "analog3",
             "pidStartCmd", "pidStopCmd", "pidResetCmd",
             "temperatureSetpoint", "levelSetpoint",
-            "tankColor", "displayLevelSwitches", "displayTemperature",
         ]
 
         # General Controls - PLC Outputs reflected in status (written by: plc or force)

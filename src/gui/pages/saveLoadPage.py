@@ -16,7 +16,7 @@ External Libraries Used:
 import logging
 import time
 from pathlib import Path
-from PyQt5.QtWidgets import QFileDialog, QMessageBox
+from PyQt5.QtWidgets import QFileDialog, QMessageBox, QWidget, QPushButton, QSlider, QLineEdit, QRadioButton
 from PyQt5.QtCore import QTimer
 
 from core.load_save import save_application_state, load_application_state, validate_state_file
@@ -82,6 +82,116 @@ class SaveLoadMixin:
             simulation_manager = None
             if hasattr(self, 'mainConfig') and hasattr(self.mainConfig, 'simulationManager'):
                 simulation_manager = self.mainConfig.simulationManager
+            
+            # Sync GUI states to status/config before saving
+            try:
+                if simulation_manager:
+                    active_sim = simulation_manager.get_active_simulation()
+                    
+                    # DON'T sync simRunning - we don't want to auto-start the simulation on load
+                    # User explicitly requested simRunning should NOT be saved
+                    
+                    if active_sim and hasattr(active_sim, 'status'):
+                        try:
+                            # Sync PID valve control states to status
+                            
+                            # Auto/Manual mode buttons
+                            auto_btn = self.findChild(QPushButton, "pushButton_PidValveAuto")
+                            man_btn = self.findChild(QPushButton, "pushButton_PidValveMan")
+                            if auto_btn and man_btn:
+                                active_sim.status.pidPidValveAutoCmd = auto_btn.isChecked()
+                                active_sim.status.pidPidValveManCmd = man_btn.isChecked()
+                                logger.info(f"    ✓ Synced Auto/Man: Auto={auto_btn.isChecked()}, Man={man_btn.isChecked()}")
+                            
+                            # Temperature control radio buttons (Analog/Digital)
+                            radio_ai_temp = self.findChild(QRadioButton, "radioButton_PidTankValveAItemp")
+                            radio_di_temp = self.findChild(QRadioButton, "radioButton_PidTankValveDItemp")
+                            if radio_ai_temp and radio_di_temp:
+                                active_sim.status.pidPidTankValveAItempCmd = radio_ai_temp.isChecked()
+                                active_sim.status.pidPidTankValveDItempCmd = radio_di_temp.isChecked()
+                                logger.info(f"    ✓ Synced Temp control: AI={radio_ai_temp.isChecked()}, DI={radio_di_temp.isChecked()}")
+                            
+                            # Level control radio buttons (Analog/Digital)
+                            radio_ai_level = self.findChild(QRadioButton, "radioButton_PidTankValveAIlevel")
+                            radio_di_level = self.findChild(QRadioButton, "radioButton_PidTankValveDIlevel")
+                            if radio_ai_level and radio_di_level:
+                                active_sim.status.pidPidTankValveAIlevelCmd = radio_ai_level.isChecked()
+                                active_sim.status.pidPidTankValveDIlevelCmd = radio_di_level.isChecked()
+                                logger.info(f"    ✓ Synced Level control: AI={radio_ai_level.isChecked()}, DI={radio_di_level.isChecked()}")
+                            
+                            # Heater power slider (0-100%)
+                            heater_sliders = [
+                                self.findChild(QSlider, "heaterPowerSlider"),
+                                self.findChild(QSlider, "heaterPowerSlider_1"),
+                                self.findChild(QSlider, "heaterPowerSlider_2"),
+                                self.findChild(QSlider, "heaterPowerSlider_3")
+                            ]
+                            for slider in heater_sliders:
+                                if slider:
+                                    # Slider is 0-100, status is 0.0-1.0
+                                    active_sim.status.heaterPowerFraction = slider.value() / 100.0
+                                    logger.info(f"    ✓ Synced heater power: {slider.value()}% ({active_sim.status.heaterPowerFraction:.2f})")
+                                    break
+                            
+                            # Temperature setpoint slider (0-27648 range)
+                            slider_temp = self.findChild(QSlider, "slider_PidTankTempSP")
+                            if slider_temp:
+                                active_sim.status.pidPidTankTempSPValue = slider_temp.value()
+                                logger.info(f"    ✓ Synced temp setpoint: {slider_temp.value()}")
+                            
+                            # Level setpoint slider (0-27648 range)
+                            slider_level = self.findChild(QSlider, "slider_PidTankLevelSP")
+                            if slider_level:
+                                active_sim.status.pidPidTankLevelSPValue = slider_level.value()
+                                logger.info(f"    ✓ Synced level setpoint: {slider_level.value()}")
+                            
+                            # Valve positions from entry fields (manual mode) - convert to fractions
+                            valve_in_entry = self.findChild(QLineEdit, "valveInEntry")
+                            if valve_in_entry:
+                                try:
+                                    val = float(valve_in_entry.text() or 0)
+                                    active_sim.status.valveInOpenFraction = val / 100.0  # Convert % to fraction
+                                    logger.info(f"    ✓ Synced valve in: {val}% ({active_sim.status.valveInOpenFraction:.2f})")
+                                except ValueError:
+                                    pass
+                            
+                            valve_out_entry = self.findChild(QLineEdit, "valveOutEntry")
+                            if valve_out_entry:
+                                try:
+                                    val = float(valve_out_entry.text() or 0)
+                                    active_sim.status.valveOutOpenFraction = val / 100.0  # Convert % to fraction
+                                    logger.info(f"    ✓ Synced valve out: {val}% ({active_sim.status.valveOutOpenFraction:.2f})")
+                                except ValueError:
+                                    pass
+                            
+                        except Exception as e:
+                            logger.warning(f"    Could not sync PID control states: {e}", exc_info=True)
+                    
+                    # Sync GUI display settings to config before saving
+                    if active_sim and hasattr(active_sim, 'config'):
+                        try:
+                            # Tank color from dropdown
+                            colorDropDown = self.findChild(QWidget, "colorDropDown")
+                            if colorDropDown:
+                                tank_color = colorDropDown.currentData()
+                                if tank_color:
+                                    active_sim.config.tankColor = tank_color
+                                    logger.info(f"    ✓ Synced tankColor: {tank_color}")
+                            
+                            # Display checkboxes
+                            levelSwitchesCheckBox = self.findChild(QWidget, "levelSwitchesCheckBox")
+                            if levelSwitchesCheckBox:
+                                active_sim.config.displayLevelSwitches = levelSwitchesCheckBox.isChecked()
+                                logger.info(f"    ✓ Synced displayLevelSwitches: {levelSwitchesCheckBox.isChecked()}")
+                            
+                            analogValueTempCheckBox = self.findChild(QWidget, "analogValueTempCheckBox")
+                            if analogValueTempCheckBox:
+                                active_sim.config.displayTemperature = analogValueTempCheckBox.isChecked()
+                                logger.info(f"    ✓ Synced displayTemperature: {analogValueTempCheckBox.isChecked()}")
+                        except Exception as e:
+                            logger.warning(f"    Could not sync GUI display settings: {e}", exc_info=True)
+            except Exception as e:
+                logger.warning(f"Could not sync status/config before save: {e}", exc_info=True)
             
             # Save state
             logger.info(f"Saving state to: {file_path}")
@@ -348,6 +458,41 @@ class SaveLoadMixin:
                 self._suppress_gui_to_status_until = time.monotonic() + 1.0
             except Exception:
                 pass
+            
+            # Update window references to loaded simulation
+            try:
+                if hasattr(self, 'mainConfig') and hasattr(self.mainConfig, 'simulationManager'):
+                    simulation_manager = self.mainConfig.simulationManager
+                    active_sim = simulation_manager.get_active_simulation()
+                    active_sim_name = simulation_manager.get_active_simulation_name()
+                    
+                    if active_sim:
+                        # Update window references
+                        self.tanksim_config = active_sim.config
+                        self.set_simulation_status(active_sim.status)
+                        logger.info(f"    ✓ Updated window references to loaded simulation: {active_sim_name}")
+                        
+                        # Map simulation name to page index
+                        sim_name_to_index = {
+                            "PIDtankValve": 0,
+                            "dualTank": 1,
+                            "conveyor": 2
+                        }
+                        
+                        # Open the correct simulation page (singleTankPage, dualTankPage, conveyorPage)
+                        sim_index = sim_name_to_index.get(active_sim_name)
+                        if sim_index is not None and hasattr(self, 'start_simulation'):
+                            try:
+                                self.start_simulation(sim_index)
+                                logger.info(f"    ✓ Opened {active_sim_name} page (index {sim_index})")
+                            except Exception as e:
+                                logger.warning(f"    Failed to open simulation page: {e}", exc_info=True)
+                        
+                        # DON'T auto-start simulation on load - user explicitly requested this
+                        # simRunning is not saved, so simulation stays stopped
+                        logger.info(f"    Simulation will NOT auto-start (simRunning not saved)")
+            except Exception as e:
+                logger.error(f"Failed to update simulation references: {e}", exc_info=True)
 
             # Trigger an immediate display refresh from loaded status/config
             try:
