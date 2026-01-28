@@ -531,11 +531,16 @@ class VatWidget(QWidget):
     
     def _on_manual_button_clicked(self):
         """Handle Manual button click - switch to manual mode."""
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"[GUI] ⚠⚠⚠ MANUAL BUTTON CLICKED - User triggered manual mode")
+        
         auto_btn = getattr(self.mainwindow, 'pushButton_PidValveAuto', None)
         man_btn = getattr(self.mainwindow, 'pushButton_PidValveMan', None)
         
         # Guard: if already in Manual mode, don't re-trigger
         if man_btn and man_btn.isChecked() and auto_btn and not auto_btn.isChecked():
+            logger.info(f"[GUI] Manual mode already active - ignoring click")
             return
         
         # Force button states
@@ -626,6 +631,15 @@ class VatWidget(QWidget):
                     slider.setValue(0)
                     slider.blockSignals(False)
                     break
+            
+            # CRITICAL: Also clear status values so PLC can take over immediately
+            if hasattr(self.mainwindow, 'tanksim_status') and self.mainwindow.tanksim_status:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.info(f"[GUI] Clearing status actuator values for Auto mode takeover")
+                self.mainwindow.tanksim_status.valveInOpenFraction = 0.0
+                self.mainwindow.tanksim_status.valveOutOpenFraction = 0.0
+                self.mainwindow.tanksim_status.heaterPowerFraction = 0.0
         except Exception:
             pass
         
@@ -687,6 +701,9 @@ class VatWidget(QWidget):
         
         # Update status (but DON'T save these)
         if hasattr(self.mainwindow, 'tanksim_status') and self.mainwindow.tanksim_status:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"[GUI] ⚠⚠⚠ MANUAL MODE ACTIVATED - Setting pidPidValveManCmd=True")
             self.mainwindow.tanksim_status.pidPidValveAutoCmd = False
             self.mainwindow.tanksim_status.pidPidValveManCmd = True
         
@@ -784,6 +801,9 @@ class VatWidget(QWidget):
     def is_manual_mode(self):
         """Check if currently in Manual mode.
         
+        AUTHORITATIVE SOURCE: Status object (not button state)
+        This ensures consistency after loading state files.
+        
         In both GUI and PLC modes, manual button allows user override of actuators.
         - GUI mode + Manual: User controls actuators
         - PLC mode + Auto: PLC controls actuators  
@@ -795,18 +815,22 @@ class VatWidget(QWidget):
         if not hasattr(self, 'mainwindow') or self.mainwindow is None:
             return False
         
-        man_btn = getattr(self.mainwindow, 'pushButton_PidValveMan', None)
-        auto_btn = getattr(self.mainwindow, 'pushButton_PidValveAuto', None)
-        
-        if man_btn and auto_btn:
-            result = man_btn.isChecked()
+        # Use STATUS as authoritative source (not button state)
+        # This ensures correct behavior after loading state files
+        status = getattr(self.mainwindow, 'tanksim_status', None)
+        if status:
+            # Manual mode = ManCmd is True AND AutoCmd is False
+            man_cmd = getattr(status, 'pidPidValveManCmd', False)
+            auto_cmd = getattr(status, 'pidPidValveAutoCmd', True)
+            result = man_cmd and not auto_cmd
+            
             # Log state changes to track unexpected mode switches
             prev_state = getattr(self, '_last_manual_mode_state', None)
             if prev_state is not None and prev_state != result:
                 import traceback
                 import logging
                 logger = logging.getLogger(__name__)
-                logger.warning(f"[is_manual_mode] MODE CHANGED: {prev_state} -> {result}, Auto={auto_btn.isChecked()}, Man={man_btn.isChecked()}")
+                logger.warning(f"[is_manual_mode] MODE CHANGED: {prev_state} -> {result}, AutoCmd={auto_cmd}, ManCmd={man_cmd}")
                 logger.warning(f"[is_manual_mode] Call stack:\n{''.join(traceback.format_stack()[-5:-1])}")
             self._last_manual_mode_state = result
             return result

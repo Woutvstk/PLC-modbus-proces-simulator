@@ -144,7 +144,11 @@ class status:
 
     def is_manual_override(self, plc_gui_control: str) -> bool:
         """True when PLC mode is active but GUI should control actuators."""
-        return plc_gui_control == "plc" and self.get_actuator_control_source(plc_gui_control) == "gui"
+        result = plc_gui_control == "plc" and self.get_actuator_control_source(plc_gui_control) == "gui"
+        # Debug logging to track unexpected manual mode activation
+        if result:
+            logger.debug(f"[STATUS] is_manual_override=True (plc_gui_control={plc_gui_control}, Auto={self.pidPidValveAutoCmd}, Man={self.pidPidValveManCmd})")
+        return result
 
     def saveToFile(self, exportFileName, createFile: bool = False):
         """Save status to a JSON file"""

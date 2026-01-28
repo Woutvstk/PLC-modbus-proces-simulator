@@ -197,6 +197,10 @@ if __name__ == "__main__":
             # Throttle calculations and data exchange
             if (time.time() - timeLastUpdate) > io_interval:
                 
+                # DEBUG: Log connection status every 5 seconds
+                if int(time.time()) % 5 == 0:
+                    logger.info(f"[MAIN] Connection: valid={validPlcConnection}, error={connectionErrorOccurred}, protocol={mainConfig.plcProtocol}")
+                
                 # Get process control from PLC or GUI
                 # Only try to use connection if: valid AND no error has occurred
                 if validPlcConnection and not connectionErrorOccurred:
@@ -240,10 +244,15 @@ if __name__ == "__main__":
                             except Exception:
                                 manual_mode = False
                             
+                            # DEBUG: Log manual mode status
+                            if int(time.time()) % 5 == 0:
+                                logger.info(f"[MAIN] manual_mode={manual_mode}, forced_values={len(forced_values)} items")
+                            
                             # Update IO with force support
                             # In Manual mode, don't read valve/heater from PLC (GUI controls them)
                             # But still write sensor values to PLC
                             try:
+                                logger.debug(f"[MAIN] Calling ioHandler.updateIO (manual_mode={manual_mode})")
                                 ioHandler.updateIO(
                                     protocolManager.get_active_protocol(),
                                     mainConfig,
@@ -293,6 +302,10 @@ if __name__ == "__main__":
                             connectionLostLogged = True
                             lastConnectionLossTime = time.time()
                 else:
+                    # DEBUG: Log why we skip IO processing
+                    if int(time.time()) % 5 == 0:  # Every 5 seconds
+                        logger.warning(f"[MAIN] SKIPPING IO: validPlcConnection={validPlcConnection}, connectionErrorOccurred={connectionErrorOccurred}")
+                    
                     # If control is PLC but no PLC connection, pretend PLC outputs are all 0
                     # Get manual mode status
                     manual_mode = False

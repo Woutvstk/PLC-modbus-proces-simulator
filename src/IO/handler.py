@@ -160,6 +160,10 @@ class IOHandler:
         if forced_values is None:
             forced_values = {}
         
+        # DEBUG: Log when updateIO is called
+        if self.debug_counter % 50 == 0:
+            logger.info(f"[IO HANDLER] updateIO called: manual_mode={manual_mode}, plcGuiControl={mainConfig.plcGuiControl}, forced_values={len(forced_values)} items")
+        
         # Reset flag when connection is restored
         if mainConfig.plcGuiControl == "plc":
             self.outputs_reset = False
@@ -174,28 +178,42 @@ class IOHandler:
             # Valve In
             if "DQValveIn" in forced_values:
                 status.valveInOpenFraction = float(1 if forced_values["DQValveIn"] else 0)
+                logger.debug(f"[IO] ValveIn from FORCE: {status.valveInOpenFraction:.2%}")
             elif "AQValveInFraction" in forced_values:
                 status.valveInOpenFraction = self.mapValue(
                     0, plc.analogMax, 0, 1, forced_values["AQValveInFraction"])
+                logger.debug(f"[IO] ValveIn from FORCE (analog): {status.valveInOpenFraction:.2%}")
             elif (mainConfig.plcGuiControl == "plc") and (config.DQValveIn or config.AQValveInFraction):
+                old_val = status.valveInOpenFraction
                 if config.DQValveIn and plc.GetDO(config.DQValveIn["byte"], config.DQValveIn["bit"]):
                     status.valveInOpenFraction = float(1)
+                    logger.info(f"[IO] ValveIn from PLC DIGITAL: {old_val:.2%} -> {status.valveInOpenFraction:.2%}")
                 elif config.AQValveInFraction:
+                    plc_value = plc.GetAO(config.AQValveInFraction["byte"])
                     status.valveInOpenFraction = self.mapValue(
-                        0, plc.analogMax, 0, 1, plc.GetAO(config.AQValveInFraction["byte"]))
+                        0, plc.analogMax, 0, 1, plc_value)
+                    if abs(status.valveInOpenFraction - old_val) > 0.01:  # Log if changed > 1%
+                        logger.info(f"[IO] ValveIn from PLC ANALOG: {old_val:.2%} -> {status.valveInOpenFraction:.2%} (raw={plc_value})")
             
             # Valve Out
             if "DQValveOut" in forced_values:
                 status.valveOutOpenFraction = float(1 if forced_values["DQValveOut"] else 0)
+                logger.debug(f"[IO] ValveOut from FORCE: {status.valveOutOpenFraction:.2%}")
             elif "AQValveOutFraction" in forced_values:
                 status.valveOutOpenFraction = self.mapValue(
                     0, plc.analogMax, 0, 1, forced_values["AQValveOutFraction"])
+                logger.debug(f"[IO] ValveOut from FORCE (analog): {status.valveOutOpenFraction:.2%}")
             elif (mainConfig.plcGuiControl == "plc") and (config.DQValveOut or config.AQValveOutFraction):
+                old_val = status.valveOutOpenFraction
                 if config.DQValveOut and plc.GetDO(config.DQValveOut["byte"], config.DQValveOut["bit"]):
                     status.valveOutOpenFraction = 1
+                    logger.info(f"[IO] ValveOut from PLC DIGITAL: {old_val:.2%} -> {status.valveOutOpenFraction:.2%}")
                 elif config.AQValveOutFraction:
+                    plc_value = plc.GetAO(config.AQValveOutFraction["byte"])
                     status.valveOutOpenFraction = self.mapValue(
-                        0, plc.analogMax, 0, 1, plc.GetAO(config.AQValveOutFraction["byte"]))
+                        0, plc.analogMax, 0, 1, plc_value)
+                    if abs(status.valveOutOpenFraction - old_val) > 0.01:
+                        logger.info(f"[IO] ValveOut from PLC ANALOG: {old_val:.2%} -> {status.valveOutOpenFraction:.2%} (raw={plc_value})")
             
             # Heater - skip reading from PLC in manual mode (GUI controls it)
             if "DQHeater" in forced_values:

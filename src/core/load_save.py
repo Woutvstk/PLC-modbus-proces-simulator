@@ -291,11 +291,10 @@ class StateManager:
                             if hasattr(active_sim.status, 'pidPidValveAutoCmd'):
                                 active_sim.status.pidPidValveAutoCmd = True
                             
-                            # Lock flags for 3 seconds
-                            if hasattr(active_sim.status, '_lock_status_flags_until'):
-                                active_sim.status._lock_status_flags_until = time.monotonic() + 3.0
+                            # Lock flags for 5 seconds - always set, don't check hasattr
+                            active_sim.status._lock_status_flags_until = time.monotonic() + 5.0
                             
-                            logger.info(f"[LOAD] ✓ Manual values cleared + flags locked for 3 sec")
+                            logger.info(f"[LOAD] ✓ Manual values cleared + flags locked for 5 sec")
             
             logger.info(f"[LOAD] ✓ Success")
             return True, state_data
@@ -474,9 +473,24 @@ def load_state_interactive(main_window: Any) -> bool:
         
         # Post-load operations
         try:
+            # 0. FIRST: Clear GUI inputs in Auto mode to prevent timer writes with stale values
+            # This MUST happen before any other GUI sync to prevent race conditions
+            _clear_gui_inputs_in_auto_mode(main_window, state_data)
+            
+            # 1. Activate protocol from loaded config (must be second to set up protocolManager)
+            _activate_protocol_after_load(main_window)
+            
+            # 2. Reload IO configuration
             _reload_io_config_after_load(main_window, str(io_config_output_path))
+            
+            # 3. Sync GUI widgets with loaded status
             _sync_status_to_gui_after_load(main_window, state_data)
+            
+            # 4. Apply visual updates (buttons, controls) - NO clearing here, done in step 0
             _apply_gui_mode_visuals_after_load(main_window)
+            
+            # 5. Auto-connect if PLC mode was active
+            _auto_connect_after_load(main_window)
         except Exception as e:
             logger.error(f"Post-load sync failed: {e}", exc_info=True)
             QMessageBox.warning(
@@ -718,8 +732,291 @@ def _sync_status_to_gui_after_load(main_window: Any, state_data: Dict[str, Any])
         logger.warning(f"[LOAD] GUI sync failed: {e}", exc_info=True)
 
 
+def _activate_protocol_after_load(main_window: Any) -> None:
+    """Activate protocol after loading state - COMPLETE protocol initialization.
+    
+    This function replicates the EXACT sequence that happens when:
+    1. User selects protocol from dropdown (on_controller_changed)
+    2. User clicks connect button (creates protocol instance in protocolManager)
+    
+    Critical: This builds the actual protocol instance and activates it in protocolManager,
+    not just UI updates!
+    """
+    try:
+        logger.info("[LOAD] ========== ACTIVATING PROTOCOL FROM LOADED CONFIG ==========")
+        
+        if not hasattr(main_window, 'mainConfig') or not main_window.mainConfig:
+            logger.warning("[LOAD] No mainConfig available")
+            return
+        
+        config = main_window.mainConfig
+        protocol_name = getattr(config, 'plcProtocol', 'GUI')
+        plc_gui_control = getattr(config, 'plcGuiControl', 'gui')
+        
+        logger.info(f"[LOAD]   Protocol: {protocol_name}, Mode: {plc_gui_control}")
+        
+        # STEP 1: Sync dropdown to match loaded protocol (UI sync)
+        if hasattr(main_window, 'controlerDropDown'):
+            dropdown = main_window.controlerDropDown
+            
+            # Find matching item in dropdown
+            # Dropdown items are in format "ProtocolName (MODE)" or just "ProtocolName"
+            for i in range(dropdown.count()):
+                item_text = dropdown.itemText(i)
+                # Extract base name (remove mode suffix)
+                if '(' in item_text:
+                    base_name = item_text[:item_text.rfind('(')].strip()
+                else:
+                    base_name = item_text
+                
+                if base_name == protocol_name:
+                    dropdown.blockSignals(True)
+                    dropdown.setCurrentIndex(i)
+                    dropdown.blockSignals(False)
+                    logger.info(f"[LOAD]   Dropdown synced to: {item_text}")
+                    break
+        
+        # STEP 2: Disconnect and deactivate existing protocol (if any)
+        # This is CRITICAL - we need to clean up the old protocol completely
+        if hasattr(main_window, 'validPlcConnection') and main_window.validPlcConnection:
+            if hasattr(main_window, 'plc') and main_window.plc:
+                try:
+                    main_window.plc.disconnect()
+                    logger.info("[LOAD]   Disconnected old protocol")
+                except:
+                    pass
+            main_window.validPlcConnection = False
+            main_window.plc = None
+            if hasattr(main_window, 'update_connection_status_icon'):
+                main_window.update_connection_status_icon()
+            
+            # Uncheck connect button
+            if hasattr(main_window, 'pushButton_connect'):
+                try:
+                    main_window.pushButton_connect.blockSignals(True)
+                    main_window.pushButton_connect.setChecked(False)
+                    main_window.pushButton_connect.blockSignals(False)
+                except:
+                    pass
+        
+        # STEP 3: Deactivate old protocol in protocolManager
+        # This is what was MISSING - we need to clean up protocolManager!
+        if hasattr(config, 'protocolManager') and config.protocolManager:
+            try:
+                config.protocolManager.deactivate()
+                logger.info("[LOAD]   Deactivated old protocol in protocolManager")
+            except Exception as e:
+                logger.warning(f"[LOAD]   Could not deactivate old protocol: {e}")
+        
+        # STEP 4: Configure UI based on protocol type (same as on_controller_changed)
+        if protocol_name == "GUI":
+            # GUI mode - disable connect button and IP field
+            config.plcGuiControl = "gui"
+            try:
+                if hasattr(main_window, 'pushButton_connect'):
+                    main_window.pushButton_connect.setEnabled(False)
+                if hasattr(main_window, 'lineEdit_IPAddress'):
+                    main_window.lineEdit_IPAddress.setEnabled(False)
+            except:
+                pass
+            logger.info("[LOAD]   GUI mode - connection disabled")
+        else:
+            # PLC mode - enable connect button and IP field
+            config.plcGuiControl = "plc"
+            try:
+                if hasattr(main_window, 'pushButton_connect'):
+                    main_window.pushButton_connect.setEnabled(True)
+                if hasattr(main_window, 'lineEdit_IPAddress'):
+                    main_window.lineEdit_IPAddress.setEnabled(True)
+            except:
+                pass
+            
+            # STEP 5: BUILD AND ACTIVATE PROTOCOL IN PROTOCOLMANAGER
+            # This is the CRITICAL step that was missing!
+            # We need to create the actual protocol instance like main.py does
+            if hasattr(config, 'protocolManager') and config.protocolManager:
+                protocol_manager = config.protocolManager
+                
+                try:
+                    # Build protocol instance from config (same as initialize_and_connect does)
+                    logger.info(f"[LOAD]   Building protocol instance: {protocol_name}")
+                    protocol_instance = protocol_manager.build_protocol_from_config(config)
+                    
+                    if protocol_instance:
+                        # Activate protocol in manager (same as initialize_and_connect does)
+                        if protocol_manager.activate_protocol(protocol_name, protocol_instance):
+                            logger.info(f"[LOAD]   ✓✓✓ Protocol instance ACTIVATED in protocolManager: {protocol_name}")
+                        else:
+                            logger.error(f"[LOAD]   ✗ Failed to activate protocol in protocolManager")
+                    else:
+                        logger.error(f"[LOAD]   ✗ Failed to build protocol instance")
+                        
+                except Exception as e:
+                    logger.error(f"[LOAD]   ✗ Exception building/activating protocol: {e}", exc_info=True)
+            else:
+                logger.warning("[LOAD]   No protocolManager available in config")
+            
+            logger.info("[LOAD]   PLC mode - connection enabled, protocol instance created")
+        
+        # STEP 6: Update IP address field to match loaded config
+        if hasattr(main_window, 'lineEdit_IPAddress'):
+            loaded_ip = getattr(config, 'plcIpAdress', '192.168.0.1')
+            try:
+                main_window.lineEdit_IPAddress.blockSignals(True)
+                main_window.lineEdit_IPAddress.setText(loaded_ip)
+                main_window.lineEdit_IPAddress.blockSignals(False)
+                logger.info(f"[LOAD]   IP address: {loaded_ip}")
+            except:
+                pass
+        
+        # STEP 7: Update active method label if available
+        if hasattr(main_window, '_update_active_method_label'):
+            try:
+                main_window._update_active_method_label(protocol_name)
+                logger.info(f"[LOAD]   Active method label updated")
+            except:
+                pass
+        
+        # STEP 8: Update vat_widget controller mode if it exists
+        if hasattr(main_window, 'vat_widget'):
+            try:
+                # Use dropdown text if available, otherwise protocol name
+                if hasattr(main_window, 'controlerDropDown'):
+                    controller_text = main_window.controlerDropDown.currentText()
+                else:
+                    controller_text = protocol_name
+                main_window.vat_widget.controler = controller_text
+                main_window.vat_widget.rebuild()
+                logger.info(f"[LOAD]   VatWidget controller updated")
+            except:
+                pass
+        
+        logger.info(f"[LOAD] ========== ✓ PROTOCOL ACTIVATION COMPLETE: {protocol_name} ==========")
+        
+    except Exception as e:
+        logger.error(f"[LOAD] ✗✗✗ Protocol activation FAILED: {e}", exc_info=True)
+
+
+def _clear_gui_inputs_in_auto_mode(main_window: Any, state_data: dict) -> None:
+    """CRITICAL FIRST STEP: Clear valve/heater GUI inputs in Auto mode BEFORE any other GUI operations.
+    
+    This prevents race conditions where timer-based callbacks (_on_update_all_settings) 
+    read stale GUI values and write them to status before we can clear them.
+    """
+    try:
+        from PyQt5.QtWidgets import QLineEdit, QSlider
+        
+        # Determine if in Auto mode
+        gui_mode = (hasattr(main_window, 'mainConfig') and 
+                    main_window.mainConfig and 
+                    main_window.mainConfig.plcGuiControl == "gui")
+        
+        # Get Auto/Man state from loaded status
+        auto_state = True  # Default to Auto
+        manual_state = False
+        
+        try:
+            simulation_manager = main_window.mainConfig.simulationManager if hasattr(main_window, 'mainConfig') else None
+            if simulation_manager:
+                active_sim = simulation_manager.get_active_simulation()
+                if active_sim and hasattr(active_sim, 'status'):
+                    auto_state = getattr(active_sim.status, 'pidPidValveAutoCmd', True)
+                    manual_state = getattr(active_sim.status, 'pidPidValveManCmd', False)
+        except Exception:
+            pass
+        
+        # Only clear if in PLC Auto mode (not GUI mode, and Auto is active)
+        if not gui_mode and auto_state and not manual_state:
+            logger.info("[LOAD] ⚠ CLEARING GUI inputs FIRST (PLC Auto mode) to prevent timer writes")
+            
+            # Clear valve entry fields
+            valve_in_entry = main_window.findChild(QLineEdit, "valveInEntry")
+            if valve_in_entry:
+                valve_in_entry.blockSignals(True)
+                valve_in_entry.setText("0")
+                valve_in_entry.blockSignals(False)
+            
+            valve_out_entry = main_window.findChild(QLineEdit, "valveOutEntry")
+            if valve_out_entry:
+                valve_out_entry.blockSignals(True)
+                valve_out_entry.setText("0")
+                valve_out_entry.blockSignals(False)
+            
+            # Clear heater slider
+            for slider_name in ["heaterPowerSlider", "heaterPowerSlider_1", "heaterPowerSlider_2", "heaterPowerSlider_3"]:
+                slider = main_window.findChild(QSlider, slider_name)
+                if slider:
+                    slider.blockSignals(True)
+                    slider.setValue(0)
+                    slider.blockSignals(False)
+                    break
+            
+            # Clear VatWidget values IMMEDIATELY
+            if hasattr(main_window, 'vat_widget') and main_window.vat_widget:
+                main_window.vat_widget.adjustableValveInValue = 0
+                main_window.vat_widget.adjustableValveOutValue = 0
+                main_window.vat_widget.heaterPowerFraction = 0.0
+                logger.info("[LOAD]   ✓ VatWidget values cleared (valveIn=0, valveOut=0, heater=0)")
+            
+            logger.info("[LOAD]   ✓ GUI inputs cleared BEFORE any timer callbacks")
+        else:
+            logger.info(f"[LOAD] No clearing needed (gui_mode={gui_mode}, auto={auto_state}, man={manual_state})")
+            
+    except Exception as e:
+        logger.warning(f"[LOAD] GUI input clearing failed: {e}", exc_info=True)
+
+
+def _auto_connect_after_load(main_window: Any) -> None:
+    """Auto-connect to PLC if loaded state had PLC protocol active.
+    
+    This triggers the same connection process as clicking the Connect button,
+    ensuring that PLC outputs are immediately read after loading.
+    """
+    try:
+        if not hasattr(main_window, 'mainConfig') or not main_window.mainConfig:
+            return
+        
+        config = main_window.mainConfig
+        
+        # Only auto-connect if in PLC mode (not GUI mode)
+        if config.plcGuiControl != "plc":
+            logger.info("[LOAD] GUI mode - skipping auto-connect")
+            return
+        
+        # Check if protocol is configured
+        if not config.plcProtocol or config.plcProtocol == "GUI (offline simulation)":
+            logger.info("[LOAD] No PLC protocol - skipping auto-connect")
+            return
+        
+        logger.info(f"[LOAD] ========== AUTO-CONNECTING TO PLC ==========")
+        logger.info(f"[LOAD]   Protocol: {config.plcProtocol}")
+        logger.info(f"[LOAD]   IP: {config.plcIpAdress}")
+        
+        # Trigger connection via tryConnect flag (same as Connect button)
+        config.tryConnect = True
+        
+        # Also check the connect button to reflect connection attempt
+        from PyQt5.QtWidgets import QPushButton
+        connect_btn = main_window.findChild(QPushButton, "pushButton_connect")
+        if connect_btn:
+            connect_btn.blockSignals(True)
+            connect_btn.setChecked(True)
+            connect_btn.blockSignals(False)
+            logger.info("[LOAD]   Connect button checked")
+        
+        logger.info("[LOAD] ========== ✓ AUTO-CONNECT TRIGGERED ==========")
+        logger.info("[LOAD]   Connection will be established in main loop")
+        
+    except Exception as e:
+        logger.warning(f"[LOAD] Auto-connect failed: {e}", exc_info=True)
+
+
 def _apply_gui_mode_visuals_after_load(main_window: Any) -> None:
-    """Apply Auto/Manual mode button visuals after load."""
+    """Apply Auto/Manual mode button visuals after load.
+    
+    NOTE: Valve/heater clearing is now done in _clear_gui_inputs_in_auto_mode() 
+    which runs FIRST to prevent race conditions.
+    """
     try:
         from PyQt5.QtWidgets import QPushButton
         
@@ -762,9 +1059,19 @@ def _apply_gui_mode_visuals_after_load(main_window: Any) -> None:
             
             logger.info(f"[LOAD]   Auto/Man buttons: {auto_state}/{man_state}")
         
-        # Update control groupbox visuals
+        # NOTE: Valve/heater clearing is done FIRST in _clear_gui_inputs_in_auto_mode()
+        # to prevent race conditions with timer callbacks
+        
+        # Update control groupbox visuals - pass correct enabled state
+        # In Auto mode (not manual), controls should be disabled (grayed out)
+        gui_mode = (hasattr(main_window, 'mainConfig') and 
+                    main_window.mainConfig and 
+                    main_window.mainConfig.plcGuiControl == "gui")
+        man_state = getattr(status, 'pidPidValveManCmd', False)
+        controls_enabled = gui_mode or man_state  # Enable if GUI mode or Manual override
+        
         if hasattr(main_window, 'vat_widget') and hasattr(main_window.vat_widget, '_update_control_groupboxes'):
-            main_window.vat_widget._update_control_groupboxes()
+            main_window.vat_widget._update_control_groupboxes(controls_enabled)
         
         logger.info("[LOAD]   ✓ Mode visuals applied")
         

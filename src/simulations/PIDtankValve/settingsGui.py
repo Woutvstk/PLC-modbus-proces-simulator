@@ -553,6 +553,13 @@ class TankSimSettingsMixin:
         
         # Effective GUI control: either pure GUI mode OR manual override mode
         effective_gui_control = gui_mode or manual_mode
+        
+        # CRITICAL GUARD: Block ALL writes during post-load lock period
+        import time
+        if hasattr(self.tanksim_status, '_lock_status_flags_until'):
+            if time.monotonic() < self.tanksim_status._lock_status_flags_until:
+                effective_gui_control = False  # Force False during lock
+                logger.debug(f"[settingsGui] LOCK ACTIVE - blocking all GUI writes")
 
         # Step 1: Read simulation values from status object
         from simulations.PIDtankValve import gui as gui_module
