@@ -162,7 +162,12 @@ class IOHandler:
         
         # DEBUG: Log when updateIO is called
         if self.debug_counter % 50 == 0:
-            logger.info(f"[IO HANDLER] updateIO called: manual_mode={manual_mode}, plcGuiControl={mainConfig.plcGuiControl}, forced_values={len(forced_values)} items")
+            logger.info(f"[IO HANDLER] updateIO called: manual_mode={manual_mode}, plcGuiControl={mainConfig.plcGuiControl}, forced_values={len(forced_values)} items, plc={'None' if plc is None else 'active'}")
+        
+        # Get analogMax from PLC or use default
+        analog_max = 27648  # Default S7 analog range
+        if plc and hasattr(plc, 'analogMax'):
+            analog_max = plc.analogMax
         
         # Reset flag when connection is restored
         if mainConfig.plcGuiControl == "plc":
@@ -181,9 +186,9 @@ class IOHandler:
                 logger.debug(f"[IO] ValveIn from FORCE: {status.valveInOpenFraction:.2%}")
             elif "AQValveInFraction" in forced_values:
                 status.valveInOpenFraction = self.mapValue(
-                    0, plc.analogMax, 0, 1, forced_values["AQValveInFraction"])
+                    0, analog_max, 0, 1, forced_values["AQValveInFraction"])
                 logger.debug(f"[IO] ValveIn from FORCE (analog): {status.valveInOpenFraction:.2%}")
-            elif (mainConfig.plcGuiControl == "plc") and (config.DQValveIn or config.AQValveInFraction):
+            elif plc and (mainConfig.plcGuiControl == "plc") and (config.DQValveIn or config.AQValveInFraction):
                 old_val = status.valveInOpenFraction
                 if config.DQValveIn and plc.GetDO(config.DQValveIn["byte"], config.DQValveIn["bit"]):
                     status.valveInOpenFraction = float(1)
@@ -191,7 +196,7 @@ class IOHandler:
                 elif config.AQValveInFraction:
                     plc_value = plc.GetAO(config.AQValveInFraction["byte"])
                     status.valveInOpenFraction = self.mapValue(
-                        0, plc.analogMax, 0, 1, plc_value)
+                        0, analog_max, 0, 1, plc_value)
                     if abs(status.valveInOpenFraction - old_val) > 0.01:  # Log if changed > 1%
                         logger.info(f"[IO] ValveIn from PLC ANALOG: {old_val:.2%} -> {status.valveInOpenFraction:.2%} (raw={plc_value})")
             
@@ -201,9 +206,9 @@ class IOHandler:
                 logger.debug(f"[IO] ValveOut from FORCE: {status.valveOutOpenFraction:.2%}")
             elif "AQValveOutFraction" in forced_values:
                 status.valveOutOpenFraction = self.mapValue(
-                    0, plc.analogMax, 0, 1, forced_values["AQValveOutFraction"])
+                    0, analog_max, 0, 1, forced_values["AQValveOutFraction"])
                 logger.debug(f"[IO] ValveOut from FORCE (analog): {status.valveOutOpenFraction:.2%}")
-            elif (mainConfig.plcGuiControl == "plc") and (config.DQValveOut or config.AQValveOutFraction):
+            elif plc and (mainConfig.plcGuiControl == "plc") and (config.DQValveOut or config.AQValveOutFraction):
                 old_val = status.valveOutOpenFraction
                 if config.DQValveOut and plc.GetDO(config.DQValveOut["byte"], config.DQValveOut["bit"]):
                     status.valveOutOpenFraction = 1
@@ -211,7 +216,7 @@ class IOHandler:
                 elif config.AQValveOutFraction:
                     plc_value = plc.GetAO(config.AQValveOutFraction["byte"])
                     status.valveOutOpenFraction = self.mapValue(
-                        0, plc.analogMax, 0, 1, plc_value)
+                        0, analog_max, 0, 1, plc_value)
                     if abs(status.valveOutOpenFraction - old_val) > 0.01:
                         logger.info(f"[IO] ValveOut from PLC ANALOG: {old_val:.2%} -> {status.valveOutOpenFraction:.2%} (raw={plc_value})")
             
@@ -220,13 +225,13 @@ class IOHandler:
                 status.heaterPowerFraction = float(1 if forced_values["DQHeater"] else 0)
             elif "AQHeaterFraction" in forced_values:
                 status.heaterPowerFraction = self.mapValue(
-                    0, plc.analogMax, 0, 1, forced_values["AQHeaterFraction"])
-            elif not manual_mode and (mainConfig.plcGuiControl == "plc") and (config.DQHeater or config.AQHeaterFraction):
+                    0, analog_max, 0, 1, forced_values["AQHeaterFraction"])
+            elif plc and not manual_mode and (mainConfig.plcGuiControl == "plc") and (config.DQHeater or config.AQHeaterFraction):
                 if config.DQHeater and plc.GetDO(config.DQHeater["byte"], config.DQHeater["bit"]):
                     status.heaterPowerFraction = 1
                 elif config.AQHeaterFraction:
                     status.heaterPowerFraction = self.mapValue(
-                        0, plc.analogMax, 0, 1, plc.GetAO(config.AQHeaterFraction["byte"]))
+                        0, analog_max, 0, 1, plc.GetAO(config.AQHeaterFraction["byte"]))
         
         # General Controls - PLC outputs: Indicators and analog values (read into status)
         self._update_indicators(plc, mainConfig, config, status, forced_values)
@@ -252,6 +257,8 @@ class IOHandler:
     
     def _update_indicators(self, plc, mainConfig, config, status, forced_values):
         """Update indicator status from PLC outputs."""
+        if not plc:
+            return
         # Indicators 1..4
         for i in range(1, 5):
             key = f"DQIndicator{i}"
@@ -268,6 +275,8 @@ class IOHandler:
     
     def _update_analog_outputs(self, plc, mainConfig, config, status, forced_values):
         """Update analog output values from PLC."""
+        if not plc:
+            return
         for i in range(1, 4):
             key = f"AQAnalog{i}"
             attr = f"analog{i}"
@@ -283,6 +292,8 @@ class IOHandler:
     
     def _write_digital_sensors(self, plc, mainConfig, config, status, forced_values):
         """Write digital sensor values to PLC inputs."""
+        if not plc:
+            return
         # Digital Level Sensor High
         if "DILevelSensorHigh" in forced_values:
             value = bool(forced_values["DILevelSensorHigh"])
@@ -321,12 +332,19 @@ class IOHandler:
     
     def _write_analog_sensors(self, plc, mainConfig, config, status, forced_values):
         """Write analog sensor values to PLC inputs."""
+        if not plc:
+            return
+        # Get analog_max from PLC or use default
+        analog_max = 27648
+        if plc and hasattr(plc, 'analogMax'):
+            analog_max = plc.analogMax
+            
         # Analog Level Sensor
         if "AILevelSensor" in forced_values:
             value = int(forced_values["AILevelSensor"])
         else:
             if hasattr(status, 'liquidVolume') and hasattr(config, 'tankVolume'):
-                value = int(self.mapValue(0, config.tankVolume, 0, plc.analogMax, status.liquidVolume))
+                value = int(self.mapValue(0, config.tankVolume, 0, analog_max, status.liquidVolume))
             else:
                 value = 0
         
@@ -344,7 +362,7 @@ class IOHandler:
             value = int(forced_values["AITemperatureSensor"])
         else:
             if hasattr(status, 'liquidTemperature'):
-                value = int(self.mapValue(-50, 250, 0, plc.analogMax, status.liquidTemperature))
+                value = int(self.mapValue(-50, 250, 0, analog_max, status.liquidTemperature))
             else:
                 value = 0
         
@@ -360,6 +378,8 @@ class IOHandler:
     
     def _write_general_controls_commands(self, plc, mainConfig, config, status, forced_values):
         """Write General Controls (Start/Stop/Reset buttons and sliders) to PLC inputs."""
+        if not plc:
+            return
         
         # Write digital command buttons (Start, Stop, Reset) to PLC inputs
         for cmd in ['Start', 'Stop', 'Reset']:
@@ -414,6 +434,8 @@ class IOHandler:
     
     def _read_plc_commands(self, plc, mainConfig, config, status, forced_values):
         """Read command buttons and sliders from PLC."""
+        if not plc:
+            return
         # Start/Stop/Reset
         for cmd in ['Start', 'Stop', 'Reset']:
             key = f"DI{cmd}"
@@ -494,6 +516,8 @@ class IOHandler:
 
     def _write_pidvalve_controls(self, plc, mainConfig, config, status, forced_values):
         """Write GUI values to PLC inputs for PIDValve controls (Start/Stop/Reset, Mode, SP)."""
+        if not plc:
+            return
         
         # Write digital command buttons (Start, Stop, Reset, Auto, Man, Temp increment, Level increment)
         for name in [

@@ -302,11 +302,16 @@ if __name__ == "__main__":
                             connectionLostLogged = True
                             lastConnectionLossTime = time.time()
                 else:
-                    # DEBUG: Log why we skip IO processing
-                    if int(time.time()) % 5 == 0:  # Every 5 seconds
-                        logger.warning(f"[MAIN] SKIPPING IO: validPlcConnection={validPlcConnection}, connectionErrorOccurred={connectionErrorOccurred}")
+                    # No PLC connection - but still process forced values from IO Config page!
+                    # This allows users to control simulation via forced values even without PLC
                     
-                    # If control is PLC but no PLC connection, pretend PLC outputs are all 0
+                    # Get forced values from GUI (IO Config page)
+                    forced_values = window.get_forced_io_values()
+                    
+                    # DEBUG: Log status
+                    if int(time.time()) % 5 == 0:  # Every 5 seconds
+                        logger.info(f"[MAIN] NO PLC CONNECTION - Processing forced values: {len(forced_values)} items")
+                    
                     # Get manual mode status
                     manual_mode = False
                     try:
@@ -314,8 +319,25 @@ if __name__ == "__main__":
                     except Exception:
                         manual_mode = False
                     
-                    ioHandler.resetOutputs(
-                        mainConfig, active_config, active_status, manual_mode=manual_mode)
+                    # Process forced values even without PLC connection
+                    # This makes forced IO values work in GUI mode or when PLC is offline
+                    if forced_values:
+                        try:
+                            # Create a dummy protocol object for forced value processing
+                            # The IO handler will use forced_values instead of reading from PLC
+                            ioHandler.updateIO(
+                                None,  # No PLC protocol
+                                mainConfig,
+                                active_config,
+                                active_status,
+                                forced_values=forced_values,
+                                manual_mode=manual_mode)
+                        except Exception as e:
+                            logger.error(f"[MAIN] Error processing forced values: {e}")
+                    else:
+                        # No forced values - reset outputs to 0
+                        ioHandler.resetOutputs(
+                            mainConfig, active_config, active_status, manual_mode=manual_mode)
                 
                 # Update button pulse timers
                 try:
