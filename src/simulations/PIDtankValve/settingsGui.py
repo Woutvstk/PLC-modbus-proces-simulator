@@ -1,9 +1,17 @@
-# tankSimSettingsPage.py - Tank Simulation Specific Settings
-# Handles:
-# - VatWidget (tank visualization)
-# - Tank-specific UI elements (valves, heater, color, etc.)
-# - Reading from simulation status
-# - Writing GUI inputs to simulation status
+"""
+Tank Simulation Settings Page - GUI page mixin for PID tank simulation settings.
+
+Handles:
+- VatWidget (tank visualization) integration
+- Tank-specific UI elements (valves, heater, color selection)
+- Reading from simulation status
+- Writing GUI inputs to simulation status
+- PID valve mode controls (Auto/Manual)
+- Trend graph management
+
+External Libraries Used:
+- PyQt5 (GPL v3) - GUI framework for widgets, layouts, and button groups
+"""
 
 from IO.buttonPulseManager import get_button_pulse_manager
 from gui.trendGraphWindow import TrendGraphManager
@@ -29,7 +37,7 @@ class TankSimSettingsMixin:
 
     def init_tanksim_settings_page(self):
         """Initialize all tank simulation page components"""
-        print("[DEBUG INIT] init_tanksim_settings_page() called")
+
         self._init_vat_widget()
         self._init_color_dropdown()
         self._init_checkboxes()
@@ -64,7 +72,7 @@ class TankSimSettingsMixin:
                 # It just won't be displayed
                 pass
         except Exception as e:
-            print(f"Error initializing vat_widget: {e}")
+            logger.error(f"Error initializing vat_widget: {e}")
             self.vat_widget = None
             raise
 
@@ -84,15 +92,6 @@ class TankSimSettingsMixin:
             for name, hexcode in colors:
                 self.colorDropDown.addItem(name, hexcode)
 
-            # Set initial color from config if available
-            if hasattr(self, 'tanksim_config') and self.tanksim_config:
-                tank_color = getattr(self.tanksim_config,
-                                     'tankColor', "#0000FF")
-                for i in range(self.colorDropDown.count()):
-                    if self.colorDropDown.itemData(i) == tank_color:
-                        self.colorDropDown.setCurrentIndex(i)
-                        break
-
             self.colorDropDown.currentIndexChanged.connect(
                 self.on_color_changed)
         except AttributeError:
@@ -107,16 +106,9 @@ class TankSimSettingsMixin:
             self.analogValueTempCheckBox.toggled.connect(
                 self.on_tank_config_changed)
 
-            # Set checked state from config if available, otherwise use defaults
-            if hasattr(self, 'tanksim_config') and self.tanksim_config:
-                self.levelSwitchesCheckBox.setChecked(
-                    getattr(self.tanksim_config, 'displayLevelSwitches', True))
-                self.analogValueTempCheckBox.setChecked(
-                    getattr(self.tanksim_config, 'displayTemperature', True))
-            else:
-                # Default values if config not yet loaded
-                self.levelSwitchesCheckBox.setChecked(True)
-                self.analogValueTempCheckBox.setChecked(True)
+            # Set default checked state
+            self.levelSwitchesCheckBox.setChecked(True)
+            self.analogValueTempCheckBox.setChecked(True)
         except AttributeError:
             pass
 
@@ -149,10 +141,6 @@ class TankSimSettingsMixin:
             for field in self.entryGroupFlowOut:
                 field.textChanged.connect(self._on_flow_out_changed)
 
-            # Connect heater power entries to update config immediately
-            for field in self.entryGroupPower:
-                field.textChanged.connect(self._on_heater_max_power_changed)
-
             # Connect volume entry to update maxVolume
             if hasattr(self, 'volumeEntry'):
                 self.volumeEntry.textChanged.connect(self._on_volume_changed)
@@ -160,70 +148,91 @@ class TankSimSettingsMixin:
         except AttributeError:
             pass
 
-        # Wire heater power sliders - simple implementation
-        # Slider value 0-100% controls heaterPowerFraction (0.0-1.0)
-        # Actual power = heaterPowerFraction * config.heaterMaxPower
+        # Wire heater power sliders/spinboxes (supports multiple copies in different stacks)
         try:
-            # Find all heater slider widgets
-            for slider_name in ['heaterPowerSlider', 'heaterPowerSlider_1', 'heaterPowerSlider_2', 'heaterPowerSlider_3']:
-                slider = getattr(self, slider_name, None)
-                if slider:
-                    slider.setMinimum(0)
-                    slider.setMaximum(100)
-                    slider.valueChanged.connect(self._on_heater_slider_changed)
-                    print(f"[DEBUG INIT] Connected {slider_name}")
-        except Exception as e:
-            print(f"[DEBUG INIT] Error setting up heater sliders: {e}")
+            self._heater_power_sliders = []
+            self._heater_power_value_labels = []
+            self._heater_power_spinboxes = []
 
-    def _on_heater_slider_changed(self, value):
-        """Handle heater power slider change (0-100%).
-        Only updates status when in GUI mode or Manual mode.
-        In Automatic mode, PLC controls the heater.
-        """
+            # Collect all heater controls that might exist in various pages
+            for name in (
+                'heaterPowerSlider',
+                'heaterPowerSlider_1',
+                'heaterPowerSlider_2',
+                'heaterPowerSlider_3',
+            ):
+                slider = getattr(self, name, None)
+                if slider is not None:
+                    self._heater_power_sliders.append(slider)
+                    slider.valueChanged.connect(
+                        lambda v, s=slider: self._on_heater_power_any_changed(
+                            v, s)
+                    )
+
+            for name in (
+                'heaterPowerSpinBox',
+                'heaterPowerSpinBox_3',
+                'heaterPowerSpinBox_4',
+            ):
+                spin = getattr(self, name, None)
+                if spin is not None:
+                    self._heater_power_spinboxes.append(spin)
+                    spin.valueChanged.connect(
+                        lambda v, sp=spin: self._on_heater_power_any_changed(
+                            v, sp)
+                    )
+        except Exception:
+            pass
+
+    def _on_heater_power_any_changed(self, value, source=None):
+        """Keep all heater power controls in sync and update labels (0-100%)."""
         try:
-            # Check if we should allow GUI control
-            gui_mode = (hasattr(self, 'mainConfig') and self.mainConfig and
-                        self.mainConfig.plcGuiControl == "gui")
-
-            manual_mode = False
-            if hasattr(self, 'vat_widget') and self.vat_widget:
-                try:
-                    manual_mode = self.vat_widget.is_manual_mode()
-                except Exception:
-                    pass
-
-            # Only allow changes in GUI mode or Manual mode
-            if not (gui_mode or manual_mode):
-                # In Automatic mode with PLC - ignore GUI changes
-                return
-
-            # Clamp value
+            # Clamp to 0..100 (slider is 0-100%)
             value = max(0, min(100, int(value)))
-            fraction = value / 100.0
 
-            # Update status - this is what gets sent to PLC
-            if hasattr(self, 'tanksim_status') and self.tanksim_status:
-                self.tanksim_status.heaterPowerFraction = fraction
+            # Sync all sliders
+            for slider in getattr(self, '_heater_power_sliders', []):
+                if slider is None or slider is source:
+                    continue
+                slider.blockSignals(True)
+                slider.setValue(value)
+                slider.blockSignals(False)
 
-            # Update all labels
-            for label_name in ['heaterPowerValueLabel', 'heaterPowerValueLabel_3']:
-                label = getattr(self, label_name, None)
-                if label:
-                    label.setText(f"{value}%")
+            # Update value labels
+            try:
+                # Collect labels lazily to avoid missing widgets
+                if not self._heater_power_value_labels:
+                    for name in (
+                        'heaterPowerValueLabel',
+                        'heaterPowerValueLabel_2',
+                        'heaterPowerValueLabel_3',
+                    ):
+                        lbl = getattr(self, name, None)
+                        if lbl is not None:
+                            self._heater_power_value_labels.append(lbl)
+                for lbl in self._heater_power_value_labels:
+                    lbl.setText(f"{value}%")
+            except Exception:
+                pass
 
-            # heaterPowerValueLabel_2 shows percentage (not watts)
-            label_2 = getattr(self, 'heaterPowerValueLabel_2', None)
-            if label_2:
-                label_2.setText(f"{value}%")
+            # Sync all spinboxes
+            for spin in getattr(self, '_heater_power_spinboxes', []):
+                if spin is None or spin is source:
+                    continue
+                spin.blockSignals(True)
+                spin.setValue(value)
+                spin.blockSignals(False)
 
-            # Sync vat_widget powerValue with config for SVG display
-            if hasattr(self, 'vat_widget') and self.vat_widget and hasattr(self, 'tanksim_config'):
-                self.vat_widget.powerValue = self.tanksim_config.heaterMaxPower
-                self.vat_widget.heaterPowerFraction = fraction
-                self.vat_widget.rebuild()
+            # Reflect immediately in status for snappier PLC export
+            if hasattr(self, 'tanksim_status') and self.tanksim_status is not None:
+                # Convert percentage (0..100) to fraction (0..1)
+                self.tanksim_status.heaterPowerFraction = value / 100.0
 
-        except Exception as e:
-            print(f"[DEBUG HEATER] Error in slider handler: {e}")
+            # Update vat_widget WITHOUT rebuild - let main loop handle rebuild
+            if hasattr(self, 'vat_widget') and self.vat_widget is not None:
+                self.vat_widget.heaterPowerFraction = value / 100.0
+                # Mark as dirty but don't rebuild - rebuilds are expensive
+                self.vat_widget._needs_rebuild = True
         except Exception:
             pass
 
@@ -272,19 +281,6 @@ class TankSimSettingsMixin:
         except (ValueError, AttributeError):
             pass
 
-    def _on_heater_max_power_changed(self, text):
-        """Handle heater max power entry change - update config immediately"""
-        try:
-            power = float(text)
-            if power >= 0:
-                if hasattr(self, 'tanksim_config') and self.tanksim_config:
-                    old_power = self.tanksim_config.heaterMaxPower
-                    self.tanksim_config.heaterMaxPower = power
-                    print(
-                        f"[DEBUG] Heater max power updated: {old_power}W -> {power}W")
-        except (ValueError, AttributeError) as e:
-            print(f"[DEBUG] Error updating heater max power: {e}")
-
     def _init_simulation_button(self):
         """Initialize simulation start/stop button"""
         try:
@@ -301,12 +297,11 @@ class TankSimSettingsMixin:
             if hasattr(self, 'vat_widget') and self.vat_widget:
                 self.vat_widget.init_mainwindow_controls(self)
         except Exception as e:
-            print(f"Error initializing PID valve mode toggle: {e}")
+            logger.error(f"Error initializing PID valve mode toggle: {e}")
 
     def _init_pidvalve_control_buttons(self):
         """Initialize PID valve control buttons with press/release handlers."""
         try:
-            print("[DEBUG INIT] Starting _init_pidvalve_control_buttons")
             self._button_pulse_manager = get_button_pulse_manager(
                 pulse_duration_ms=200)
             button_manager = self._button_pulse_manager
@@ -314,47 +309,41 @@ class TankSimSettingsMixin:
             # Get status object or use None (will be set later)
             status_obj = getattr(self, 'tanksim_status', None)
 
-            # Start button
+            # Start button - Uses pidPidValveStartCmd (separate from General Controls)
             btn_start = getattr(self, 'pushButton_PidValveStart', None)
             if btn_start:
                 button_manager.register_button(
-                    'PidValveStart', status_obj, 'pidPidValveStartCmd')
+                    'PidStart', status_obj, 'pidPidValveStartCmd')
                 btn_start.pressed.connect(
-                    lambda: button_manager.on_button_pressed('PidValveStart'))
+                    lambda: button_manager.on_button_pressed('PidStart'))
                 btn_start.released.connect(
-                    lambda: button_manager.on_button_released('PidValveStart'))
-                print(
-                    "[DEBUG INIT] Connected pushButton_PidValveStart with pulse manager")
+                    lambda: button_manager.on_button_released('PidStart'))
             else:
-                print("[DEBUG INIT] pushButton_PidValveStart NOT FOUND")
+                pass
 
-            # Stop button
+            # Stop button - Uses pidPidValveStopCmd (separate from General Controls)
             btn_stop = getattr(self, 'pushButton_PidValveStop', None)
             if btn_stop:
                 button_manager.register_button(
-                    'PidValveStop', status_obj, 'pidPidValveStopCmd')
+                    'PidStop', status_obj, 'pidPidValveStopCmd')
                 btn_stop.pressed.connect(
-                    lambda: button_manager.on_button_pressed('PidValveStop'))
+                    lambda: button_manager.on_button_pressed('PidStop'))
                 btn_stop.released.connect(
-                    lambda: button_manager.on_button_released('PidValveStop'))
-                print(
-                    "[DEBUG INIT] Connected pushButton_PidValveStop with pulse manager")
+                    lambda: button_manager.on_button_released('PidStop'))
             else:
-                print("[DEBUG INIT] pushButton_PidValveStop NOT FOUND")
+                pass
 
-            # Reset button
+            # Reset button - Uses pidPidValveResetCmd (separate from General Controls)
             btn_reset = getattr(self, 'pushButton_PidValveReset', None)
             if btn_reset:
                 button_manager.register_button(
-                    'PidValveReset', status_obj, 'pidPidValveResetCmd')
+                    'PidReset', status_obj, 'pidPidValveResetCmd')
                 btn_reset.pressed.connect(
-                    lambda: button_manager.on_button_pressed('PidValveReset'))
+                    lambda: button_manager.on_button_pressed('PidReset'))
                 btn_reset.released.connect(
-                    lambda: button_manager.on_button_released('PidValveReset'))
-                print(
-                    "[DEBUG INIT] Connected pushButton_PidValveReset with pulse manager")
+                    lambda: button_manager.on_button_released('PidReset'))
             else:
-                print("[DEBUG INIT] pushButton_PidValveReset NOT FOUND")
+                pass
 
             # Radio buttons for temp control - create separate button group for mutual exclusivity
             self._temp_button_group = QButtonGroup()
@@ -401,6 +390,8 @@ class TankSimSettingsMixin:
             if slider_temp:
                 slider_temp.setMinimum(0)
                 slider_temp.setMaximum(27648)
+                # Set initial value to 20°C (which is 5529 in the 0-27648 range: 0 to 100°C)
+                slider_temp.setValue(5529)
                 slider_temp.valueChanged.connect(self._on_temp_sp_changed)
                 if label_temp:
                     slider_temp.valueChanged.connect(
@@ -418,25 +409,19 @@ class TankSimSettingsMixin:
                     slider_level.valueChanged.connect(
                         lambda v: self._update_level_label(label_level, v))
                     self._update_level_label(label_level, slider_level.value())
-
-            print("[DEBUG INIT] Finished _init_pidvalve_control_buttons")
         except Exception as e:
-            print(
-                f"[DEBUG INIT] Exception in _init_pidvalve_control_buttons: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.error(f"Exception in _init_pidvalve_control_buttons: {e}")
 
     def update_button_manager_status(self):
         """Update button pulse manager with current status object. Call when tanksim_status becomes available."""
         if hasattr(self, '_button_pulse_manager') and self.tanksim_status is not None:
             button_manager = self._button_pulse_manager
             button_manager.set_button_status_obj(
-                'PidValveStart', self.tanksim_status)
+                'PidStart', self.tanksim_status)
             button_manager.set_button_status_obj(
-                'PidValveStop', self.tanksim_status)
+                'PidStop', self.tanksim_status)
             button_manager.set_button_status_obj(
-                'PidValveReset', self.tanksim_status)
-            print("[DEBUG INIT] Updated button manager status objects")
+                'PidReset', self.tanksim_status)
 
     def _on_pid_start_pressed(self):
         """Deprecated - now handled by pulse manager."""
@@ -496,10 +481,8 @@ class TankSimSettingsMixin:
         try:
             if hasattr(self, 'tanksim_status') and self.tanksim_status:
                 self.tanksim_status.pidPidTankTempSPValue = int(value)
-                print(
-                    f"[DEBUG] Temp SP changed: {value} -> status.pidPidTankTempSPValue = {int(value)}")
         except Exception as e:
-            print(f"[DEBUG] Error in _on_temp_sp_changed: {e}")
+            pass
 
     def _update_temp_label(self, label, analog_value):
         """Update temperature label from analog slider value (0-27648)."""
@@ -515,9 +498,10 @@ class TankSimSettingsMixin:
                 boiling_temp = getattr(
                     self.tanksim_config, 'liquidBoilingTemp', 100.0)
 
-            # Map: analog 0-27648 → temp 0 to boiling_temp (changed from -50)
-            temp_celsius = (analog_value / 27648.0) * boiling_temp
-            label.setText(f"{temp_celsius:.1f}°C")
+            # Map: analog 0-27648 → temp 0 to boiling_temp
+            temp_range = boiling_temp - 0
+            temp_celsius = 0 + (analog_value / 27648.0) * temp_range
+            label.setText(f"{int(round(temp_celsius))}°C")
         except Exception as e:
             label.setText("--")
 
@@ -536,7 +520,7 @@ class TankSimSettingsMixin:
                 return
             # Map analog 0-27648 → percentage 0-100%
             level_percent = (analog_value / 27648.0) * 100.0
-            label.setText(f"{level_percent:.1f}%")
+            label.setText(f"{int(round(level_percent))}%")
         except Exception as e:
             try:
                 label.setText("--")
@@ -562,7 +546,7 @@ class TankSimSettingsMixin:
             try:
                 self._init_vat_widget()
             except Exception as e:
-                print(f"Warning: Could not initialize vat_widget: {e}")
+                logger.warning(f"Could not initialize vat_widget: {e}")
                 return
 
         gui_mode = False
@@ -572,33 +556,26 @@ class TankSimSettingsMixin:
         except Exception:
             gui_mode = False
 
-        # Check manual override (PLC mode + Manual => GUI controls actuators)
+        # Check manual mode
         manual_mode = False
         try:
-            if hasattr(self, 'tanksim_status') and self.tanksim_status:
-                manual_mode = self.tanksim_status.is_manual_override(
-                    self.mainConfig.plcGuiControl)
+            manual_mode = self.vat_widget.is_manual_mode() if hasattr(
+                self.vat_widget, 'is_manual_mode') else False
         except Exception:
             manual_mode = False
 
         # Effective GUI control: either pure GUI mode OR manual override mode
         effective_gui_control = gui_mode or manual_mode
 
-        # CRITICAL GUARD: Block ALL writes during post-load lock period
-        import time
-        if hasattr(self.tanksim_status, '_lock_status_flags_until'):
-            if time.monotonic() < self.tanksim_status._lock_status_flags_until:
-                effective_gui_control = False  # Force False during lock
-                # logger.debug(f"[settingsGui] LOCK ACTIVE - blocking all GUI writes")
-
         # Step 1: Read simulation values from status object
         from simulations.PIDtankValve import gui as gui_module
         gui_module.liquidVolume = self.tanksim_status.liquidVolume
         gui_module.tempVat = self.tanksim_status.liquidTemperature
+        gui_module.simRunning = self.tanksim_status.simRunning
 
-        # Sync vat_widget powerValue with config.heaterMaxPower
+        # Pass config to VatWidget so it can display signal names from IO configuration
         if hasattr(self, 'tanksim_config') and self.tanksim_config:
-            self.vat_widget.powerValue = self.tanksim_config.heaterMaxPower
+            self.vat_widget.config = self.tanksim_config
 
         # Pass heater power fraction to the VatWidget for coil color
         # BUT only in PLC mode - in manual/GUI mode, keep the user's checkbox value
@@ -613,34 +590,15 @@ class TankSimSettingsMixin:
         try:
             # Use GUI fields in GUI mode; otherwise use live config/status values
             if gui_mode:
-                # Try all possible entry field names (UI file has multiple naming conventions)
                 if hasattr(self, 'maxFlowInEntry'):
-                    try:
-                        self.vat_widget.valveInMaxFlowValue = int(
-                            float(self.maxFlowInEntry.text() or 5))
-                    except (ValueError, AttributeError):
-                        self.vat_widget.valveInMaxFlowValue = 5
+                    self.vat_widget.valveInMaxFlowValue = int(
+                        self.maxFlowInEntry.text() or 5)
                 if hasattr(self, 'maxFlowOutEntry'):
-                    try:
-                        self.vat_widget.valveOutMaxFlowValue = int(
-                            float(self.maxFlowOutEntry.text() or 2))
-                    except (ValueError, AttributeError):
-                        self.vat_widget.valveOutMaxFlowValue = 2
-
-                # Try all heater power entry variants
-                power_set = False
-                for power_entry_name in ['powerHeatingCoilMaxEntry', 'powerHeatingCoilEntry', 'powerHeatingCoilEntry2']:
-                    power_entry = getattr(self, power_entry_name, None)
-                    if power_entry:
-                        try:
-                            self.vat_widget.powerValue = float(
-                                power_entry.text() or 10000.0)
-                            power_set = True
-                            break
-                        except (ValueError, AttributeError):
-                            pass
-                if not power_set:
-                    self.vat_widget.powerValue = 10000.0
+                    self.vat_widget.valveOutMaxFlowValue = int(
+                        self.maxFlowOutEntry.text() or 2)
+                if hasattr(self, 'powerHeatingCoilEntry'):
+                    self.vat_widget.powerValue = float(
+                        self.powerHeatingCoilEntry.text() or 10000.0)
 
                 try:
                     if hasattr(self, 'volumeEntry'):
@@ -658,15 +616,7 @@ class TankSimSettingsMixin:
                     self.vat_widget.levelSwitchMinHeight = float(
                         self.levelSwitchMinHeightEntry.text() or 10.0)
             else:
-                # PLC mode: read from config object (correct after load)
-                # IMPORTANT: Always refresh cfg reference to get latest config from simulation manager
-                if hasattr(self, 'mainConfig') and self.mainConfig and hasattr(self.mainConfig, 'simulationManager'):
-                    sim_mgr = self.mainConfig.simulationManager
-                    active_sim_name = sim_mgr.get_active_simulation_name()
-                    cfg = sim_mgr.get_simulation_config(active_sim_name)
-                else:
-                    cfg = getattr(self, 'tanksim_config', None)
-                
+                cfg = getattr(self, 'tanksim_config', None)
                 self.vat_widget.valveInMaxFlowValue = int(
                     cfg.valveInMaxFlow) if cfg and cfg.valveInMaxFlow is not None else 5
                 self.vat_widget.valveOutMaxFlowValue = int(
@@ -733,6 +683,38 @@ class TankSimSettingsMixin:
                 except Exception:
                     pass
 
+                # Update setpoint slider positions and labels in PLC mode
+                try:
+                    # Update temperature setpoint slider and label
+                    slider_temp = getattr(self, 'slider_PidTankTempSP', None)
+                    label_temp = getattr(self, 'label_PidTankTempSP', None)
+                    if slider_temp and hasattr(self.tanksim_status, 'pidPidTankTempSPValue'):
+                        temp_sp_value = int(
+                            self.tanksim_status.pidPidTankTempSPValue)
+                        # Prevent triggering valueChanged
+                        slider_temp.blockSignals(True)
+                        slider_temp.setValue(temp_sp_value)
+                        slider_temp.blockSignals(False)
+                        if label_temp:
+                            self._update_temp_label(label_temp, temp_sp_value)
+
+                    # Update level setpoint slider and label
+                    slider_level = getattr(self, 'slider_PidTankLevelSP', None)
+                    label_level = getattr(self, 'label_PidTankLevelSP', None)
+                    if slider_level and hasattr(self.tanksim_status, 'pidPidTankLevelSPValue'):
+                        level_sp_value = int(
+                            self.tanksim_status.pidPidTankLevelSPValue)
+                        # Prevent triggering valueChanged
+                        slider_level.blockSignals(True)
+                        slider_level.setValue(level_sp_value)
+                        slider_level.blockSignals(False)
+                        if label_level:
+                            self._update_level_label(
+                                label_level, level_sp_value)
+                except Exception as e:
+                    logger.debug(
+                        f"Error updating setpoint sliders in PLC mode: {e}")
+
             # Water color
             self.vat_widget.waterColor = self.colorDropDown.currentData()
 
@@ -770,61 +752,61 @@ class TankSimSettingsMixin:
         # Step 7: Feed data to trend graphs if they're open
         try:
             if hasattr(self, 'trend_manager'):
-                # Add temperature with heater power fraction (0-1) converted to percentage
-                power_pct = self.tanksim_status.heaterPowerFraction * 100.0
+                # Calculate temperature setpoint
+                temp_setpoint = None
+                slider_temp = getattr(self, 'slider_PidTankTempSP', None)
+                if slider_temp:
+                    # Convert analog value to temperature (0-27648 → 0 to boilingTemp)
+                    boiling_temp = getattr(self.tanksim_config, 'liquidBoilingTemp', 100.0) if hasattr(
+                        self, 'tanksim_config') else 100.0
+                    analog_value = slider_temp.value()
+                    temp_range = boiling_temp - 0
+                    temp_setpoint = 0 + (analog_value / 27648.0) * temp_range
 
-                # Get temperature setpoint from slider
-                temp_sp = None
-                try:
-                    slider_temp = getattr(self, 'slider_PidTankTempSP', None)
-                    if slider_temp:
-                        # Convert analog value (0-27648) to temperature (0-boilingTemp)
-                        boiling_temp = getattr(self.tanksim_config, 'liquidBoilingTemp', 100.0) if hasattr(
-                            self, 'tanksim_config') else 100.0
-                        temp_sp = (slider_temp.value() /
-                                   27648.0) * boiling_temp
-                except Exception:
-                    pass
+                # Get tank volume max for level percentage calculation
+                tank_volume_max = getattr(self.tanksim_config, 'tankVolume', 200.0) if hasattr(
+                    self, 'tanksim_config') else 200.0
 
-                # Add to temperature trend with power and setpoint
+                # Add temperature data with PV (%), Setpoint (%), and OP (%)
+                # Convert all to percentages: liquidTemperature and setpoint as % of boiling temp
+                temp_pv_percent = (self.tanksim_status.liquidTemperature /
+                                   boiling_temp * 100.0) if boiling_temp > 0 else 0
+                temp_sp_percent = (temp_setpoint / boiling_temp *
+                                   100.0) if boiling_temp > 0 and temp_setpoint is not None else 0
+                heater_op_percent = self.tanksim_status.heaterPowerFraction * 100.0
+
                 self.trend_manager.add_temperature(
-                    pv_value=self.tanksim_status.liquidTemperature,
-                    setpoint_value=temp_sp,
-                    output_value=power_pct
+                    pv_value=temp_pv_percent,
+                    setpoint_value=temp_sp_percent,
+                    output_value=heater_op_percent
                 )
 
-                # Add level with valve fractions (convert to percentage)
-                valve_in_pct = self.tanksim_status.valveInOpenFraction * 100.0
-                valve_out_pct = self.tanksim_status.valveOutOpenFraction * 100.0
-                level_sp = None
-                try:
-                    slider_level = getattr(self, 'slider_PidTankLevelSP', None)
-                    if slider_level and hasattr(self, 'tanksim_config'):
-                        # Convert analog value to level percentage
-                        level_sp = (slider_level.value() / 27648.0) * 100.0
-                except Exception:
-                    pass
+                # Update temperature setpoint display
+                self.trend_manager.set_temperature_setpoint(temp_sp_percent)
+
+                # Get level setpoint (from slider or status)
+                level_setpoint = self.tanksim_status.levelSetpoint if hasattr(
+                    self.tanksim_status, 'levelSetpoint') else 100.0
+                level_sp_percent = (level_setpoint / tank_volume_max *
+                                    100.0) if tank_volume_max > 0 else 0
+
+                # Add level data with PV (%), valve positions (%)
+                level_pv_percent = (self.tanksim_status.liquidVolume /
+                                    tank_volume_max * 100.0) if tank_volume_max > 0 else 0
+                valve_in_percent = self.tanksim_status.valveInOpenFraction * 100.0
+                valve_out_percent = self.tanksim_status.valveOutOpenFraction * 100.0
 
                 self.trend_manager.add_level(
-                    pv_value=self.tanksim_status.liquidVolume / self.tanksim_config.tankVolume *
-                    100.0 if hasattr(self, 'tanksim_config') else 0.0,
-                    setpoint_value=level_sp,
-                    valve_in_fraction=valve_in_pct,
-                    valve_out_fraction=valve_out_pct
+                    pv_value=level_pv_percent,
+                    setpoint_value=level_sp_percent,
+                    valve_in_fraction=valve_in_percent,
+                    valve_out_fraction=valve_out_percent
                 )
+
+                # Update level setpoint display
+                self.trend_manager.set_level_setpoint(level_sp_percent)
         except Exception as e:
             logger.debug(f"Error updating trend graphs: {e}")
-
-    def is_manual_mode(self):
-        """Check if manual mode is active - generic method for main.py"""
-        try:
-            if hasattr(self, 'tanksim_status') and self.tanksim_status and hasattr(self, 'mainConfig') and self.mainConfig:
-                return self.tanksim_status.is_manual_override(self.mainConfig.plcGuiControl)
-            if hasattr(self, 'vat_widget') and self.vat_widget:
-                return self.vat_widget.is_manual_mode()
-        except Exception:
-            pass
-        return False
 
     def _update_gui_panel_visibility(self):
         """Show GUI control panels based on controller mode, but never hide them."""
@@ -874,20 +856,16 @@ class TankSimSettingsMixin:
         # If PLC is in control, do not overwrite runtime status, but still propagate UI config changes (max flows, power, etc.)
         gui_mode = (self.mainConfig.plcGuiControl == "gui")
 
-        # Check if Manual override is active (PLC mode + Manual => GUI controls actuators)
+        # Check if Manual mode is active (even in PLC mode, Manual mode allows GUI control)
         manual_mode = False
-        if hasattr(self, 'tanksim_status') and self.tanksim_status:
+        if hasattr(self, 'vat_widget') and self.vat_widget:
             try:
-                manual_mode = self.tanksim_status.is_manual_override(
-                    self.mainConfig.plcGuiControl)
+                manual_mode = self.vat_widget.is_manual_mode()
             except Exception:
                 manual_mode = False
 
-        # Effective control: GUI mode OR Manual override allows writing valve/heater values
+        # Effective control: GUI mode OR Manual mode allows writing valve/heater values
         effective_gui_control = gui_mode or manual_mode
-        # logger.info(f"[settingsGui] gui_mode={gui_mode}, manual_mode={manual_mode}, effective_gui_control={effective_gui_control}")
-
-        # logger.debug(f"[settingsGui] gui_mode={gui_mode}, manual_mode={manual_mode}, effective_gui_control={effective_gui_control}")
 
         # Update PLCControl_PIDControl widget based on GUI mode
         if hasattr(self, 'vat_widget') and self.vat_widget:
@@ -938,39 +916,53 @@ class TankSimSettingsMixin:
             except Exception:
                 pass
 
-            # Write valve positions ONLY when in GUI mode or Manual mode
-            # In Automatic mode, PLC controls valves - don't override with GUI values
-            if manual_mode or gui_mode:
-                try:
-                    old_in = self.tanksim_status.valveInOpenFraction
-                    old_out = self.tanksim_status.valveOutOpenFraction
-                    new_in = self.vat_widget.adjustableValveInValue / 100.0
-                    new_out = self.vat_widget.adjustableValveOutValue / 100.0
+            # Write valve positions - CRITICAL: Always write these in GUI mode or Manual mode
+            try:
+                self.tanksim_status.valveInOpenFraction = self.vat_widget.adjustableValveInValue / 100.0
+                self.tanksim_status.valveOutOpenFraction = self.vat_widget.adjustableValveOutValue / 100.0
+            except Exception as e:
+                logger.error(f"Error writing valve positions: {e}")
 
-                    self.tanksim_status.valveInOpenFraction = new_in
-
-                    self.tanksim_status.valveOutOpenFraction = new_out
-                    # logger.info(f"[settingsGui] WROTE VALVE: valveIn {old_in:.2%} -> {new_in:.2%}, valveOut {old_out:.2%} -> {new_out:.2%}")
-                except Exception as e:
-                    logger.error(f"Error writing valve positions: {e}")
-            else:
-                # In PLC Auto mode - do NOT write from GUI
-                # Log if we would have written (to detect unwanted writes)
+            # Write heater state (always analog mode now)
+            try:
+                # Analog mode: Use the first visible heater slider; fallback to first available
+                slider_val = None
                 try:
-                    gui_valve_in = self.vat_widget.adjustableValveInValue / 100.0
-                    gui_valve_out = self.vat_widget.adjustableValveOutValue / 100.0
-                    if gui_valve_in != 0 or gui_valve_out != 0:
-                        logger.info(
-                            f"[settingsGui] BLOCKED valve write in Auto mode: GUI has valveIn={gui_valve_in:.2%}, valveOut={gui_valve_out:.2%} (ignored)")
+                    for slider in getattr(self, '_heater_power_sliders', []):
+                        if slider is None:
+                            continue
+                        if slider.isVisible():
+                            slider_val = int(slider.value())
+                            break
+                    if slider_val is None:
+                        first_slider = next(
+                            (s for s in getattr(self, '_heater_power_sliders', []) if s is not None), None)
+                        if first_slider is not None:
+                            slider_val = int(first_slider.value())
+                    if slider_val is None:
+                        slider_val = 0
+                    # Convert from percentage (0-100) to fraction (0-1)
+                    self.tanksim_status.heaterPowerFraction = max(
+                        0.0, min(1.0, slider_val / 100.0))
                 except Exception:
-                    pass
-
-            # Write heater state - SKIP THIS, _on_heater_slider_changed handles it directly
-            # Commenting out to prevent overwriting status.heaterPowerFraction with 0
-            # try:
-            #     # OLD CODE that overwrites heaterPowerFraction
-            # except Exception as e:
-            #     logger.error(f"Error writing heater state: {e}")
+                    self.tanksim_status.heaterPowerFraction = 0.0
+            except Exception as e:
+                logger.error(f"Error writing heater state: {e}")
+        else:
+            # In PLC mode (automatic), convert IO value to levelSetpoint
+            # The IO handler reads pidPidTankLevelSPValue from PLC (0-27648)
+            # Convert it to levelSetpoint in liters for simulation
+            try:
+                if hasattr(self.tanksim_status, 'pidPidTankLevelSPValue') and hasattr(self, 'tanksim_config') and self.tanksim_config:
+                    level_analog = float(
+                        self.tanksim_status.pidPidTankLevelSPValue)
+                    # Convert 0-27648 to 0-100% then to liters
+                    level_percent = (level_analog / 27648.0) * 100.0
+                    tank_volume = self.tanksim_config.tankVolume
+                    self.tanksim_status.levelSetpoint = (
+                        level_percent / 100.0) * tank_volume
+            except Exception as e:
+                logger.debug(f"Error converting PLC level setpoint: {e}")
 
         # Also push key limits from GUI into the simulation configuration
         # so changes to max flows and heater power affect the physics.
@@ -993,9 +985,6 @@ class TankSimSettingsMixin:
                         self.tanksim_config.valveOutMaxFlow = val_out
                 except Exception:
                     pass
-
-                # Heating coil setpoint (from slider) - handled by _on_heater_slider_changed
-                # Slider updates status.heaterPowerFraction directly, no need to read here
 
                 # Heating coil max power (W)
                 try:
@@ -1116,19 +1105,9 @@ class TankSimSettingsMixin:
         """Callback when water color changes"""
         new_color = self.colorDropDown.currentData()
         self.vat_widget.waterColor = new_color
-        # Also update config for persistence
-        if hasattr(self, 'tanksim_config') and self.tanksim_config:
-            self.tanksim_config.tankColor = new_color
 
     def on_tank_config_changed(self):
         """Callback when tank configuration changes"""
-        # Update config for persistence
-        if hasattr(self, 'tanksim_config') and self.tanksim_config:
-            if hasattr(self, 'levelSwitchesCheckBox'):
-                self.tanksim_config.displayLevelSwitches = self.levelSwitchesCheckBox.isChecked()
-            if hasattr(self, 'analogValueTempCheckBox'):
-                self.tanksim_config.displayTemperature = self.analogValueTempCheckBox.isChecked()
-
         # Always use analog valve control (digital mode removed)
         try:
             stacked_widget = self.findChild(QStackedWidget, "regelingSimGui")
@@ -1184,12 +1163,28 @@ class TankSimSettingsMixin:
             self.trend_manager = TrendGraphManager()
 
             # Update trend manager with current configuration
+            # Try to get tank volume from GUI field first, fall back to config
+            tank_volume_liters = 200.0
+            try:
+                if hasattr(self, 'volumeEntry') and self.volumeEntry:
+                    volume_m3 = float(self.volumeEntry.text() or 0.2)
+                    tank_volume_liters = volume_m3 * 1000.0  # Convert m³ to liters
+                elif hasattr(self, 'tanksim_config') and self.tanksim_config:
+                    tank_volume_liters = self.tanksim_config.tankVolume
+            except (ValueError, AttributeError):
+                if hasattr(self, 'tanksim_config') and self.tanksim_config:
+                    tank_volume_liters = self.tanksim_config.tankVolume
+
+            boiling_temp = 100.0
             if hasattr(self, 'tanksim_config') and self.tanksim_config:
-                self.trend_manager.set_config(
-                    tank_volume_max=self.tanksim_config.tankVolume,
-                    temp_max=getattr(self.tanksim_config,
-                                     'liquidBoilingTemp', 100.0)
-                )
+                boiling_temp = getattr(
+                    self.tanksim_config, 'liquidBoilingTemp', 100.0)
+
+            self.trend_manager.set_config(
+                tank_volume_max=tank_volume_liters,
+                temp_max=boiling_temp,
+                boiling_temp=boiling_temp
+            )
 
             # Connect temperature trend button
             if hasattr(self, 'pushButton_TempTrend'):

@@ -3,5 +3,4 @@ src/tankSim/io_configuration.json
 src/guiCommon/Resource_rc.py
 build
 dist
-src/gui/media/Resource_rc.py
 src/IO/IO_configuration.json

@@ -35,8 +35,8 @@ class configuration:
         self.DIReset = {"byte": 0, "bit": 4}
         # ANALOG
         self.AQValveInFraction = {"byte": 2}
-        self.AQValveOutFraction = {"byte": 4}
-        self.AQHeaterFraction = {"byte": 6}
+        self.AQValveOutFraction = {"byte": 20}
+        self.AQHeaterFraction = {"byte": 8}
         # General Controls - ANALOG (PLC Inputs)
         self.AIControl1 = {"byte": 6}
         self.AIControl2 = {"byte": 8}
@@ -93,9 +93,9 @@ class configuration:
             "Sim_WaterTemperatureMeasurement": "AITemperatureSensor",
 
             # PLC Controls Buttons
-            "Sim_StartButton": "DIPidValveStart",
-            "Sim_StopButton": "DIPidValveStop",
-            "Sim_ResetButton": "DIPidValveReset",
+            "Sim_PidValveStartButton": "DIPidValveStart",
+            "Sim_PidValveStopButton": "DIPidValveStop",
+            "Sim_PidValveResetButton": "DIPidValveReset",
 
             # Mode Switches
             "Sim_AutomaticMode": "DIPidValveAuto",
