@@ -33,13 +33,13 @@ class IOHandler:
         self._first_update = True  # Track first update to force initial analog writes
         self._force_write_end_time = None  # Track forced write period end time
 
-    def start_force_write_period(self, duration: float = 0.5) -> None:
+    def start_force_write_period(self, duration: float = 1.5) -> None:
         """
         Start a forced write period where all analog values are written to PLC.
         This is useful after connection to ensure PLC has correct initial values.
 
         Args:
-            duration: Duration in seconds for the forced write period (default 500ms)
+            duration: Duration in seconds for the forced write period (default 1500ms)
         """
         self._force_write_end_time = time.time() + duration
         logger.info(f"Started {duration*1000:.0f}ms forced write period")
@@ -330,8 +330,8 @@ class IOHandler:
                                                     config, 'DIStop', None),
                                                 getattr(config, 'DIReset', None)]):
                 key = "DILevelSensorHigh"
-                # On first update, force write even if value seems unchanged
-                if self._first_update or self._last_sent_di.get(key) != value:
+                # On first update or during force period, write even if value seems unchanged
+                if self._first_update or self._is_in_force_write_period() or self._last_sent_di.get(key) != value:
                     plc.SetDI(addr["byte"], addr["bit"], value)
                     self._last_sent_di[key] = value
 
@@ -350,8 +350,8 @@ class IOHandler:
                                                     config, 'DIStop', None),
                                                 getattr(config, 'DIReset', None)]):
                 key = "DILevelSensorLow"
-                # On first update, force write even if value seems unchanged
-                if self._first_update or self._last_sent_di.get(key) != value:
+                # On first update or during force period, write even if value seems unchanged
+                if self._first_update or self._is_in_force_write_period() or self._last_sent_di.get(key) != value:
                     plc.SetDI(addr["byte"], addr["bit"], value)
                     self._last_sent_di[key] = value
 
@@ -378,8 +378,8 @@ class IOHandler:
             addr = config.AILevelSensor
             if addr:
                 key = "AILevelSensor"
-                # On first update, force write even if value seems unchanged
-                if self._first_update or self._last_sent_ai.get(key) != value:
+                # On first update or during force period, write even if value seems unchanged
+                if self._first_update or self._is_in_force_write_period() or self._last_sent_ai.get(key) != value:
                     plc.SetAI(addr["byte"], value)
                     self._last_sent_ai[key] = value
 
@@ -397,8 +397,8 @@ class IOHandler:
             addr = config.AITemperatureSensor
             if addr:
                 key = "AITemperatureSensor"
-                # On first update, force write even if value seems unchanged
-                if self._first_update or self._last_sent_ai.get(key) != value:
+                # On first update or during force period, write even if value seems unchanged
+                if self._first_update or self._is_in_force_write_period() or self._last_sent_ai.get(key) != value:
                     plc.SetAI(addr["byte"], value)
                     self._last_sent_ai[key] = value
 
@@ -430,8 +430,8 @@ class IOHandler:
                         plc.SetDI(addr["byte"], addr["bit"], desired)
                         self._last_sent_di[cache_key] = desired
                     else:
-                        # On first update, force write even if value seems unchanged
-                        if self._first_update or self._last_sent_di.get(cache_key) != desired:
+                        # On first update or during force period, write even if value seems unchanged
+                        if self._first_update or self._is_in_force_write_period() or self._last_sent_di.get(cache_key) != desired:
                             plc.SetDI(addr["byte"], addr["bit"], desired)
                             self._last_sent_di[cache_key] = desired
 
@@ -454,8 +454,8 @@ class IOHandler:
                 addr = getattr(config, key)
                 if addr:
                     cache_key = key
-                    # On first update, force write even if value seems unchanged
-                    if self._first_update or self._last_sent_ai.get(cache_key) != value:
+                    # On first update or during force period, write even if value seems unchanged
+                    if self._first_update or self._is_in_force_write_period() or self._last_sent_ai.get(cache_key) != value:
                         plc.SetAI(addr["byte"], value)
                         self._last_sent_ai[cache_key] = value
 
@@ -580,8 +580,8 @@ class IOHandler:
                         key, desired)
                     if ton_ready:
                         cache_key = key
-                        # On first update, force write even if value seems unchanged
-                        if self._first_update or self._last_sent_di.get(cache_key) != desired:
+                        # On first update or during force period, write even if value seems unchanged
+                        if self._first_update or self._is_in_force_write_period() or self._last_sent_di.get(cache_key) != desired:
                             plc.SetDI(addr["byte"], addr["bit"], desired)
                             self._last_sent_di[cache_key] = desired
                             if "PidValve" in key:
@@ -613,7 +613,8 @@ class IOHandler:
                 addr = getattr(config, key)
                 if addr:
                     cache_key = key
-                    if self._last_sent_ai.get(cache_key) != value:
+                    # During force period, write even if value seems unchanged
+                    if self._is_in_force_write_period() or self._last_sent_ai.get(cache_key) != value:
                         plc.SetAI(addr["byte"], value)
                         self._last_sent_ai[cache_key] = value
                         print(

@@ -1775,6 +1775,7 @@ class IOConfigMixin:
                     self.pushButton_connect.blockSignals(False)
                     
                     # Trigger the connect action
+                    # The main loop will start force write period after successful connection
                     if hasattr(self, 'mainConfig'):
                         self.mainConfig.tryConnect = True
             except Exception as e:

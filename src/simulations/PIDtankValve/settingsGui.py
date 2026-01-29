@@ -659,7 +659,14 @@ class TankSimSettingsMixin:
                         self.levelSwitchMinHeightEntry.text() or 10.0)
             else:
                 # PLC mode: read from config object (correct after load)
-                cfg = getattr(self, 'tanksim_config', None)
+                # IMPORTANT: Always refresh cfg reference to get latest config from simulation manager
+                if hasattr(self, 'mainConfig') and self.mainConfig and hasattr(self.mainConfig, 'simulationManager'):
+                    sim_mgr = self.mainConfig.simulationManager
+                    active_sim_name = sim_mgr.get_active_simulation_name()
+                    cfg = sim_mgr.get_simulation_config(active_sim_name)
+                else:
+                    cfg = getattr(self, 'tanksim_config', None)
+                
                 self.vat_widget.valveInMaxFlowValue = int(
                     cfg.valveInMaxFlow) if cfg and cfg.valveInMaxFlow is not None else 5
                 self.vat_widget.valveOutMaxFlowValue = int(

@@ -90,7 +90,7 @@ io_config_path = src_dir / "IO" / "IO_configuration.json"
 if io_config_path.exists():
     active_config.load_io_config_from_file(io_config_path)
     logger.info(f"IO configuration loaded from: {io_config_path}")
-    # Start forced write period after loading config (500ms)
+    # Start forced write period after loading config (3000ms)
     ioHandler.start_force_write_period()
 else:
     logger.warning(f"IO configuration not found: {io_config_path}")
@@ -141,6 +141,11 @@ if __name__ == "__main__":
         while not mainConfig.doExit:
             app.processEvents()
 
+            # Refresh simulation object references in case file load replaced them
+            active_sim = simulationManager.get_active_simulation()
+            active_config = active_sim.config
+            active_status = active_sim.status
+
             time.sleep(0.004)
 
             # Check for connect command from GUI
@@ -149,11 +154,6 @@ if __name__ == "__main__":
                 connectionLostLogged = False
                 connectionErrorOccurred = False  # Reset error flag on new connection attempt
                 mainConfig.tryConnect = False
-                # Clear GUI force overrides before connecting
-                try:
-                    window.clear_all_forces()
-                except Exception:
-                    pass
 
                 # In GUI mode, skip PLC connection entirely
                 if mainConfig.plcGuiControl == "gui":
@@ -179,10 +179,10 @@ if __name__ == "__main__":
                         except Exception:
                             pass
                     else:
-                        # Connection successful - start forced write period (500ms)
+                        # Connection successful - start forced write period (3000ms)
                         ioHandler.start_force_write_period()
                         logger.info(
-                            "Connection established - starting 500ms IO initialization period")
+                            "Connection established - starting 3000ms IO initialization period")
 
                 # Update GUI connection status
                 window.validPlcConnection = validPlcConnection
@@ -344,10 +344,6 @@ if __name__ == "__main__":
                         except Exception as e:
                             logger.error(
                                 f"[MAIN] Error processing forced values: {e}")
-                    else:
-                        # No forced values - reset outputs to 0
-                        ioHandler.resetOutputs(
-                            mainConfig, active_config, active_status, manual_mode=manual_mode)
 
                 # Update button pulse timers
                 try:

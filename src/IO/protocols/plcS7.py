@@ -9,7 +9,7 @@ except (ImportError, OSError) as e:
 
 class plcS7:
     """Class for communication with a Siemens S7 PLC using Snap7."""
-    analogMax = 32767  # Max value for signed 16-bit integer
+    analogMax = 27648  # Max value for signed 16-bit integer
 
     def __init__(self, ip: str, rack: int, slot: int, tcpport: int = 102, network_adapter: str = "auto"):
         """

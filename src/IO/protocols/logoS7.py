@@ -9,7 +9,7 @@ class logoS7:
     This class provides bit- and word-level access for digital and analog I/O,
     compatible with the LOGO memory structure.
     """
-    analogMax = 32767  # Max value for signed 16-bit integer
+    analogMax = 27648  # Max value for signed 16-bit integer
 
     def __init__(self, ip: str, tsapLogo: int, tsapServer: int, tcpport: int = 102, network_adapter: str = "auto"):
         """

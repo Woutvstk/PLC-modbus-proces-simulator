@@ -6,7 +6,7 @@ import os
 
 
 class plcSimAPI:
-    analogMax = 32767  # Max value for signed 16-bit integer
+    analogMax = 27648  # Max value for signed 16-bit integer
 
     """
     Class for communication with a Siemens S7 PLC simulator via the
