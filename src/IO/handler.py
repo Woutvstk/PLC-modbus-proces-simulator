@@ -390,7 +390,9 @@ class IOHandler:
             value = int(forced_values["AITemperatureSensor"])
         else:
             if hasattr(status, 'liquidTemperature'):
-                value = int(self.mapValue(-50, 250, 0,
+                # Map temperature from 0°C to boilingTemp (default 100°C) to 0-27648
+                boiling_temp = getattr(config, 'liquidBoilingTemp', 100.0)
+                value = int(self.mapValue(0, boiling_temp, 0,
                             analog_max, status.liquidTemperature))
             else:
                 value = 0
