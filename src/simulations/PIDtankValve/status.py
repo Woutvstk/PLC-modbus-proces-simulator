@@ -72,12 +72,18 @@ class status:
         self.importExportVariableList = [
             "liquidVolume", "liquidTemperature",
             "valveInOpenFraction", "valveOutOpenFraction", "heaterPowerFraction",
-            "generalStartCmd", "generalStopCmd", "generalResetCmd",
-            "generalControl1Value", "generalControl2Value", "generalControl3Value",
-            "indicator1", "indicator2", "indicator3", "indicator4",
-            "analog1", "analog2", "analog3",
-            "pidStartCmd", "pidStopCmd", "pidResetCmd",
+            # Radio button states (DO save these - they're persistent settings)
+            "pidPidValveAutoCmd", "pidPidValveManCmd",
+            "pidPidTankValveAItempCmd", "pidPidTankValveDItempCmd",
+            "pidPidTankValveAIlevelCmd", "pidPidTankValveDIlevelCmd",
+            # Slider/setpoint values (DO save these)
+            "pidPidTankTempSPValue", "pidPidTankLevelSPValue",
             "temperatureSetpoint", "levelSetpoint",
+            # NOTE: Removed pushbutton states - they're transient and should not persist:
+            # generalStartCmd, generalStopCmd, generalResetCmd,
+            # pidStartCmd, pidStopCmd, pidResetCmd,
+            # generalControl1Value, generalControl2Value, generalControl3Value,
+            # indicator1-4, analog1-3
         ]
 
         # General Controls - PLC Outputs reflected in status (written by: plc or force)

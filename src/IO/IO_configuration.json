@@ -43,7 +43,7 @@
       "bit": "",
       "address": "IW4",
       "status": "4608",
-      "description": "Current water temperature (°C)",
+      "description": "Current water temperature (\u00c2\u00b0C)",
       "range": "0-27648"
     },
     {
@@ -203,7 +203,7 @@
       "bit": "",
       "address": "IW6",
       "status": "0",
-      "description": "Desired water temperature (-50 to 100°C)",
+      "description": "Desired water temperature (-50 to 100\u00c2\u00b0C)",
       "range": "0-27648"
     },
     {

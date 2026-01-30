@@ -728,6 +728,92 @@ def _sync_status_to_gui_after_load(main_window: Any, state_data: Dict[str, Any])
         if not active_sim:
             return
 
+        status = active_sim.status if hasattr(active_sim, 'status') else None
+
+        # Restore radio button states
+        if status:
+            logger.info("[LOAD] Restoring radio buttons and sliders...")
+            
+            # Temperature control radio buttons
+            radio_ai_temp = main_window.findChild(QRadioButton, "radioButton_PidTankValveAItemp")
+            radio_di_temp = main_window.findChild(QRadioButton, "radioButton_PidTankValveDItemp")
+            if radio_ai_temp and hasattr(status, 'pidPidTankValveAItempCmd'):
+                radio_ai_temp.blockSignals(True)
+                radio_ai_temp.setChecked(status.pidPidTankValveAItempCmd)
+                radio_ai_temp.blockSignals(False)
+                logger.info(f"[LOAD]   radioButton_PidTankValveAItemp = {status.pidPidTankValveAItempCmd}")
+            if radio_di_temp and hasattr(status, 'pidPidTankValveDItempCmd'):
+                radio_di_temp.blockSignals(True)
+                radio_di_temp.setChecked(status.pidPidTankValveDItempCmd)
+                radio_di_temp.blockSignals(False)
+                
+            # Level control radio buttons
+            radio_ai_level = main_window.findChild(QRadioButton, "radioButton_PidTankValveAIlevel")
+            radio_di_level = main_window.findChild(QRadioButton, "radioButton_PidTankValveDIlevel")
+            if radio_ai_level and hasattr(status, 'pidPidTankValveAIlevelCmd'):
+                radio_ai_level.blockSignals(True)
+                radio_ai_level.setChecked(status.pidPidTankValveAIlevelCmd)
+                radio_ai_level.blockSignals(False)
+                logger.info(f"[LOAD]   radioButton_PidTankValveAIlevel = {status.pidPidTankValveAIlevelCmd}")
+            if radio_di_level and hasattr(status, 'pidPidTankValveDIlevelCmd'):
+                radio_di_level.blockSignals(True)
+                radio_di_level.setChecked(status.pidPidTankValveDIlevelCmd)
+                radio_di_level.blockSignals(False)
+                
+            # Auto/Manual toggle buttons
+            auto_btn = main_window.findChild(QPushButton, "pushButton_PidValveAuto")
+            man_btn = main_window.findChild(QPushButton, "pushButton_PidValveMan")
+            if auto_btn and hasattr(status, 'pidPidValveAutoCmd'):
+                auto_btn.blockSignals(True)
+                auto_btn.setChecked(status.pidPidValveAutoCmd)
+                auto_btn.blockSignals(False)
+                logger.info(f"[LOAD]   pushButton_PidValveAuto = {status.pidPidValveAutoCmd}")
+            if man_btn and hasattr(status, 'pidPidValveManCmd'):
+                man_btn.blockSignals(True)
+                man_btn.setChecked(status.pidPidValveManCmd)
+                man_btn.blockSignals(False)
+                
+            # Temperature setpoint slider
+            slider_temp = main_window.findChild(QSlider, "slider_PidTankTempSP")
+            if slider_temp and hasattr(status, 'pidPidTankTempSPValue'):
+                slider_temp.blockSignals(True)
+                slider_temp.setValue(int(status.pidPidTankTempSPValue))
+                slider_temp.blockSignals(False)
+                logger.info(f"[LOAD]   slider_PidTankTempSP = {status.pidPidTankTempSPValue}")
+                
+            # Level setpoint slider
+            slider_level = main_window.findChild(QSlider, "slider_PidTankLevelSP")
+            if slider_level and hasattr(status, 'pidPidTankLevelSPValue'):
+                slider_level.blockSignals(True)
+                slider_level.setValue(int(status.pidPidTankLevelSPValue))
+                slider_level.blockSignals(False)
+                logger.info(f"[LOAD]   slider_PidTankLevelSP = {status.pidPidTankLevelSPValue}")
+                
+            # Heater power slider (multiple instances)
+            heater_value = int(status.heaterPowerFraction * 100.0) if hasattr(status, 'heaterPowerFraction') else 0
+            for slider_name in ["heaterPowerSlider", "heaterPowerSlider_1", "heaterPowerSlider_2", "heaterPowerSlider_3"]:
+                slider = main_window.findChild(QSlider, slider_name)
+                if slider:
+                    slider.blockSignals(True)
+                    slider.setValue(heater_value)
+                    slider.blockSignals(False)
+            logger.info(f"[LOAD]   heaterPowerSlider = {heater_value}%")
+                
+            # Valve entries
+            valve_in_entry = main_window.findChild(QLineEdit, "valveInEntry")
+            if valve_in_entry and hasattr(status, 'valveInOpenFraction'):
+                valve_in_entry.blockSignals(True)
+                valve_in_entry.setText(str(round(status.valveInOpenFraction * 100.0, 1)))
+                valve_in_entry.blockSignals(False)
+                logger.info(f"[LOAD]   valveInEntry = {status.valveInOpenFraction * 100.0}%")
+                
+            valve_out_entry = main_window.findChild(QLineEdit, "valveOutEntry")
+            if valve_out_entry and hasattr(status, 'valveOutOpenFraction'):
+                valve_out_entry.blockSignals(True)
+                valve_out_entry.setText(str(round(status.valveOutOpenFraction * 100.0, 1)))
+                valve_out_entry.blockSignals(False)
+                logger.info(f"[LOAD]   valveOutEntry = {status.valveOutOpenFraction * 100.0}%")
+
         # Update GUI from config
         if hasattr(active_sim, 'config'):
             config = active_sim.config
@@ -1185,12 +1271,13 @@ def _populate_all_config_to_gui(main_window: Any) -> None:
             # Convert from liters to percentage of tank volume
             tank_volume = getattr(config, 'tankVolume', 200.0)
             trigger_pct = (trigger_liters / tank_volume * 100.0) if tank_volume > 0 else 90.0
-            logger.info(f"  [6/17] digitalLevelSensorHighTriggerLevel: {trigger_liters} L ({trigger_pct:.3f}%)")
+            trigger_pct_rounded = round(trigger_pct, 1)
+            logger.info(f"  [6/17] digitalLevelSensorHighTriggerLevel: {trigger_liters} L ({trigger_pct_rounded:.1f}%)")
             if hasattr(main_window, 'levelSwitchMaxHeightEntry'):
                 main_window.levelSwitchMaxHeightEntry.blockSignals(True)
-                main_window.levelSwitchMaxHeightEntry.setText(str(trigger_pct))
+                main_window.levelSwitchMaxHeightEntry.setText(str(trigger_pct_rounded))
                 main_window.levelSwitchMaxHeightEntry.blockSignals(False)
-                logger.info(f"    ✓ levelSwitchMaxHeightEntry = '{trigger_pct}%'")
+                logger.info(f"    ✓ levelSwitchMaxHeightEntry = '{trigger_pct_rounded}%'")
                 count += 1
 
         # 7. Digital Level Sensor Low Trigger (convert liters to percentage)
@@ -1200,12 +1287,13 @@ def _populate_all_config_to_gui(main_window: Any) -> None:
             # Convert from liters to percentage of tank volume
             tank_volume = getattr(config, 'tankVolume', 200.0)
             trigger_pct = (trigger_liters / tank_volume * 100.0) if tank_volume > 0 else 10.0
-            logger.info(f"  [7/17] digitalLevelSensorLowTriggerLevel: {trigger_liters} L ({trigger_pct:.3f}%)")
+            trigger_pct_rounded = round(trigger_pct, 1)
+            logger.info(f"  [7/17] digitalLevelSensorLowTriggerLevel: {trigger_liters} L ({trigger_pct_rounded:.1f}%)")
             if hasattr(main_window, 'levelSwitchMinHeightEntry'):
                 main_window.levelSwitchMinHeightEntry.blockSignals(True)
-                main_window.levelSwitchMinHeightEntry.setText(str(trigger_pct))
+                main_window.levelSwitchMinHeightEntry.setText(str(trigger_pct_rounded))
                 main_window.levelSwitchMinHeightEntry.blockSignals(False)
-                logger.info(f"    ✓ levelSwitchMinHeightEntry = '{trigger_pct}%'")
+                logger.info(f"    ✓ levelSwitchMinHeightEntry = '{trigger_pct_rounded}%'")
                 count += 1
 
         # 8. Heater Max Power (convert W to kW)
