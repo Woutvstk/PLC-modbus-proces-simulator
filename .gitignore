@@ -4,3 +4,4 @@ src/guiCommon/Resource_rc.py
 build
 dist
 src/IO/IO_configuration.json
+src/IO/IO_configuration.json

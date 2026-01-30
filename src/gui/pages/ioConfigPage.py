@@ -874,8 +874,8 @@ class IOScreen:
         self.byte_offsets = {
             'BoolInput': 0,
             'BoolOutput': 0,
-            'DWORDInput': 2,
-            'DWORDOutput': 2
+            'DWORDInput': 4,
+            'DWORDOutput': 4
         }
         
         self.config_file = Path("io_config.json")
@@ -1104,8 +1104,8 @@ class IOScreen:
         self.byte_offsets = {
             'BoolInput': 0,
             'BoolOutput': 0,
-            'DWORDInput': 2,
-            'DWORDOutput': 2
+            'DWORDInput': 4,
+            'DWORDOutput': 4
         }
         self.readdress_all_signals()
 
@@ -1811,8 +1811,8 @@ class IOConfigMixin:
         """Reset offsets to defaults"""
         self.QLineEdit_BoolInput.setText("0")
         self.QLineEdit_BoolOutput.setText("0")
-        self.QLineEdit_DWORDInput.setText("2")
-        self.QLineEdit_DWORDOutput.setText("2")
+        self.QLineEdit_DWORDInput.setText("4")
+        self.QLineEdit_DWORDOutput.setText("4")
         
         self.io_screen.reset_offsets_to_default()
         # Mark dirty due to offset changes
