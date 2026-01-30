@@ -1185,12 +1185,12 @@ def _populate_all_config_to_gui(main_window: Any) -> None:
             # Convert from liters to percentage of tank volume
             tank_volume = getattr(config, 'tankVolume', 200.0)
             trigger_pct = (trigger_liters / tank_volume * 100.0) if tank_volume > 0 else 90.0
-            logger.info(f"  [6/17] digitalLevelSensorHighTriggerLevel: {trigger_liters} L ({trigger_pct:.1f}%)")
+            logger.info(f"  [6/17] digitalLevelSensorHighTriggerLevel: {trigger_liters} L ({trigger_pct:.3f}%)")
             if hasattr(main_window, 'levelSwitchMaxHeightEntry'):
                 main_window.levelSwitchMaxHeightEntry.blockSignals(True)
-                main_window.levelSwitchMaxHeightEntry.setText(str(round(trigger_pct, 1)))
+                main_window.levelSwitchMaxHeightEntry.setText(str(trigger_pct))
                 main_window.levelSwitchMaxHeightEntry.blockSignals(False)
-                logger.info(f"    ✓ levelSwitchMaxHeightEntry = '{round(trigger_pct, 1)}%'")
+                logger.info(f"    ✓ levelSwitchMaxHeightEntry = '{trigger_pct}%'")
                 count += 1
 
         # 7. Digital Level Sensor Low Trigger (convert liters to percentage)
@@ -1200,24 +1200,24 @@ def _populate_all_config_to_gui(main_window: Any) -> None:
             # Convert from liters to percentage of tank volume
             tank_volume = getattr(config, 'tankVolume', 200.0)
             trigger_pct = (trigger_liters / tank_volume * 100.0) if tank_volume > 0 else 10.0
-            logger.info(f"  [7/17] digitalLevelSensorLowTriggerLevel: {trigger_liters} L ({trigger_pct:.1f}%)")
+            logger.info(f"  [7/17] digitalLevelSensorLowTriggerLevel: {trigger_liters} L ({trigger_pct:.3f}%)")
             if hasattr(main_window, 'levelSwitchMinHeightEntry'):
                 main_window.levelSwitchMinHeightEntry.blockSignals(True)
-                main_window.levelSwitchMinHeightEntry.setText(str(round(trigger_pct, 1)))
+                main_window.levelSwitchMinHeightEntry.setText(str(trigger_pct))
                 main_window.levelSwitchMinHeightEntry.blockSignals(False)
-                logger.info(f"    ✓ levelSwitchMinHeightEntry = '{round(trigger_pct, 1)}%'")
+                logger.info(f"    ✓ levelSwitchMinHeightEntry = '{trigger_pct}%'")
                 count += 1
 
         # 8. Heater Max Power (convert W to kW)
         if hasattr(config, 'heaterMaxPower'):
             print(f"Loading heaterMaxPower: {config.heaterMaxPower}")
-            power_kw = config.heaterMaxPower / 1000.0
-            logger.info(f"  [8/17] heaterMaxPower: {config.heaterMaxPower} W ({power_kw:.3f} kW)")
+            power_w = config.heaterMaxPower 
+            logger.info(f"  [8/17] heaterMaxPower: {config.heaterMaxPower} W ({power_w:.3f} W)")
             if hasattr(main_window, 'powerHeatingCoilEntry'):
                 main_window.powerHeatingCoilEntry.blockSignals(True)
-                main_window.powerHeatingCoilEntry.setText(str(round(power_kw, 2)))
+                main_window.powerHeatingCoilEntry.setText(str(round(power_w, 2)))
                 main_window.powerHeatingCoilEntry.blockSignals(False)
-                logger.info(f"    ✓ powerHeatingCoilEntry = '{round(power_kw, 2)}'")
+                logger.info(f"    ✓ powerHeatingCoilEntry = '{round(power_w, 2)}'")
                 count += 1
 
         # 9. Tank Heat Loss
@@ -1235,11 +1235,11 @@ def _populate_all_config_to_gui(main_window: Any) -> None:
         if hasattr(config, 'liquidSpecificHeatCapacity'):
             print(f"Loading liquidSpecificHeatCapacity: {config.liquidSpecificHeatCapacity}")
             logger.info(f"  [10/17] liquidSpecificHeatCapacity: {config.liquidSpecificHeatCapacity}")
-            if hasattr(main_window, 'specificHeatCapacityEntry'):
-                main_window.specificHeatCapacityEntry.blockSignals(True)
-                main_window.specificHeatCapacityEntry.setText(str(config.liquidSpecificHeatCapacity))
-                main_window.specificHeatCapacityEntry.blockSignals(False)
-                logger.info(f"    ✓ specificHeatCapacityEntry = '{config.liquidSpecificHeatCapacity}'")
+            if hasattr(main_window, 'specificHeatCapacity'):
+                main_window.specificHeatCapacity.blockSignals(True)
+                main_window.specificHeatCapacity.setText(str(config.liquidSpecificHeatCapacity))
+                main_window.specificHeatCapacity.blockSignals(False)
+                logger.info(f"    ✓ specificHeatCapacity = '{config.liquidSpecificHeatCapacity}'")
                 count += 1
 
         # 11. Liquid Boiling Temperature
@@ -1253,15 +1253,17 @@ def _populate_all_config_to_gui(main_window: Any) -> None:
                 logger.info(f"    ✓ boilingTempEntry = '{config.liquidBoilingTemp}'")
                 count += 1
 
-        # 12. Liquid Specific Weight
+        # 12. Liquid Specific Weight (stored as kg/L, display as kg/m³)
         if hasattr(config, 'liquidSpecificWeight'):
             print(f"Loading liquidSpecificWeight: {config.liquidSpecificWeight}")
-            logger.info(f"  [12/17] liquidSpecificWeight: {config.liquidSpecificWeight}")
+            # Convert from kg/L to kg/m³ for display
+            weight_kgm3 = config.liquidSpecificWeight * 1000.0
+            logger.info(f"  [12/17] liquidSpecificWeight: {config.liquidSpecificWeight} kg/L ({weight_kgm3} kg/m³)")
             if hasattr(main_window, 'specificWeightEntry'):
                 main_window.specificWeightEntry.blockSignals(True)
-                main_window.specificWeightEntry.setText(str(config.liquidSpecificWeight))
+                main_window.specificWeightEntry.setText(str(weight_kgm3))
                 main_window.specificWeightEntry.blockSignals(False)
-                logger.info(f"    ✓ specificWeightEntry = '{config.liquidSpecificWeight}'")
+                logger.info(f"    ✓ specificWeightEntry = '{weight_kgm3} kg/m³'")
                 count += 1
 
         # 13. Liquid Volume Time Delay

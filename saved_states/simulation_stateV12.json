@@ -1,6 +1,6 @@
 {
   "version": "2.0",
-  "timestamp": "2026-01-30T03:19:30.231555",
+  "timestamp": "2026-01-30T03:38:10.444962",
   "description": "PLC Simulator - Complete State Snapshot",
   "main_config": {
     "plcGuiControl": "plc",
@@ -20,18 +20,18 @@
     "valveInMaxFlow": 55.0,
     "valveOutMaxFlow": 55.0,
     "ambientTemp": 25.0,
-    "digitalLevelSensorHighTriggerLevel": 275.0,
+    "digitalLevelSensorHighTriggerLevel": 277.5,
     "digitalLevelSensorLowTriggerLevel": 25.0,
-    "heaterMaxPower": 5000.0,
+    "heaterMaxPower": 5069.0,
     "tankHeatLoss": 155.0,
-    "liquidSpecificHeatCapacity": 5.0,
+    "liquidSpecificHeatCapacity": 0.997,
     "liquidBoilingTemp": 5.0,
-    "liquidSpecificWeight": 5.0,
+    "liquidSpecificWeight": 0.005,
     "liquidVolumeTimeDelay": 5.0,
     "liquidTempTimeDelay": 5.0,
-    "tankColor": "#800080",
-    "displayLevelSwitches": false,
-    "displayTemperature": true
+    "tankColor": "#00FF00",
+    "displayLevelSwitches": true,
+    "displayTemperature": false
   },
   "simulation_status": {
     "liquidVolume": 100.0,

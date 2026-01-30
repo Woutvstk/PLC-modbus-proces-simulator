@@ -1086,12 +1086,12 @@ class TankSimSettingsMixin:
                     pass
 
                 try:
-                    # Specific weight (kg/L)
-                    # UI provides kg/L directly, store as-is
+                    # Density (kg/m³) mapped as specific weight (kg/L) if needed
+                    # UI provides kg/m³; convert to kg/L by dividing by 1000
                     if hasattr(self, 'specificWeightEntry'):
-                        rho_kgl = float(self.specificWeightEntry.text())
-                        if rho_kgl > 0:
-                            self.tanksim_config.liquidSpecificWeight = rho_kgl
+                        rho_m3 = float(self.specificWeightEntry.text())
+                        if rho_m3 > 0:
+                            self.tanksim_config.liquidSpecificWeight = rho_m3 / 1000.0
                 except Exception:
                     pass
 
