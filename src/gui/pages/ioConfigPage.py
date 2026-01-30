@@ -218,12 +218,24 @@ class DroppableTableWidget(QTableWidget):
             else:
                 return
             
+            # Set the internal format address first
             if new_address != current_address:
                 self.blockSignals(True)
                 self.setItem(row, 4, ReadOnlyTableWidgetItem(new_address))
                 self.blockSignals(False)
             
+            # Refresh ALL addresses to LOGO format (robust approach)
             if self.io_screen:
+                print(f"[DEBUG] on_item_changed: Refreshing all addresses to LOGO format")
+                self.io_screen.main_window._refresh_all_logo_addresses()
+                
+                # Get the updated address for conflict detection
+                addr_item = self.item(row, 4)
+                if addr_item:
+                    new_address = addr_item.text()
+            
+            if self.io_screen:
+                print(f"[DEBUG] on_item_changed: Calling conflict detection on {new_address}")
                 self.io_screen.validate_and_fix_manual_address(row)
             
             self._save_row_data(row)
@@ -882,7 +894,15 @@ class IOScreen:
         self.byte_offsets[offset_type] = value
     
     def is_address_in_use(self, address, exclude_row=None):
-        """Check if an address is already in use"""
+        """Check if an address is already in use
+        
+        Args:
+            address: The address to check (in whatever format it's stored in table)
+            exclude_row: Row to exclude from check (usually current row being edited)
+            
+        Returns:
+            Tuple of (bool: is_in_use, int: conflicting_row_number or None)
+        """
         table = self.main_window.tableWidget_IO
         
         for row in range(table.rowCount()):
@@ -890,7 +910,13 @@ class IOScreen:
                 continue
             
             addr_item = table.item(row, 4)
-            if addr_item and addr_item.text() == address:
+            if not addr_item:
+                continue
+            
+            table_address = addr_item.text()
+            
+            # Compare as-is (both should be in same format - LOGO in LOGO mode, internal in PLC mode)
+            if table_address == address:
                 return True, row
         
         return False, None
@@ -903,38 +929,64 @@ class IOScreen:
         type_item = table.item(row, 1)
         addr_item = table.item(row, 4)
         
-        if not byte_item or not type_item:
+        if not byte_item or not type_item or not addr_item:
             return
         
         old_row_data = table.row_data.get(row, {})
         
         try:
             data_type = type_item.text()
-            current_addr = addr_item.text() if addr_item else ""
-            if not current_addr:
+            
+            # Read the proposed address directly from table (already in correct format - LOGO or internal)
+            proposed_address = addr_item.text()
+            if not proposed_address:
                 return
             
-            io_prefix = current_addr[0]
-            byte_num = int(byte_item.text()) if byte_item.text() else 0
+            # Debug output
+            print(f"[DEBUG] Conflict check running for {'output' if 'Q' in proposed_address or 'AQ' in proposed_address else 'input'}: {proposed_address}")
             
-            if data_type == 'bool':
-                bit_item = table.item(row, 3)
-                bit_num = int(bit_item.text()) if bit_item and bit_item.text() else 0
-                proposed_address = f"{io_prefix}{byte_num}.{bit_num}"
-            elif data_type in ['int', 'word']:
-                proposed_address = f"{io_prefix}W{byte_num}"
+            in_use, conflict_row = self.is_address_in_use(proposed_address, exclude_row=row)
+            
+            print(f"[DEBUG] Conflict detected: {'yes' if in_use else 'no'}")
+            
+            if in_use and conflict_row is not None:
+                # Address conflict detected - reassign the conflicting tag to a free address
+                conflict_type_item = table.item(conflict_row, 1)
+                conflict_addr_item = table.item(conflict_row, 4)
+                
+                if conflict_type_item and conflict_addr_item:
+                    conflict_data_type = conflict_type_item.text()
+                    conflict_current_addr = conflict_addr_item.text()
+                    conflict_io_prefix = conflict_current_addr[0] if conflict_current_addr else 'I'
+                    
+                    # Find free address for the conflicting tag
+                    free_byte, free_bit, free_address = table.find_free_address(conflict_io_prefix, conflict_data_type)
+                    
+                    print(f"[DEBUG] Reassigning conflicting tag from {conflict_current_addr} to byte {free_byte}, bit {free_bit}")
+                    
+                    # Reassign the conflicting tag
+                    table.blockSignals(True)
+                    table.setItem(conflict_row, 2, EditableTableWidgetItem(str(free_byte)))
+                    if free_bit is not None:
+                        table.setItem(conflict_row, 3, EditableTableWidgetItem(str(free_bit)))
+                    else:
+                        table.setItem(conflict_row, 3, EditableTableWidgetItem(""))
+                    table.setItem(conflict_row, 4, ReadOnlyTableWidgetItem(free_address))
+                    
+                    print(f"[DEBUG] Reassigning conflicting tag from {conflict_current_addr} to byte {free_byte}, bit {free_bit}")
+                    
+                    table.blockSignals(False)
+                    
+                    # Refresh ALL addresses to LOGO format (includes the reassigned one)
+                    self.main_window._refresh_all_logo_addresses()
+                    
+                    table._save_row_data(conflict_row)
+                    
+                    # Now allow the current row to take the desired address
+                    table._save_row_data(row)
+                    self.save_configuration()
             else:
-                return
-            
-            in_use, _ = self.is_address_in_use(proposed_address, exclude_row=row)
-            
-            if in_use:
-                old_address = old_row_data.get(4, "")
-                table.blockSignals(True)
-                if addr_item:
-                    addr_item.setText(old_address)
-                table.blockSignals(False)
-            else:
+                # No conflict - just save
                 table._save_row_data(row)
                 self.save_configuration()
             
@@ -991,10 +1043,32 @@ class IOScreen:
             if name_item and name_item.text() and type_item and type_item.text():
                 addr_item = table.item(row, 4)
                 if addr_item and addr_item.text():
+                    address_text = addr_item.text()
+                    
+                    # Detect tag type from address format
+                    if address_text.startswith('V') and not address_text.startswith('VW'):
+                        # V0.0, V0.1 → digital input
+                        io_prefix = 'I'
+                    elif address_text.startswith('VW') or address_text.startswith('IW'):
+                        # VW2, VW4, IW2 → analog input
+                        io_prefix = 'I'
+                    elif address_text.startswith('Q') and not address_text.startswith('QW'):
+                        # Q1, Q2 → digital output (already correct)
+                        io_prefix = 'Q'
+                    elif address_text.startswith('AQ') or address_text.startswith('QW'):
+                        # AQ1, AQ2, QW2, QW4 → analog output
+                        io_prefix = 'Q'
+                    elif address_text.startswith('I'):
+                        # I0.0, I0.1 → digital input (PLC mode)
+                        io_prefix = 'I'
+                    else:
+                        # Default fallback
+                        io_prefix = address_text[0]
+                    
                     signals_to_readdress.append({
                         'row': row,
                         'type': type_item.text(),
-                        'io_prefix': addr_item.text()[0]
+                        'io_prefix': io_prefix
                     })
         
         # Clear existing address info to free up space
@@ -1090,6 +1164,207 @@ class IOConfigMixin:
                 return f"V{byte_num}.{bit_num}"
             else:
                 return f"VW{byte_num}"
+    
+    def _logo_address_to_internal(self, logo_address, attr_name):
+        """Convert LOGO display address back to internal format for comparison
+        
+        Args:
+            logo_address: LOGO format address (e.g., "Q1", "AQ2", "V0.0")
+            attr_name: The attribute name (e.g., "DQ_motorStartCmd")
+            
+        Returns:
+            Internal format address (e.g., "Q0.0", "QW2", "I0.0")
+        """
+        try:
+            # Digital Outputs: Q1 -> Q0.0, Q2 -> Q0.1, etc.
+            if logo_address.startswith('Q') and not logo_address.startswith('QW'):
+                q_num = int(logo_address[1:])
+                byte_num = 0
+                bit_num = q_num - 1
+                return f"Q{byte_num}.{bit_num}"
+            
+            # Analog Outputs: AQ1 -> QW2, AQ2 -> QW4, etc.
+            elif logo_address.startswith('AQ'):
+                aq_num = int(logo_address[2:])
+                byte_num = (aq_num - 1) * 2 + 2
+                return f"QW{byte_num}"
+            
+            # Inputs: V0.0 -> I0.0, V0.1 -> I0.1, etc.
+            elif logo_address.startswith('V') and '.' in logo_address:
+                parts = logo_address[1:].split('.')
+                return f"I{parts[0]}.{parts[1]}"
+            
+            # Analog Inputs: VW0 -> IW0, VW2 -> IW2, etc.
+            elif logo_address.startswith('VW'):
+                byte_num = logo_address[2:]
+                return f"IW{byte_num}"
+            
+            # Already internal format or unknown - return as-is
+            else:
+                return logo_address
+                
+        except Exception:
+            return logo_address
+    
+    def _refresh_all_logo_addresses(self):
+        """Refresh ALL address cells in the table to LOGO format if in LOGO mode
+        Call this after any address change or after loading tags
+        """
+        table = None
+        try:
+            # Check if we're in LOGO mode
+            is_logo = False
+            if hasattr(self, 'mainConfig') and self.mainConfig:
+                is_logo = (self.mainConfig.plcProtocol == "logo!")
+            
+            if not is_logo:
+                print(f"[DEBUG] _refresh_all_logo_addresses: Not in LOGO mode, skipping")
+                return
+            
+            # Get table - this method is on MainWindow (IOConfigMixin)
+            table = self.tableWidget_IO
+            if not table:
+                return
+            
+            print(f"[DEBUG] _refresh_all_logo_addresses: Starting refresh for {table.rowCount()} rows")
+            
+            table.blockSignals(True)
+            
+            for row in range(table.rowCount()):
+                name_item = table.item(row, 0)
+                if not name_item or not name_item.text():
+                    continue
+                
+                # Get signal mapping
+                signal_name = name_item.data(Qt.UserRole) if name_item.data(Qt.UserRole) else name_item.text()
+                if signal_name not in self.tanksim_config.io_signal_mapping:
+                    continue
+                
+                attr_name = self.tanksim_config.io_signal_mapping[signal_name]
+                
+                # Get byte and bit from table
+                byte_item = table.item(row, 2)
+                bit_item = table.item(row, 3)
+                
+                if not byte_item or not byte_item.text():
+                    continue
+                
+                byte_num = int(byte_item.text())
+                bit_num = None
+                if bit_item and bit_item.text():
+                    bit_num = int(bit_item.text())
+                
+                # Convert to LOGO display format
+                if bit_num is not None:
+                    logo_address = self._get_logo_display_address(attr_name, byte_num, bit_num)
+                else:
+                    logo_address = self._get_logo_display_address(attr_name, byte_num, None)
+                
+                # Update address cell
+                table.setItem(row, 4, ReadOnlyTableWidgetItem(logo_address))
+            
+            table.blockSignals(False)
+            
+            print(f"[DEBUG] _refresh_all_logo_addresses: Refresh complete")
+            
+        except Exception as e:
+            print(f"[DEBUG ERROR] _refresh_all_logo_addresses failed: {str(e)}")
+            if table and hasattr(table, 'blockSignals'):
+                table.blockSignals(False)
+    
+    def _logo_address_to_internal(self, logo_address, attr_name):
+        """Convert LOGO display address back to internal format for comparison
+        
+        Args:
+            logo_address: LOGO format address (e.g., "Q1", "AQ2", "V0.0")
+            attr_name: The attribute name (e.g., "DQ_motorStartCmd")
+            
+        Returns:
+            Internal format address (e.g., "Q0.0", "QW2", "I0.0")
+        """
+        try:
+            # Digital Outputs: Q1 -> Q0.0, Q2 -> Q0.1, etc.
+            if logo_address.startswith('Q') and not logo_address.startswith('QW'):
+                q_num = int(logo_address[1:])
+                byte_num = 0
+                bit_num = q_num - 1
+                return f"Q{byte_num}.{bit_num}"
+            
+            # Analog Outputs: AQ1 -> QW2, AQ2 -> QW4, etc.
+            elif logo_address.startswith('AQ'):
+                aq_num = int(logo_address[2:])
+                byte_num = (aq_num - 1) * 2 + 2
+                return f"QW{byte_num}"
+            
+            # Inputs: V0.0 -> I0.0, V0.1 -> I0.1, etc.
+            elif logo_address.startswith('V') and '.' in logo_address:
+                parts = logo_address[1:].split('.')
+                return f"I{parts[0]}.{parts[1]}"
+            
+            # Analog Inputs: VW0 -> IW0, VW2 -> IW2, etc.
+            elif logo_address.startswith('VW'):
+                byte_num = logo_address[2:]
+                return f"IW{byte_num}"
+            
+            # Already internal format or unknown - return as-is
+            else:
+                return logo_address
+                
+        except Exception:
+            return logo_address
+    
+    def _refresh_logo_address_display(self, row):
+        """Refresh the LOGO display format for a specific table row
+        
+        Args:
+            row: The row number to refresh
+        """
+        try:
+            table = self.tableWidget_IO
+            config = self.tanksim_config
+            
+            if not config:
+                return
+            
+            name_item = table.item(row, 0)
+            if not name_item or not name_item.text():
+                return
+            
+            # Use canonical name for lookup
+            signal_name = name_item.data(Qt.UserRole) if name_item.data(Qt.UserRole) else name_item.text()
+            
+            if signal_name not in config.io_signal_mapping:
+                return
+            
+            attr_name = config.io_signal_mapping[signal_name]
+            
+            # Get byte and bit from table
+            byte_item = table.item(row, 2)
+            bit_item = table.item(row, 3)
+            
+            if not byte_item or not byte_item.text():
+                return
+            
+            byte_num = int(byte_item.text())
+            bit_num = None
+            
+            if bit_item and bit_item.text():
+                bit_num = int(bit_item.text())
+            
+            # Get LOGO display address
+            logo_address = self._get_logo_display_address(attr_name, byte_num, bit_num)
+            
+            print(f"[DEBUG] Interpolator refresh called for row {row}: {logo_address}")
+            print(f"[DEBUG] Table updated with new address: {logo_address}")
+            
+            # Update ADDRESS column with LOGO format
+            table.blockSignals(True)
+            table.setItem(row, 4, ReadOnlyTableWidgetItem(logo_address))
+            table.blockSignals(False)
+            
+        except Exception as e:
+            print(f"[DEBUG ERROR] Interpolator refresh failed: {str(e)}")
+            pass
     
     def init_io_config_page(self):
         """Initialize all I/O config page components"""
@@ -1465,6 +1740,11 @@ class IOConfigMixin:
             
             table.blockSignals(False)
             
+            # Refresh ALL addresses to LOGO format after loading tags
+            if self.io_screen:
+                print(f"[DEBUG] load_all_tags_to_table: Refreshing all addresses to LOGO format")
+                self.io_screen.main_window._refresh_all_logo_addresses()
+            
             # Save configuration
             if self.io_screen:
                 self.io_screen.save_configuration()
@@ -1511,7 +1791,13 @@ class IOConfigMixin:
                 'DWORDOutput': new_dword_output
             }
             
+            print(f"[DEBUG] apply_offsets: Readdressing all signals with new offsets")
             self.io_screen.readdress_all_signals()
+            
+            # Refresh all addresses to LOGO format if in LOGO mode
+            print(f"[DEBUG] apply_offsets: Refreshing all addresses to LOGO format")
+            self._refresh_all_logo_addresses()
+            
             # Mark dirty due to offset changes
             try:
                 self._mark_io_dirty()
@@ -1797,8 +2083,14 @@ class IOConfigMixin:
             except Exception as e:
                 pass
             
-            # STEP 5: Update table from reloaded config
-            self._update_table_from_config()
+            # STEP 4b: Readdress all signals based on new offsets
+            print(f"[DEBUG] reload_io_config: Readdressing all signals with new offsets")
+            self.io_screen.readdress_all_signals()
+            
+            # STEP 5: Refresh all addresses to LOGO format if in LOGO mode
+            # (Skip _update_table_from_config because it would overwrite the readdressed values)
+            print(f"[DEBUG] reload_io_config: Refreshing all addresses to LOGO format after readdressing")
+            self._refresh_all_logo_addresses()
             
             if not skip_confirmation:
                 QMessageBox.information(self, "Success", "Configuration activated and reloaded successfully")
@@ -1936,8 +2228,12 @@ class IOConfigMixin:
             except Exception as e:
                 return  # Silent fail
             
-            # STEP 5: Update table from reloaded config
-            self._update_table_from_config()
+            # STEP 4b: Readdress all signals based on new offsets
+            self.io_screen.readdress_all_signals()
+            
+            # STEP 5: Refresh all addresses to LOGO format if in LOGO mode
+            # (Skip _update_table_from_config because it would overwrite the readdressed values)
+            self._refresh_all_logo_addresses()
             
             # Auto-reload activates config; clear dirty state (silent success)
             try:

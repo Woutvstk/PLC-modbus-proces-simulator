@@ -294,18 +294,18 @@ class VatWidget(QWidget):
         else:
             self.setGroupColor("tagTempValue", RED)
 
-        self.setSVGText("adjustableValveInValue", str(
-            self.adjustableValveInValue) + "%")
-        self.setSVGText("adjustableValveOutValue", str(
-            self.adjustableValveOutValue) + "%")
-        self.setSVGText("valveInMaxFlowValue", str(
-            self.valveInMaxFlowValue) + "l/s")
-        self.setSVGText("valveOutMaxFlowValue", str(
-            self.valveOutMaxFlowValue) + "l/s")
-        self.setSVGText("levelSwitchMinHeight", str(
-            self.levelSwitchMinHeight) + "%")
-        self.setSVGText("levelSwitchMaxHeight", str(
-            self.levelSwitchMaxHeight) + "%")
+        self.setSVGText("adjustableValveInValue", 
+            f"{self.adjustableValveInValue:.1f}%")
+        self.setSVGText("adjustableValveOutValue", 
+            f"{self.adjustableValveOutValue:.1f}%")
+        self.setSVGText("valveInMaxFlowValue", 
+            f"{self.valveInMaxFlowValue:.1f}l/s")
+        self.setSVGText("valveOutMaxFlowValue", 
+            f"{self.valveOutMaxFlowValue:.1f}l/s")
+        self.setSVGText("levelSwitchMinHeight", 
+            f"{self.levelSwitchMinHeight:.1f}%")
+        self.setSVGText("levelSwitchMaxHeight", 
+            f"{self.levelSwitchMaxHeight:.1f}%")
         # Calculate actual power delivered to heating coil (0 to max)
         actual_power = self.powerValue * self.heaterPowerFraction
         self.setSVGText("powerValue",
@@ -530,7 +530,7 @@ class VatWidget(QWidget):
             self.waterInVat.set("y", str(newY))
         self.setHightIndicator("levelIndicator", newY)
         self.setHightIndicator("levelValue", newY + 2)
-        self.setSVGText("levelValue", str(int(level_percentage)) + "%")
+        self.setSVGText("levelValue", f"{level_percentage:.1f}%")
 
     def setHightIndicator(self, itemId, hoogte):
         """Set the Y-position of an indicator"""
