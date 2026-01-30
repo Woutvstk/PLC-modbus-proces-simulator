@@ -167,9 +167,123 @@ class SaveLoadMixin:
                         except Exception as e:
                             logger.warning(f"    Could not sync PID control states: {e}", exc_info=True)
                     
-                    # Sync GUI display settings to config before saving
+                    # Sync GUI display settings and configuration parameters to config before saving
                     if active_sim and hasattr(active_sim, 'config'):
                         try:
+                            # Tank volume (convert m³ to liters)
+                            volumeEntry = self.findChild(QLineEdit, "volumeEntry")
+                            if volumeEntry and volumeEntry.text():
+                                try:
+                                    volume_m3 = float(volumeEntry.text())
+                                    active_sim.config.tankVolume = volume_m3 * 1000.0  # Convert m³ to L
+                                    logger.info(f"    ✓ Synced tankVolume: {volume_m3} m³ ({active_sim.config.tankVolume} L)")
+                                except ValueError:
+                                    pass
+                            
+                            # Flow rates
+                            maxFlowInEntry = self.findChild(QLineEdit, "maxFlowInEntry")
+                            if maxFlowInEntry and maxFlowInEntry.text():
+                                try:
+                                    active_sim.config.valveInMaxFlow = float(maxFlowInEntry.text())
+                                    logger.info(f"    ✓ Synced valveInMaxFlow: {active_sim.config.valveInMaxFlow}")
+                                except ValueError:
+                                    pass
+                            
+                            maxFlowOutEntry = self.findChild(QLineEdit, "maxFlowOutEntry")
+                            if maxFlowOutEntry and maxFlowOutEntry.text():
+                                try:
+                                    active_sim.config.valveOutMaxFlow = float(maxFlowOutEntry.text())
+                                    logger.info(f"    ✓ Synced valveOutMaxFlow: {active_sim.config.valveOutMaxFlow}")
+                                except ValueError:
+                                    pass
+                            
+                            # Ambient temperature
+                            ambientTempEntry = self.findChild(QLineEdit, "ambientTempEntry")
+                            if ambientTempEntry and ambientTempEntry.text():
+                                try:
+                                    active_sim.config.ambientTemp = float(ambientTempEntry.text())
+                                    logger.info(f"    ✓ Synced ambientTemp: {active_sim.config.ambientTemp}")
+                                except ValueError:
+                                    pass
+                            
+                            # Heater power (convert kW to W)
+                            powerHeatingCoilEntry = self.findChild(QLineEdit, "powerHeatingCoilEntry")
+                            if powerHeatingCoilEntry and powerHeatingCoilEntry.text():
+                                try:
+                                    power_kw = float(powerHeatingCoilEntry.text())
+                                    active_sim.config.heaterMaxPower = power_kw * 1000.0  # Convert kW to W
+                                    logger.info(f"    ✓ Synced heaterMaxPower: {power_kw} kW ({active_sim.config.heaterMaxPower} W)")
+                                except ValueError:
+                                    pass
+                            
+                            # Heat loss
+                            heatLossVatEntry = self.findChild(QLineEdit, "heatLossVatEntry")
+                            if heatLossVatEntry and heatLossVatEntry.text():
+                                try:
+                                    active_sim.config.tankHeatLoss = float(heatLossVatEntry.text())
+                                    logger.info(f"    ✓ Synced tankHeatLoss: {active_sim.config.tankHeatLoss}")
+                                except ValueError:
+                                    pass
+                            
+                            # Level sensor thresholds
+                            levelSwitchMaxHeightEntry = self.findChild(QLineEdit, "levelSwitchMaxHeightEntry")
+                            if levelSwitchMaxHeightEntry and levelSwitchMaxHeightEntry.text():
+                                try:
+                                    active_sim.config.digitalLevelSensorHighTriggerLevel = float(levelSwitchMaxHeightEntry.text())
+                                    logger.info(f"    ✓ Synced digitalLevelSensorHighTriggerLevel: {active_sim.config.digitalLevelSensorHighTriggerLevel}")
+                                except ValueError:
+                                    pass
+                            
+                            levelSwitchMinHeightEntry = self.findChild(QLineEdit, "levelSwitchMinHeightEntry")
+                            if levelSwitchMinHeightEntry and levelSwitchMinHeightEntry.text():
+                                try:
+                                    active_sim.config.digitalLevelSensorLowTriggerLevel = float(levelSwitchMinHeightEntry.text())
+                                    logger.info(f"    ✓ Synced digitalLevelSensorLowTriggerLevel: {active_sim.config.digitalLevelSensorLowTriggerLevel}")
+                                except ValueError:
+                                    pass
+                            
+                            # Liquid properties
+                            specificHeatCapacityEntry = self.findChild(QLineEdit, "specificHeatCapacityEntry")
+                            if specificHeatCapacityEntry and specificHeatCapacityEntry.text():
+                                try:
+                                    active_sim.config.liquidSpecificHeatCapacity = float(specificHeatCapacityEntry.text())
+                                    logger.info(f"    ✓ Synced liquidSpecificHeatCapacity: {active_sim.config.liquidSpecificHeatCapacity}")
+                                except ValueError:
+                                    pass
+                            
+                            specificWeightEntry = self.findChild(QLineEdit, "specificWeightEntry")
+                            if specificWeightEntry and specificWeightEntry.text():
+                                try:
+                                    active_sim.config.liquidSpecificWeight = float(specificWeightEntry.text())
+                                    logger.info(f"    ✓ Synced liquidSpecificWeight: {active_sim.config.liquidSpecificWeight}")
+                                except ValueError:
+                                    pass
+                            
+                            boilingTempEntry = self.findChild(QLineEdit, "boilingTempEntry")
+                            if boilingTempEntry and boilingTempEntry.text():
+                                try:
+                                    active_sim.config.liquidBoilingTemp = float(boilingTempEntry.text())
+                                    logger.info(f"    ✓ Synced liquidBoilingTemp: {active_sim.config.liquidBoilingTemp}")
+                                except ValueError:
+                                    pass
+                            
+                            # Time delays
+                            timeDelayfillingEntry = self.findChild(QLineEdit, "timeDelayfillingEntry")
+                            if timeDelayfillingEntry and timeDelayfillingEntry.text():
+                                try:
+                                    active_sim.config.liquidVolumeTimeDelay = float(timeDelayfillingEntry.text())
+                                    logger.info(f"    ✓ Synced liquidVolumeTimeDelay: {active_sim.config.liquidVolumeTimeDelay}")
+                                except ValueError:
+                                    pass
+                            
+                            timeDelayTempEntry = self.findChild(QLineEdit, "timeDelayTempEntry")
+                            if timeDelayTempEntry and timeDelayTempEntry.text():
+                                try:
+                                    active_sim.config.liquidTempTimeDelay = float(timeDelayTempEntry.text())
+                                    logger.info(f"    ✓ Synced liquidTempTimeDelay: {active_sim.config.liquidTempTimeDelay}")
+                                except ValueError:
+                                    pass
+                            
                             # Tank color from dropdown
                             if hasattr(self, 'colorDropDown') and self.colorDropDown:
                                 tank_color = self.colorDropDown.currentData()
@@ -177,16 +291,24 @@ class SaveLoadMixin:
                                     active_sim.config.tankColor = tank_color
                                     logger.info(f"    ✓ Synced tankColor: {tank_color}")
                             
+<<<<<<< Updated upstream
                             # Display checkboxes
                             if hasattr(self, 'levelSwitchesCheckBox') and self.levelSwitchesCheckBox:
                                 active_sim.config.displayLevelSwitches = self.levelSwitchesCheckBox.isChecked()
                                 logger.info(f"    ✓ Synced displayLevelSwitches: {self.levelSwitchesCheckBox.isChecked()}")
+=======
+                            # Display checkboxes - CRITICAL FIX
+                            levelSwitchesCheckBox = self.findChild(QWidget, "levelSwitchesCheckBox")
+                            if levelSwitchesCheckBox:
+                                active_sim.config.displayLevelSwitches = levelSwitchesCheckBox.isChecked()
+                                logger.info(f"    ✓ Synced displayLevelSwitches: {levelSwitchesCheckBox.isChecked()}")
+>>>>>>> Stashed changes
                             
                             if hasattr(self, 'analogValueTempCheckBox') and self.analogValueTempCheckBox:
                                 active_sim.config.displayTemperature = self.analogValueTempCheckBox.isChecked()
                                 logger.info(f"    ✓ Synced displayTemperature: {self.analogValueTempCheckBox.isChecked()}")
                         except Exception as e:
-                            logger.warning(f"    Could not sync GUI display settings: {e}", exc_info=True)
+                            logger.warning(f"    Could not sync configuration to config object: {e}", exc_info=True)
             except Exception as e:
                 logger.warning(f"Could not sync status/config before save: {e}", exc_info=True)
             
@@ -523,6 +645,7 @@ class SaveLoadMixin:
             
             logger.info(">>> apply_loaded_state_to_gui: Starting to apply loaded config/status to GUI fields...")
             
+<<<<<<< Updated upstream
             # SECTION 1: Apply configuration values to entry fields
             if config:
                 try:
@@ -536,21 +659,56 @@ class SaveLoadMixin:
                         self.volumeEntry.blockSignals(False)
                         logger.info(f"    ✓ tankVolume: {config.tankVolume} L")
                         count += 1
+=======
+            # Debug: Check if simSettings page is available
+            if not hasattr(self, 'volumeEntry'):
+                logger.warning(">>> apply_loaded_state_to_gui: volumeEntry not found - GUI may not be initialized")
+                logger.info(">>> Attempting to find widgets from simSettings mixin...")
+            
+            # SECTION 1: Apply configuration values to entry fields
+            if config:
+                try:
+                    # Tank parameters
+                    if hasattr(config, 'tankVolume'):
+                        volume_m3 = config.tankVolume / 1000.0  # Convert liters to m³
+                        if hasattr(self, 'volumeEntry') and self.volumeEntry:
+                            self.volumeEntry.blockSignals(True)
+                            self.volumeEntry.setText(str(round(volume_m3, 2)))
+                            self.volumeEntry.blockSignals(False)
+                            logger.info(f"    ✓ tankVolume: {config.tankVolume} L ({volume_m3:.2f} m³)")
+                        else:
+                            logger.warning(f"    ⚠ volumeEntry widget not found, skipping")
+>>>>>>> Stashed changes
                     
                     # Flow rates
                     if hasattr(config, 'valveInMaxFlow') and hasattr(self, 'maxFlowInEntry'):
                         self.maxFlowInEntry.blockSignals(True)
                         self.maxFlowInEntry.setText(str(config.valveInMaxFlow))
                         self.maxFlowInEntry.blockSignals(False)
+<<<<<<< Updated upstream
                         logger.info(f"    ✓ valveInMaxFlow: {config.valveInMaxFlow}")
                         count += 1
+=======
+                        # Sync to linked fields
+                        if hasattr(self, 'maxFlowInEntry1') and hasattr(self, 'maxFlowInEntry2'):
+                            self.maxFlowInEntry1.blockSignals(True)
+                            self.maxFlowInEntry1.setText(str(config.valveInMaxFlow))
+                            self.maxFlowInEntry1.blockSignals(False)
+                            self.maxFlowInEntry2.blockSignals(True)
+                            self.maxFlowInEntry2.setText(str(config.valveInMaxFlow))
+                            self.maxFlowInEntry2.blockSignals(False)
+                        logger.info(f"    ✓ valveInMaxFlow: {config.valveInMaxFlow}")
+>>>>>>> Stashed changes
                     
                     if hasattr(config, 'valveOutMaxFlow') and hasattr(self, 'maxFlowOutEntry'):
                         self.maxFlowOutEntry.blockSignals(True)
                         self.maxFlowOutEntry.setText(str(config.valveOutMaxFlow))
                         self.maxFlowOutEntry.blockSignals(False)
                         logger.info(f"    ✓ valveOutMaxFlow: {config.valveOutMaxFlow}")
+<<<<<<< Updated upstream
                         count += 1
+=======
+>>>>>>> Stashed changes
                     
                     # Ambient temperature
                     if hasattr(config, 'ambientTemp') and hasattr(self, 'ambientTempEntry'):
@@ -558,16 +716,78 @@ class SaveLoadMixin:
                         self.ambientTempEntry.setText(str(config.ambientTemp))
                         self.ambientTempEntry.blockSignals(False)
                         logger.info(f"    ✓ ambientTemp: {config.ambientTemp}")
+<<<<<<< Updated upstream
                         count += 1
                     
                     # Heater power (convert W to kW)
                     if hasattr(config, 'heaterMaxPower') and hasattr(self, 'powerHeatingCoilEntry'):
                         power_kw = config.heaterMaxPower / 1000.0
+=======
+                    
+                    # Heater power
+                    if hasattr(config, 'heaterMaxPower') and hasattr(self, 'powerHeatingCoilEntry'):
+                        power_kw = config.heaterMaxPower / 1000.0  # Convert W to kW
+>>>>>>> Stashed changes
                         self.powerHeatingCoilEntry.blockSignals(True)
                         self.powerHeatingCoilEntry.setText(str(round(power_kw, 2)))
                         self.powerHeatingCoilEntry.blockSignals(False)
                         logger.info(f"    ✓ heaterMaxPower: {config.heaterMaxPower} W")
+<<<<<<< Updated upstream
                         count += 1
+=======
+                    
+                    # Heat loss
+                    if hasattr(config, 'tankHeatLoss') and hasattr(self, 'heatLossVatEntry'):
+                        self.heatLossVatEntry.blockSignals(True)
+                        self.heatLossVatEntry.setText(str(config.tankHeatLoss))
+                        self.heatLossVatEntry.blockSignals(False)
+                        logger.info(f"    ✓ tankHeatLoss: {config.tankHeatLoss}")
+                    
+                    # Level sensor thresholds
+                    if hasattr(config, 'digitalLevelSensorHighTriggerLevel') and hasattr(self, 'levelSwitchMaxHeightEntry'):
+                        self.levelSwitchMaxHeightEntry.blockSignals(True)
+                        self.levelSwitchMaxHeightEntry.setText(str(config.digitalLevelSensorHighTriggerLevel))
+                        self.levelSwitchMaxHeightEntry.blockSignals(False)
+                        logger.info(f"    ✓ digitalLevelSensorHighTriggerLevel: {config.digitalLevelSensorHighTriggerLevel}")
+                    
+                    if hasattr(config, 'digitalLevelSensorLowTriggerLevel') and hasattr(self, 'levelSwitchMinHeightEntry'):
+                        self.levelSwitchMinHeightEntry.blockSignals(True)
+                        self.levelSwitchMinHeightEntry.setText(str(config.digitalLevelSensorLowTriggerLevel))
+                        self.levelSwitchMinHeightEntry.blockSignals(False)
+                        logger.info(f"    ✓ digitalLevelSensorLowTriggerLevel: {config.digitalLevelSensorLowTriggerLevel}")
+                    
+                    # Liquid properties
+                    if hasattr(config, 'liquidSpecificHeatCapacity') and hasattr(self, 'specificHeatCapacityEntry'):
+                        self.specificHeatCapacityEntry.blockSignals(True)
+                        self.specificHeatCapacityEntry.setText(str(config.liquidSpecificHeatCapacity))
+                        self.specificHeatCapacityEntry.blockSignals(False)
+                        logger.info(f"    ✓ liquidSpecificHeatCapacity: {config.liquidSpecificHeatCapacity}")
+                    
+                    if hasattr(config, 'liquidSpecificWeight') and hasattr(self, 'specificWeightEntry'):
+                        self.specificWeightEntry.blockSignals(True)
+                        self.specificWeightEntry.setText(str(config.liquidSpecificWeight))
+                        self.specificWeightEntry.blockSignals(False)
+                        logger.info(f"    ✓ liquidSpecificWeight: {config.liquidSpecificWeight}")
+                    
+                    if hasattr(config, 'liquidBoilingTemp') and hasattr(self, 'boilingTempEntry'):
+                        self.boilingTempEntry.blockSignals(True)
+                        self.boilingTempEntry.setText(str(config.liquidBoilingTemp))
+                        self.boilingTempEntry.blockSignals(False)
+                        logger.info(f"    ✓ liquidBoilingTemp: {config.liquidBoilingTemp}")
+                    
+                    # Time delays
+                    if hasattr(config, 'liquidVolumeTimeDelay') and hasattr(self, 'timeDelayfillingEntry'):
+                        self.timeDelayfillingEntry.blockSignals(True)
+                        self.timeDelayfillingEntry.setText(str(config.liquidVolumeTimeDelay))
+                        self.timeDelayfillingEntry.blockSignals(False)
+                        logger.info(f"    ✓ liquidVolumeTimeDelay: {config.liquidVolumeTimeDelay}")
+                    
+                    if hasattr(config, 'liquidTempTimeDelay') and hasattr(self, 'timeDelayTempEntry'):
+                        self.timeDelayTempEntry.blockSignals(True)
+                        self.timeDelayTempEntry.setText(str(config.liquidTempTimeDelay))
+                        self.timeDelayTempEntry.blockSignals(False)
+                        logger.info(f"    ✓ liquidTempTimeDelay: {config.liquidTempTimeDelay}")
+>>>>>>> Stashed changes
                     
                     # Tank color
                     if hasattr(config, 'tankColor') and hasattr(self, 'colorDropDown'):
@@ -577,25 +797,37 @@ class SaveLoadMixin:
                                 self.colorDropDown.setCurrentIndex(i)
                                 self.colorDropDown.blockSignals(False)
                                 logger.info(f"    ✓ tankColor: {config.tankColor}")
+<<<<<<< Updated upstream
                                 count += 1
                                 break
                     
                     # Display checkboxes
+=======
+                                break
+                    
+                    # CRITICAL: Display checkboxes
+>>>>>>> Stashed changes
                     if hasattr(config, 'displayLevelSwitches') and hasattr(self, 'levelSwitchesCheckBox'):
                         self.levelSwitchesCheckBox.blockSignals(True)
                         self.levelSwitchesCheckBox.setChecked(config.displayLevelSwitches)
                         self.levelSwitchesCheckBox.blockSignals(False)
                         logger.info(f"    ✓ displayLevelSwitches: {config.displayLevelSwitches}")
+<<<<<<< Updated upstream
                         count += 1
+=======
+>>>>>>> Stashed changes
                     
                     if hasattr(config, 'displayTemperature') and hasattr(self, 'analogValueTempCheckBox'):
                         self.analogValueTempCheckBox.blockSignals(True)
                         self.analogValueTempCheckBox.setChecked(config.displayTemperature)
                         self.analogValueTempCheckBox.blockSignals(False)
                         logger.info(f"    ✓ displayTemperature: {config.displayTemperature}")
+<<<<<<< Updated upstream
                         count += 1
                     
                     logger.info(f">>> Config values applied: {count} fields updated")
+=======
+>>>>>>> Stashed changes
                     
                 except Exception as e:
                     logger.error(f"Error applying config to GUI: {e}", exc_info=True)
@@ -603,20 +835,52 @@ class SaveLoadMixin:
             # SECTION 2: Apply status values to process displays
             if status:
                 try:
+<<<<<<< Updated upstream
                     count = 0
                     
+=======
+>>>>>>> Stashed changes
                     # Liquid parameters
                     if hasattr(status, 'liquidVolume') and hasattr(self, 'vat_widget'):
                         self.vat_widget.currentVolume = status.liquidVolume
                         logger.info(f"    ✓ liquidVolume: {status.liquidVolume:.2f} L")
+<<<<<<< Updated upstream
                         count += 1
+=======
+>>>>>>> Stashed changes
                     
                     if hasattr(status, 'liquidTemperature') and hasattr(self, 'vat_widget'):
                         self.vat_widget.currentTemp = status.liquidTemperature
                         logger.info(f"    ✓ liquidTemperature: {status.liquidTemperature:.2f} °C")
+<<<<<<< Updated upstream
                         count += 1
                     
                     logger.info(f">>> Status values applied: {count} fields updated")
+=======
+                    
+                    # Valve positions
+                    if hasattr(status, 'valveInOpenFraction') and hasattr(self, 'valveInEntry'):
+                        valve_percent = int(status.valveInOpenFraction * 100)
+                        self.valveInEntry.blockSignals(True)
+                        self.valveInEntry.setText(str(valve_percent))
+                        self.valveInEntry.blockSignals(False)
+                        logger.info(f"    ✓ valveInOpenFraction: {status.valveInOpenFraction:.2f}")
+                    
+                    if hasattr(status, 'valveOutOpenFraction') and hasattr(self, 'valveOutEntry'):
+                        valve_percent = int(status.valveOutOpenFraction * 100)
+                        self.valveOutEntry.blockSignals(True)
+                        self.valveOutEntry.setText(str(valve_percent))
+                        self.valveOutEntry.blockSignals(False)
+                        logger.info(f"    ✓ valveOutOpenFraction: {status.valveOutOpenFraction:.2f}")
+                    
+                    # Heater
+                    if hasattr(status, 'heaterPowerFraction') and hasattr(self, 'heatingValueEntry'):
+                        heater_percent = int(status.heaterPowerFraction * 100)
+                        self.heatingValueEntry.blockSignals(True)
+                        self.heatingValueEntry.setText(str(heater_percent))
+                        self.heatingValueEntry.blockSignals(False)
+                        logger.info(f"    ✓ heaterPowerFraction: {status.heaterPowerFraction:.2f}")
+>>>>>>> Stashed changes
                     
                 except Exception as e:
                     logger.error(f"Error applying status to GUI: {e}", exc_info=True)
@@ -624,4 +888,8 @@ class SaveLoadMixin:
             logger.info(">>> ✓ apply_loaded_state_to_gui completed successfully")
             
         except Exception as e:
+<<<<<<< Updated upstream
             logger.error(f"ERROR in apply_loaded_state_to_gui: {e}", exc_info=True)
+=======
+            logger.error(f"ERROR in apply_loaded_state_to_gui: {e}", exc_info=True)
+>>>>>>> Stashed changes
