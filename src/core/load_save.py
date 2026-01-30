@@ -1178,26 +1178,34 @@ def _populate_all_config_to_gui(main_window: Any) -> None:
                 logger.info(f"    ✓ ambientTempEntry = '{config.ambientTemp}'")
                 count += 1
 
-        # 6. Digital Level Sensor High Trigger
+        # 6. Digital Level Sensor High Trigger (convert liters to percentage)
         if hasattr(config, 'digitalLevelSensorHighTriggerLevel'):
-            print(f"Loading digitalLevelSensorHighTriggerLevel: {config.digitalLevelSensorHighTriggerLevel}")
-            logger.info(f"  [6/17] digitalLevelSensorHighTriggerLevel: {config.digitalLevelSensorHighTriggerLevel}")
+            trigger_liters = config.digitalLevelSensorHighTriggerLevel
+            print(f"Loading digitalLevelSensorHighTriggerLevel: {trigger_liters}")
+            # Convert from liters to percentage of tank volume
+            tank_volume = getattr(config, 'tankVolume', 200.0)
+            trigger_pct = (trigger_liters / tank_volume * 100.0) if tank_volume > 0 else 90.0
+            logger.info(f"  [6/17] digitalLevelSensorHighTriggerLevel: {trigger_liters} L ({trigger_pct:.1f}%)")
             if hasattr(main_window, 'levelSwitchMaxHeightEntry'):
                 main_window.levelSwitchMaxHeightEntry.blockSignals(True)
-                main_window.levelSwitchMaxHeightEntry.setText(str(config.digitalLevelSensorHighTriggerLevel))
+                main_window.levelSwitchMaxHeightEntry.setText(str(round(trigger_pct, 1)))
                 main_window.levelSwitchMaxHeightEntry.blockSignals(False)
-                logger.info(f"    ✓ levelSwitchMaxHeightEntry = '{config.digitalLevelSensorHighTriggerLevel}'")
+                logger.info(f"    ✓ levelSwitchMaxHeightEntry = '{round(trigger_pct, 1)}%'")
                 count += 1
 
-        # 7. Digital Level Sensor Low Trigger
+        # 7. Digital Level Sensor Low Trigger (convert liters to percentage)
         if hasattr(config, 'digitalLevelSensorLowTriggerLevel'):
-            print(f"Loading digitalLevelSensorLowTriggerLevel: {config.digitalLevelSensorLowTriggerLevel}")
-            logger.info(f"  [7/17] digitalLevelSensorLowTriggerLevel: {config.digitalLevelSensorLowTriggerLevel}")
+            trigger_liters = config.digitalLevelSensorLowTriggerLevel
+            print(f"Loading digitalLevelSensorLowTriggerLevel: {trigger_liters}")
+            # Convert from liters to percentage of tank volume
+            tank_volume = getattr(config, 'tankVolume', 200.0)
+            trigger_pct = (trigger_liters / tank_volume * 100.0) if tank_volume > 0 else 10.0
+            logger.info(f"  [7/17] digitalLevelSensorLowTriggerLevel: {trigger_liters} L ({trigger_pct:.1f}%)")
             if hasattr(main_window, 'levelSwitchMinHeightEntry'):
                 main_window.levelSwitchMinHeightEntry.blockSignals(True)
-                main_window.levelSwitchMinHeightEntry.setText(str(config.digitalLevelSensorLowTriggerLevel))
+                main_window.levelSwitchMinHeightEntry.setText(str(round(trigger_pct, 1)))
                 main_window.levelSwitchMinHeightEntry.blockSignals(False)
-                logger.info(f"    ✓ levelSwitchMinHeightEntry = '{config.digitalLevelSensorLowTriggerLevel}'")
+                logger.info(f"    ✓ levelSwitchMinHeightEntry = '{round(trigger_pct, 1)}%'")
                 count += 1
 
         # 8. Heater Max Power (convert W to kW)

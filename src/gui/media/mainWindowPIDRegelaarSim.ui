@@ -1514,7 +1514,7 @@ QPushButton:pressed {
 }</string>
              </property>
              <property name="currentIndex">
-              <number>0</number>
+              <number>1</number>
              </property>
              <widget class="QWidget" name="MainSingleTank">
               <layout class="QHBoxLayout" name="horizontalLayout_18">
@@ -5491,7 +5491,7 @@ QGroupBox::title {
                         <item row="3" column="1">
                          <layout class="QHBoxLayout" name="horizontalLayout_33">
                           <item>
-                           <widget class="QLineEdit" name="powerHeatingCoilMaxEntry">
+                           <widget class="QLineEdit" name="powerHeatingCoilEntry">
                             <property name="maximumSize">
                              <size>
                               <width>100</width>
@@ -6852,8 +6852,8 @@ QPushButton:pressed {
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>998</width>
-                <height>977</height>
+                <width>295</width>
+                <height>154</height>
                </rect>
               </property>
               <property name="styleSheet">
@@ -9780,7 +9780,7 @@ QSpinBox::up-button, QSpinBox::down-button {
  </resources>
  <connections/>
  <buttongroups>
-  <buttongroup name="buttonGroup_2"/>
   <buttongroup name="buttonGroup"/>
+  <buttongroup name="buttonGroup_2"/>
  </buttongroups>
 </ui>
