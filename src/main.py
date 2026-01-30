@@ -193,8 +193,8 @@ if __name__ == "__main__":
             # PLCSim communication can be slower; throttle slightly
             io_interval = active_config.simulationInterval
             if mainConfig.plcProtocol == "PLCSim S7-1500/1200/400/300/ET 200SP":
-                # Use a minimum interval of 100ms
-                io_interval = max(0.1, active_config.simulationInterval)
+                # Use a minimum interval of 50ms for better GUI responsiveness
+                io_interval = max(0.05, active_config.simulationInterval)
 
             # Throttle calculations and data exchange
             if (time.time() - timeLastUpdate) > io_interval:
@@ -372,6 +372,11 @@ if __name__ == "__main__":
                 except Exception as e:
                     logger.error(
                         f"Error in update_tanksim_display: {e}", exc_info=True)
+
+                # Process GUI events after complete update cycle for PLCSim responsiveness
+                # This prevents race conditions while maintaining GUI responsiveness
+                if mainConfig.plcProtocol == "PLCSim S7-1500/1200/400/300/ET 200SP":
+                    app.processEvents()
 
                 timeLastUpdate = time.time()
 

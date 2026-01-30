@@ -342,6 +342,16 @@ class TrendGraphWindow(QMainWindow):
         self.line.set_data([], [])
         self.canvas.draw_idle()
 
+    def moveEvent(self, event):
+        """Handle window move - force immediate plot update to prevent gaps"""
+        super().moveEvent(event)
+        self.update_plot()
+
+    def resizeEvent(self, event):
+        """Handle window resize - force immediate plot update"""
+        super().resizeEvent(event)
+        self.update_plot()
+
     def closeEvent(self, event):
         """Handle window close"""
         self.update_timer.stop()

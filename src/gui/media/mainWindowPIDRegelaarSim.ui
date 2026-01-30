@@ -1164,7 +1164,7 @@ QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
           <enum>QFrame::NoFrame</enum>
          </property>
          <property name="currentIndex">
-          <number>0</number>
+          <number>5</number>
          </property>
          <widget class="QWidget" name="singleTankPage">
           <layout class="QVBoxLayout" name="verticalLayout_19">
@@ -1514,7 +1514,7 @@ QPushButton:pressed {
 }</string>
              </property>
              <property name="currentIndex">
-              <number>1</number>
+              <number>0</number>
              </property>
              <widget class="QWidget" name="MainSingleTank">
               <layout class="QHBoxLayout" name="horizontalLayout_18">
@@ -7363,6 +7363,9 @@ QPushButton:pressed {
                    </item>
                    <item>
                     <widget class="QWidget" name="OffsetMenu" native="true">
+                     <property name="enabled">
+                      <bool>true</bool>
+                     </property>
                      <property name="sizePolicy">
                       <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
                        <horstretch>0</horstretch>
@@ -7780,6 +7783,9 @@ QWidget#OffsetMenu{
                         </item>
                         <item>
                          <widget class="QPushButton" name="pushButton_ApplyOffset">
+                          <property name="enabled">
+                           <bool>true</bool>
+                          </property>
                           <property name="sizePolicy">
                            <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
                             <horstretch>0</horstretch>
@@ -9780,7 +9786,7 @@ QSpinBox::up-button, QSpinBox::down-button {
  </resources>
  <connections/>
  <buttongroups>
-  <buttongroup name="buttonGroup"/>
   <buttongroup name="buttonGroup_2"/>
+  <buttongroup name="buttonGroup"/>
  </buttongroups>
 </ui>

@@ -138,7 +138,7 @@ class configuration:
         self.lowestByte, self.highestByte = self.get_byte_range()
 
         """Simulation settings"""
-        self.simulationInterval = 0.2  # in seconds
+        self.simulationInterval = 0.1  # in seconds
 
         """Process settings"""
         self.tankVolume: float = 200.0
