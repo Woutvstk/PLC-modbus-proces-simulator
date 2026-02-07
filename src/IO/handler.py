@@ -388,25 +388,13 @@ class IOHandler:
         # Analog Temperature Sensor
         if "AITemperatureSensor" in forced_values:
             value = int(forced_values["AITemperatureSensor"])
-            logger.debug(f"TEMP DEBUG: Using forced value = {value}")
         else:
             if hasattr(status, 'liquidTemperature'):
                 # Map temperature from 0°C to boilingTemp (default 100°C) to 0-27648
                 boiling_temp = getattr(config, 'liquidBoilingTemp', 100.0)
-                
-                # Calculate the float value first
-                value_float = self.mapValue(0, boiling_temp, 0, analog_max, status.liquidTemperature)
-                value = int(value_float)
-                
-                # DEBUG: Always log temperature scaling with detailed info
-                logger.info(f"TEMP SCALING: Temp={status.liquidTemperature:.2f}°C, boiling={boiling_temp}°C, analog_max={analog_max}, float_value={value_float:.2f}, int_value={value}")
-                
-                # Debug logging for high temperatures
-                if status.liquidTemperature >= boiling_temp - 1:  # Within 1°C of boiling
-                    logger.info(f"Temp sensor NEAR BOILING: {status.liquidTemperature:.2f}°C → {value} (boiling={boiling_temp}°C, max={analog_max})")
+                value = int(self.mapValue(0, boiling_temp, 0, analog_max, status.liquidTemperature))
             else:
                 value = 0
-                logger.debug(f"TEMP DEBUG: No liquidTemperature attribute, using value = 0")
 
         if self._is_enabled(config, 'AITemperatureSensor') and hasattr(config, 'AITemperatureSensor'):
             addr = config.AITemperatureSensor
@@ -614,9 +602,6 @@ class IOHandler:
                         if self._first_update or self._is_in_force_write_period() or self._last_sent_di.get(cache_key) != desired:
                             plc.SetDI(addr["byte"], addr["bit"], desired)
                             self._last_sent_di[cache_key] = desired
-                            if "PidValve" in key:
-                                print(
-                                    f"[HANDLER] Writing {key}={desired} to byte {addr['byte']}, bit {addr['bit']}")
             else:
                 if "PidValve" in key and (name == "Start" or name == "Stop" or name == "Reset"):
                     print(
@@ -647,8 +632,6 @@ class IOHandler:
                     if self._is_in_force_write_period() or self._last_sent_ai.get(cache_key) != value:
                         plc.SetAI(addr["byte"], value)
                         self._last_sent_ai[cache_key] = value
-                        print(
-                            f"[HANDLER] Writing {key}={value} to byte {addr['byte']}")
             else:
                 print(
                     f"[HANDLER] Skipping {key}: is_enabled={is_enabled}, has_attr={has_attr}")
@@ -678,8 +661,6 @@ class IOHandler:
                     if self._is_in_force_write_period() or self._last_sent_ai.get(cache_key) != value:
                         plc.SetAI(addr["byte"], value)
                         self._last_sent_ai[cache_key] = value
-                        print(
-                            f"[HANDLER] Writing {key}={value} to byte {addr['byte']}")
             else:
                 print(
                     f"[HANDLER] Skipping {key}: is_enabled={is_enabled}, has_attr={has_attr}")

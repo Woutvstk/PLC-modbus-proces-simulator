@@ -171,9 +171,9 @@ class MainWindow(QMainWindow, Ui_MainWindow, ProcessSettingsMixin, IOConfigMixin
         self.pending_ip = None
 
         # Main update timer (start after pages init)
-        # Increased to 250ms to reduce GUI load - was causing excessive redraws
+        # 150ms update cycle for responsive GUI across all protocols
         self.timer = QTimer()
-        self.timer.setInterval(250)
+        self.timer.setInterval(150)
         self.timer.timeout.connect(self.update_all_values)
 
         # Connect button

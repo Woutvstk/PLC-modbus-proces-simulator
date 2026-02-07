@@ -1613,7 +1613,7 @@ class IOConfigMixin:
                         self.treeWidget_IO.signal_data[signal_name] = signal_info
     
     def load_all_tags_to_table(self):
-        """Load all draggable tags from tree into table"""
+        """Load all draggable tags from tree into table (respects enabled_attrs from config)"""
         if not hasattr(self, 'treeWidget_IO') or self.treeWidget_IO is None:
             QMessageBox.warning(self, "Error", "No tags available to load")
             return
@@ -1623,6 +1623,16 @@ class IOConfigMixin:
             return
         
         try:
+            # Get enabled attributes from config to filter signals
+            enabled_attrs = set()
+            if self.io_screen and hasattr(self.io_screen, 'main_window'):
+                main_window = self.io_screen.main_window
+                if hasattr(main_window, 'tanksim_config'):
+                    config = main_window.tanksim_config
+                    if hasattr(config, 'enabled_attrs'):
+                        enabled_attrs = config.enabled_attrs
+                        print(f"[IO] Loading tags: {len(enabled_attrs)} enabled attributes in config")
+            
             # Get all signal items from the tree (leaf nodes only)
             all_signals = []
             
@@ -1633,6 +1643,22 @@ class IOConfigMixin:
                     signal_name = item.text(0)
                     # Skip category labels and empty items
                     if signal_name and signal_name not in ['Inputs', 'Outputs', 'Digital', 'Analog', 'TankSim', 'ConveyorSim', 'GeneralControls']:
+                        # Check if this signal is enabled in config
+                        if enabled_attrs:
+                            # Get attribute name from signal name
+                            attr_name = None
+                            if hasattr(self.io_screen, 'main_window'):
+                                main_window = self.io_screen.main_window
+                                if hasattr(main_window, 'tanksim_config'):
+                                    config = main_window.tanksim_config
+                                    if hasattr(config, 'io_signal_mapping'):
+                                        # io_signal_mapping is dict: signal_name -> attr_name
+                                        attr_name = config.io_signal_mapping.get(signal_name)
+                            
+                            # Only add signal if its attribute is enabled
+                            if attr_name and attr_name not in enabled_attrs:
+                                return  # Skip this signal - not enabled
+                        
                         # Get signal data if available
                         signal_data = None
                         if hasattr(self.treeWidget_IO, 'signal_data') and signal_name in self.treeWidget_IO.signal_data:

@@ -32,7 +32,7 @@ GREEN = "#00FF00"
 # Warning thresholds
 BOILING_TEMPERATURE = 100.0  # °C
 
-# Global state variables (deprecated - kept for backwards compatibility)
+# Global state variables )
 heatingCoil = True
 liquidVolume = 0
 tempVat = 0

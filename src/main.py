@@ -185,7 +185,8 @@ if __name__ == "__main__":
             # PLCSim communication can be slower; throttle slightly
             io_interval = active_config.simulationInterval
             if mainConfig.plcProtocol == "PLCSim S7-1500/1200/400/300/ET 200SP":
-                io_interval = max(0.03, active_config.simulationInterval)
+                # Use 20ms minimum to reduce network overhead (40+ TCP calls via NetToPLCSim)
+                io_interval = max(0.020, active_config.simulationInterval)
 
             # Throttle calculations and data exchange
             if (time.time() - timeLastUpdate) > io_interval:
