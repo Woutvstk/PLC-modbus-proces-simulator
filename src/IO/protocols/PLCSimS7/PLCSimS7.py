@@ -252,13 +252,27 @@ class plcSimS7:
 
         try:
             print("Starting NetToPLCSim server...")
-            # Start the process hidden
+            # Start the process hidden with proper Windows flags for console=False compatibility
+            # CREATE_NO_WINDOW prevents console window creation in windowless apps
+            CREATE_NO_WINDOW = 0x08000000
+            startupinfo = None
+            creationflags = 0
+            
+            if sys.platform == 'win32':
+                # Windows-specific: prevent console window
+                creationflags = CREATE_NO_WINDOW
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = 0  # SW_HIDE
+            
             self._server_process = subprocess.Popen(
                 command_list,
                 cwd=exe_dir,
                 shell=False,
                 stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
+                stderr=subprocess.DEVNULL,
+                creationflags=creationflags,
+                startupinfo=startupinfo
             )
 
             time.sleep(0.1)  # Short initial pause
