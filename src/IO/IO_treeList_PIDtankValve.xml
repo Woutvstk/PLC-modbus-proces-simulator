@@ -10,8 +10,8 @@
             </Digital>
             <Analog>
                 <!-- Tank Measurement Sensors -->
-                <Signal description="Current water level in tank (0-100%)" type="int" range="0-27648" io_prefix="I" status="0">Sim_WaterLevelMeasurement</Signal>
-                <Signal description="Current water temperature (°C)" type="int" range="0-27648" io_prefix="I" status="0">Sim_WaterTemperatureMeasurement</Signal>
+                <Signal description="Current water level in tank (0-100%)" type="int" range="PLC(0-27648) LOGO(0-1000)" io_prefix="I" status="0">Sim_WaterLevelMeasurement</Signal>
+                <Signal description="Current water temperature (°C)" type="int" range="PLC(0-27648) LOGO(0-1000)" io_prefix="I" status="0">Sim_WaterTemperatureMeasurement</Signal>
             </Analog>
         </Inputs>
         <Outputs>
@@ -23,9 +23,9 @@
             </Digital>
             <Analog>
                 <!-- Actuator Controls -->
-                <Signal description="Upper inlet valve position (0-100% open)" type="int" range="0-27648" io_prefix="Q" status="0">Sim_InletValvePosition</Signal>
-                <Signal description="Lower outlet valve position (0-100% open)" type="int" range="0-27648" io_prefix="Q" status="0">Sim_OutletValvePosition</Signal>
-                <Signal description="Heater power level (0-100%)" type="int" range="0-27648" io_prefix="Q" status="0">Sim_HeaterPowerLevel</Signal>
+                <Signal description="Upper inlet valve position (0-100% open)" type="int" range="PLC(0-27648) LOGO(0-1000)" io_prefix="Q" status="0">Sim_InletValvePosition</Signal>
+                <Signal description="Lower outlet valve position (0-100% open)" type="int" range="PLC(0-27648) LOGO(0-1000)" io_prefix="Q" status="0">Sim_OutletValvePosition</Signal>
+                <Signal description="Heater power level (0-100%)" type="int" range="PLC(0-27648) LOGO(0-1000)" io_prefix="Q" status="0">Sim_HeaterPowerLevel</Signal>
             </Analog>
         </Outputs>
     </PIDtankValve_Sensors_Actuators>
@@ -48,12 +48,12 @@
             </Digital>
             <Analog>
                 <!-- Control Setpoints -->
-                <Signal description="Desired water temperature (-50 to 100°C)" type="int" range="0-27648" io_prefix="I" status="0">Sim_TemperatureSetpoint</Signal>
-                <Signal description="Desired water level (0-100%)" type="int" range="0-27648" io_prefix="I" status="0">Sim_WaterLevelSetpoint</Signal>
+                <Signal description="Desired water temperature (-50 to 100°C)" type="int" range="PLC(0-27648) LOGO(0-1000)" io_prefix="I" status="0">Sim_TemperatureSetpoint</Signal>
+                <Signal description="Desired water level (0-100%)" type="int" range="PLC(0-27648) LOGO(0-1000)" io_prefix="I" status="0">Sim_WaterLevelSetpoint</Signal>
                 <!-- PID Factors -->
-                <Signal description="PID Proportional factor (0-27648)" type="int" range="0-27648" io_prefix="I" status="0">Sim_Pfactor</Signal>
-                <Signal description="PID Integral factor (0-27648)" type="int" range="0-27648" io_prefix="I" status="0">Sim_Ifactor</Signal>
-                <Signal description="PID Derivative factor (0-27648)" type="int" range="0-27648" io_prefix="I" status="0">Sim_Dfactor</Signal>
+                <Signal description="PID Proportional factor PLC(0-27648) LOGO(0-1000)" type="int" range="PLC(0-27648) LOGO(0-1000)" io_prefix="I" status="0">Sim_Pfactor</Signal>
+                <Signal description="PID Integral factor PLC(0-27648) LOGO(0-1000)" type="int" range="PLC(0-27648) LOGO(0-1000)" io_prefix="I" status="0">Sim_Ifactor</Signal>
+                <Signal description="PID Derivative factor PLC(0-27648) LOGO(0-1000)" type="int" range="PLC(0-27648) LOGO(0-1000)" io_prefix="I" status="0">Sim_Dfactor</Signal>
             </Analog>
         </Inputs>
         <Outputs>
@@ -73,9 +73,9 @@
             </Digital>
             <Analog>
                 <!-- PLC Inputs = Simulator Outputs -->
-                <Signal description="General Control slider 1 value" type="int" range="0-27648" io_prefix="I" status="0">Control1</Signal>
-                <Signal description="General Control slider 2 value" type="int" range="0-27648" io_prefix="I" status="0">Control2</Signal>
-                <Signal description="General Control slider 3 value" type="int" range="0-27648" io_prefix="I" status="0">Control3</Signal>
+                <Signal description="General Control slider 1 value" type="int" range="PLC(0-27648) LOGO(0-1000)" io_prefix="I" status="0">Control1</Signal>
+                <Signal description="General Control slider 2 value" type="int" range="PLC(0-27648) LOGO(0-1000)" io_prefix="I" status="0">Control2</Signal>
+                <Signal description="General Control slider 3 value" type="int" range="PLC(0-27648) LOGO(0-1000)" io_prefix="I" status="0">Control3</Signal>
             </Analog>
         </Inputs>
         <Outputs>
@@ -88,9 +88,9 @@
             </Digital>
             <Analog>
                 <!-- PLC Outputs = Simulator Inputs -->
-                <Signal description="General Analog value 1" type="int" range="0-27648" io_prefix="Q" status="0">Analog1</Signal>
-                <Signal description="General Analog value 2" type="int" range="0-27648" io_prefix="Q" status="0">Analog2</Signal>
-                <Signal description="General Analog value 3" type="int" range="0-27648" io_prefix="Q" status="0">Analog3</Signal>
+                <Signal description="General Analog value 1" type="int" range="PLC(0-27648) LOGO(0-1000)" io_prefix="Q" status="0">Analog1</Signal>
+                <Signal description="General Analog value 2" type="int" range="PLC(0-27648) LOGO(0-1000)" io_prefix="Q" status="0">Analog2</Signal>
+                <Signal description="General Analog value 3" type="int" range="PLC(0-27648) LOGO(0-1000)" io_prefix="Q" status="0">Analog3</Signal>
             </Analog>
         </Outputs>
     </GeneralControls>

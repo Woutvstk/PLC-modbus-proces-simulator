@@ -77,6 +77,30 @@ class logoS7:
             print(f"isConnected() error: {e}")
             return False
 
+    def GetAI(self, byte: int) -> int:
+        """
+        Read an analog input (AI) value from the LOGO V-memory.
+        LOGO provides 0-1000 range, but internal code expects 0-27648.
+        This function scales 0-1000 from LOGO to 0-27648 for internal use.
+
+        Parameters:
+        byte (int): Starting byte index (must be even)
+
+        Returns:
+        int: Scaled value (0-27648), -1 on error
+        """
+        try:
+            if byte >= 0 and byte % 2 == 0:
+                address = f"VW{byte}"
+                logo_value = self.logo.read(address)
+                # Scale from LOGO 0-1000 to internal 0-27648
+                scaled_value = int((int(logo_value) / 1000.0) * 27648.0)
+                return scaled_value
+            return -1
+        except Exception as e:
+            # Raise to allow upper layers to disconnect on error
+            raise
+
     def SetDI(self, byte: int, bit: int, value: bool) -> int:
         """
         Set a digital input (DI) bit in the LOGO V-memory.
@@ -120,23 +144,48 @@ class logoS7:
             # Raise to allow upper layers to disconnect on error
             raise
 
+    def GetDI(self, byte: int, bit: int) -> int:
+        """
+        Read a digital input (DI) bit from the LOGO V-memory.
+
+        Parameters:
+        byte (int): Byte index (0–n)
+        bit (int): Bit index (0–7)
+
+        Returns:
+        int: 1 or 0 if successful, -1 on error
+        """
+        try:
+            if 0 <= bit < 8:
+                address = f"V{byte}.{bit}"
+                data = self.logo.read(address)
+                return int(bool(data))
+            return -1
+        except Exception as e:
+            # Raise to allow upper layers to disconnect on error
+            raise
+
     def SetAI(self, byte: int, value: int) -> int:
         """
         Set an analog input (AI) value in the LOGO V-memory.
+        LOGO uses 0-1000 range, but internal code uses 0-27648.
+        This function scales 0-27648 to 0-1000 before writing.
 
         Parameters:
         byte (int): Starting byte index
-        value (int): 16-bit unsigned integer (0–65535)
+        value (int): 16-bit value (0-27648 internally, scaled to 0-1000 for LOGO)
 
         Returns:
-        int: Value written, -1 on error
+        int: Original value (0-27648), -1 on error
         """
         try:
             if byte >= 0:
-                val = int(value) & 0xFFFF
+                # Scale from internal 0-27648 to LOGO 0-1000
+                logo_value = int((value / 27648.0) * 1000.0)
+                logo_value = max(0, min(1000, logo_value))  # Clamp to 0-1000
                 address = f"VW{byte}"
-                self.logo.write(address, val)
-                return val
+                self.logo.write(address, logo_value)
+                return value  # Return original internal value
             return -1
         except Exception as e:
             # Raise to allow upper layers to disconnect on error
@@ -145,18 +194,22 @@ class logoS7:
     def GetAO(self, byte: int) -> int:
         """
         Read an analog output (AO) value from the LOGO V-memory.
+        LOGO provides 0-1000 range, but internal code expects 0-27648.
+        This function scales 0-1000 from LOGO to 0-27648 for internal use.
 
         Parameters:
         byte (int): Starting byte index (must be even)
 
         Returns:
-        int: 16-bit unsigned integer, -1 on error
+        int: Scaled value (0-27648), -1 on error
         """
         try:
             if byte % 2 == 0:
                 address = f"VW{byte }"
-                data = self.logo.read(address)
-                return int(data)
+                logo_value = self.logo.read(address)
+                # Scale from LOGO 0-1000 to internal 0-27648
+                scaled_value = int((int(logo_value) / 1000.0) * 27648.0)
+                return scaled_value
             return -1
         except Exception as e:
             # Raise to allow upper layers to disconnect on error
@@ -187,20 +240,24 @@ class logoS7:
     def SetAO(self, byte: int, value: int) -> int:
         """
         Set an analog output (AO) value in the LOGO V-memory output area.
+        LOGO uses 0-1000 range, but internal code uses 0-27648.
+        This function scales 0-27648 to 0-1000 before writing.
 
         Parameters:
         byte (int): Starting byte index (must be even)
-        value (int): 16-bit integer value
+        value (int): 16-bit value (0-27648 internally, scaled to 0-1000 for LOGO)
 
         Returns:
-        int: Value written, -1 on error
+        int: Original value (0-27648), -1 on error
         """
         try:
             if byte >= 0 and byte % 2 == 0:
-                val = int(value) & 0xFFFF
+                # Scale from internal 0-27648 to LOGO 0-1000
+                logo_value = int((value / 27648.0) * 1000.0)
+                logo_value = max(0, min(1000, logo_value))  # Clamp to 0-1000
                 address = f"VW{byte }"
-                self.logo.write(address, val)
-                return val
+                self.logo.write(address, logo_value)
+                return value  # Return original internal value
             return -1
         except Exception as e:
             print(f"SetAO() error at byte {byte}: {e}")

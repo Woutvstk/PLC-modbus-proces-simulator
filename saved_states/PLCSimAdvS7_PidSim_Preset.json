@@ -1,6 +1,6 @@
 {
   "version": "2.0",
-  "timestamp": "2026-02-08T12:49:42.757547",
+  "timestamp": "2026-02-08T22:39:45.206870",
   "description": "PLC Simulator - Complete State Snapshot",
   "main_config": {
     "plcGuiControl": "plc",
@@ -218,7 +218,7 @@
         "bit": "",
         "address": "IW6",
         "status": "0",
-        "description": "Current water temperature (\u00c3\u201a\u00c2\u00b0C)",
+        "description": "Current water temperature (\u00c3\u0192\u00e2\u20ac\u0161\u00c3\u201a\u00c2\u00b0C)",
         "range": "0-27648"
       },
       {
@@ -228,7 +228,7 @@
         "bit": "",
         "address": "IW8",
         "status": "0",
-        "description": "Desired water temperature (-50 to 100\u00c3\u201a\u00c2\u00b0C)",
+        "description": "Desired water temperature (-50 to 100\u00c3\u0192\u00e2\u20ac\u0161\u00c3\u201a\u00c2\u00b0C)",
         "range": "0-27648"
       },
       {

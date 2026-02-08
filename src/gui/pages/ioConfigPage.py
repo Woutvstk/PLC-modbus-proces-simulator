@@ -802,6 +802,8 @@ class DroppableTableWidget(QTableWidget):
     def apply_force_analog(self, row, signal_name):
         """Apply force to an analog signal with dialog"""
         max_value = 27648
+        is_logo = False
+        
         if self.io_screen and hasattr(self.io_screen, 'main_window'):
             main_window = self.io_screen.main_window
             if (hasattr(main_window, 'validPlcConnection') and 
@@ -809,6 +811,12 @@ class DroppableTableWidget(QTableWidget):
                 hasattr(main_window, 'plc') and 
                 main_window.plc):
                 max_value = main_window.plc.analogMax
+            
+            # Check if LOGO protocol (uses 0-1000 display range)
+            if (hasattr(main_window, 'mainConfig') and 
+                main_window.mainConfig and 
+                main_window.mainConfig.plcProtocol == "logo!"):
+                is_logo = True
         
         current_value = 0
         status_item = self.item(row, 5)
@@ -819,18 +827,24 @@ class DroppableTableWidget(QTableWidget):
             except ValueError:
                 current_value = 0
         
+        # For LOGO: display range is 0-1000, but internally stored as 0-27648
+        display_max = 1000 if is_logo else max_value
+        display_current = int((current_value / 27648.0) * 1000.0) if is_logo else current_value
+        
         value, ok = QInputDialog.getInt(
             self,
             "Force Analog Value",
-            f"Enter value for '{signal_name}':\n(Range: 0 - {max_value})",
-            current_value,
+            f"Enter value for '{signal_name}':\n(Range: 0 - {display_max})",
+            display_current,
             0,
-            max_value,
+            display_max,
             1
         )
         
         if ok:
-            self.apply_force(row, value)
+            # For LOGO: scale from display 0-1000 to internal 0-27648
+            internal_value = int((value / 1000.0) * 27648.0) if is_logo else value
+            self.apply_force(row, internal_value)
 
     def remove_force(self, row):
         """Remove force from a signal"""
@@ -1052,10 +1066,10 @@ class IOScreen:
                 config.custom_signal_names.update(saved_custom_names)
                 logger.info(f"[IO] Restored {len(saved_custom_names)} custom names after clearing")
             
-            # Then remove ALL rows
+            # Then clear contents and restore fixed row count
             table.clearContents()  # Clear all items first
-            table.setRowCount(0)    # Then remove all rows
-            logger.info("[IO] Table completely cleared (all rows removed)")
+            table.setRowCount(50)  # Always keep 50 rows
+            logger.info("[IO] Table cleared and reset to 50 rows")
             
             # Unblock signals briefly to allow table to update
             table.blockSignals(False)
@@ -1083,15 +1097,12 @@ class IOScreen:
                 except Exception as e:
                     logger.warning(f"[IO] Could not update offset GUI fields: {e}")
             
-            # Add rows for each signal and populate
-            logger.info(f"[IO] Adding {num_signals} new rows to table")
+            # Populate rows for each signal (table already has 50 rows)
+            logger.info(f"[IO] Adding {num_signals} signals to table")
             from gui.pages.ioConfigPage import EditableTableWidgetItem, ReadOnlyTableWidgetItem
             from PyQt5.QtCore import Qt
             
             for idx, signal in enumerate(config_data['signals']):
-                # Add new row
-                table.insertRow(idx)
-                
                 # Get canonical name
                 canonical_name = signal.get('name', '')
                 display_name = canonical_name
@@ -2519,8 +2530,9 @@ class IOConfigMixin:
             config = self.tanksim_config
             table = self.tableWidget_IO
             
-            # Clear table first
+            # Clear table first and restore fixed row count
             table.setRowCount(0)
+            table.setRowCount(50)
             table.blockSignals(True)
             
             # Get enabled attributes (these are the saved signals)
@@ -2553,9 +2565,6 @@ class IOConfigMixin:
                 attr_value = getattr(config, attr_name, None)
                 if attr_value is None:
                     continue
-                
-                # Add row
-                table.setRowCount(row + 1)
                 
                 # Set signal name (use custom name if available)
                 display_name = signal_name
@@ -2739,6 +2748,11 @@ class IOConfigMixin:
                     hasattr(self, 'plc') and 
                     self.plc)
             
+            # Check if LOGO protocol is active (uses 0-1000 range for display)
+            is_logo = (hasattr(self, 'mainConfig') and 
+                      self.mainConfig and 
+                      self.mainConfig.plcProtocol == "logo!")
+            
             for row in range(table.rowCount()):
                 name_item = table.item(row, 0)
                 if not name_item or not name_item.text():
@@ -2892,6 +2906,13 @@ class IOConfigMixin:
                     type_item = table.item(row, 1)
                     data_type = type_item.text() if type_item else 'bool'
                     value = False if data_type == 'bool' else 0
+                
+                # For LOGO protocol: scale analog values from 0-27648 to 0-1000 for display
+                # Internal code still works with 0-27648, but LOGO displays 0-1000
+                # Apply to both AI (inputs to PLC) and AQ (outputs from PLC)
+                if is_logo and (attr_name.startswith("AQ") or attr_name.startswith("AI")) and isinstance(value, (int, float)):
+                    # Scale down from internal 0-27648 to LOGO display 0-1000
+                    value = int((value / 27648.0) * 1000.0)
                 
                 table.update_status_column(row, value)
                 

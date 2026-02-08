@@ -1,6 +1,6 @@
 {
   "version": "2.0",
-  "timestamp": "2026-02-08T12:45:40.215549",
+  "timestamp": "2026-02-08T22:37:26.786976",
   "description": "PLC Simulator - Complete State Snapshot",
   "main_config": {
     "plcGuiControl": "plc",
@@ -45,10 +45,10 @@
     "pidPidTankValveDItempCmd": false,
     "pidPidTankValveAIlevelCmd": true,
     "pidPidTankValveDIlevelCmd": false,
-    "pidPidTankTempSPValue": 19354,
-    "pidPidTankLevelSPValue": 19354,
+    "pidPidTankTempSPValue": 0,
+    "pidPidTankLevelSPValue": 0,
     "temperatureSetpoint": 5529.0,
-    "levelSetpoint": 280.005787037037,
+    "levelSetpoint": 0.0,
     "pidPfactorValue": 1,
     "pidIfactorValue": 1,
     "pidDfactorValue": 1
@@ -152,14 +152,14 @@
         "range": "0-1"
       },
       {
-        "name": "Sim_WaterLevelMeasurement",
+        "name": "Sim_TemperatureSetpoint",
         "type": "int",
         "byte": "2",
         "bit": "",
         "address": "VW2",
-        "status": "6912",
-        "description": "Current water level in tank (0-100%)",
-        "range": "0-27648"
+        "status": "0",
+        "description": "Desired water temperature (-50 to 100\u00c3\u201a\u00c2\u00b0C)",
+        "range": "PLC(0-27648) LOGO(0-1000)"
       },
       {
         "name": "Sim_WaterTemperatureMeasurement",
@@ -167,9 +167,9 @@
         "byte": "4",
         "bit": "",
         "address": "VW4",
-        "status": "0",
+        "status": "209",
         "description": "Current water temperature (\u00c2\u00b0C)",
-        "range": "0-27648"
+        "range": "PLC(0-27648) LOGO(0-1000)"
       },
       {
         "name": "Sim_InletValveOnOff",
@@ -185,101 +185,21 @@
         "name": "Sim_OutletValveOnOff",
         "type": "bool",
         "byte": "0",
-        "bit": "1",
-        "address": "Q2",
+        "bit": "0",
+        "address": "Q1",
         "status": "FALSE",
         "description": "Lower outlet valve - Drain water OUT (ON/OFF)",
         "range": "0-1"
       },
       {
-        "name": "Sim_HeaterOnOff",
-        "type": "bool",
-        "byte": "0",
-        "bit": "2",
-        "address": "Q3",
-        "status": "FALSE",
-        "description": "Heater - Heat the water (ON/OFF)",
-        "range": "0-1"
-      },
-      {
-        "name": "Sim_InletValvePosition",
+        "name": "Sim_HeaterPowerLevel",
         "type": "int",
         "byte": "0",
         "bit": "",
         "address": "AQ1",
         "status": "0",
-        "description": "Upper inlet valve position (0-100% open)",
-        "range": "0-27648"
-      },
-      {
-        "name": "Sim_OutletValvePosition",
-        "type": "int",
-        "byte": "2",
-        "bit": "",
-        "address": "AQ2",
-        "status": "0",
-        "description": "Lower outlet valve position (0-100% open)",
-        "range": "0-27648"
-      },
-      {
-        "name": "Sim_HeaterPowerLevel",
-        "type": "int",
-        "byte": "4",
-        "bit": "",
-        "address": "AQ3",
-        "status": "0",
         "description": "Heater power level (0-100%)",
-        "range": "0-27648"
-      },
-      {
-        "name": "Sim_TemperatureSetpoint",
-        "type": "int",
-        "byte": "0",
-        "bit": "",
-        "address": "VW0",
-        "status": "0",
-        "description": "Desired water temperature (-50 to 100\u00c2\u00b0C)",
-        "range": "0-27648"
-      },
-      {
-        "name": "Sim_WaterLevelSetpoint",
-        "type": "int",
-        "byte": "6",
-        "bit": "",
-        "address": "VW6",
-        "status": "0",
-        "description": "Desired water level (0-100%)",
-        "range": "0-27648"
-      },
-      {
-        "name": "Sim_Pfactor",
-        "type": "int",
-        "byte": "8",
-        "bit": "",
-        "address": "VW8",
-        "status": "1",
-        "description": "PID Proportional factor (0-27648)",
-        "range": "0-27648"
-      },
-      {
-        "name": "Sim_Ifactor",
-        "type": "int",
-        "byte": "10",
-        "bit": "",
-        "address": "VW10",
-        "status": "1",
-        "description": "PID Integral factor (0-27648)",
-        "range": "0-27648"
-      },
-      {
-        "name": "Sim_Dfactor",
-        "type": "int",
-        "byte": "12",
-        "bit": "",
-        "address": "VW12",
-        "status": "1",
-        "description": "PID Derivative factor (0-27648)",
-        "range": "0-27648"
+        "range": "PLC(0-27648) LOGO(0-1000)"
       }
     ],
     "custom_signal_names": {}
